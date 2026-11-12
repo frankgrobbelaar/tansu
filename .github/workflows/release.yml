@@ -64,8 +64,9 @@ jobs:
         env:
           TANSU_KEYSTORE_BASE64: ${{ secrets.TANSU_KEYSTORE_BASE64 }}
           TANSU_KEYSTORE_PASSWORD: ${{ secrets.TANSU_KEYSTORE_PASSWORD }}
-          TANSU_KEY_ALIAS: ${{ secrets.TANSU_KEY_ALIAS }}
           TANSU_KEY_PASSWORD: ${{ secrets.TANSU_KEY_PASSWORD }}
+          # Not a secret: as one, GitHub would hide the word "tansu" all through the log.
+          TANSU_KEY_ALIAS: tansu
         run: |
           if [ -z "$TANSU_KEYSTORE_BASE64" ]; then
             echo "::error::The release key isn't in the repository's secrets. See docs/releasing.md."
@@ -83,7 +84,8 @@ jobs:
         run: |
           apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner
           "$apksigner" verify --print-certs tansu.apk | tee certs.txt
-          signer=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certs.txt)
+          # apksigner says "Signer #1 certificate …" or "V2 Signer: certificate …" by version.
+          signer=$(grep -m 1 -oE 'certificate SHA-256 digest: [0-9a-f]+' certs.txt | awk '{print $4}')
           expected=$(tr -d '[:space:]' < .github/release-certificate.sha256)
           if [ "$signer" != "$expected" ]; then
             echo "::error::tansu.apk is signed by $signer, not the release key ($expected)."

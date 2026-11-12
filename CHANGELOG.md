@@ -5,9 +5,6 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
-- Open and share files on servers: tansu brings them to the phone first, with their progress and
-  Cancel, then hands them to the app you pick.
-
 ## 0.1.0 - 2026-11-13
 
 The first version.
@@ -22,7 +19,9 @@ The first version.
   Browse says so in plain words with the next step.
 - Select files and folders with a long press. Cut or copy them, then paste in any folder of any
   drawer; a name that's already there asks Keep both, Replace or Skip.
-- Rename, new folder, details, share files from the phone, and delete, which asks once and says
-  what, how much and where.
+- Rename, new folder, details, share, and delete, which asks once and says what, how much and
+  where.
+- Open and share files on servers too: tansu brings them to the phone first, with their progress
+  and Cancel, then hands them to the app you pick.
 - Every copy, move and delete is a job with its progress, time left and a notification. Jobs keep
   going when you leave tansu, and can be paused, resumed, cancelled and retried.

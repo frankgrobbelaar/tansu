@@ -17,8 +17,8 @@ Android installs an update only if it's signed with the same key as the app alre
 
 - One release keystore, made once (12 Nov 2026), kept outside the repo, with a backup somewhere
   safe. On the owner's PC it's in `%USERPROFILE%\tansu-release-key\`, with a note on keeping it.
-- CI gets it as repository secrets: `TANSU_KEYSTORE_BASE64`, `TANSU_KEYSTORE_PASSWORD`,
-  `TANSU_KEY_ALIAS` and `TANSU_KEY_PASSWORD`. `app/build.gradle.kts` signs a release build only
+- CI gets it as repository secrets: `TANSU_KEYSTORE_BASE64`, `TANSU_KEYSTORE_PASSWORD` and
+  `TANSU_KEY_PASSWORD`. The key's alias, `tansu`, isn't secret and is set in the workflow. `app/build.gradle.kts` signs a release build only
   when `TANSU_KEYSTORE` (the keystore's path) and those passwords are set.
 - The certificate's SHA-256 is in `.github/release-certificate.sha256`. The release workflow
   refuses to publish an APK signed by anything else.
