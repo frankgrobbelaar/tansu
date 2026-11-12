@@ -84,7 +84,7 @@ fun ServerFormRoute(
         onTrust = viewModel::trust,
         onBack = onBack,
         modifier = modifier,
-        localNetworkBlocked = !localNetwork.allowed,
+        localNetworkBlocked = !localNetwork.allowed && LocalNetwork.looksLocal(state.hostName),
     )
 }
 

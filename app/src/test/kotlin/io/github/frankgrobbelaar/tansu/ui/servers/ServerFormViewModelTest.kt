@@ -12,8 +12,11 @@ import io.github.frankgrobbelaar.tansu.servers.ServerCheck
 import io.github.frankgrobbelaar.tansu.servers.ServerStore
 import io.github.frankgrobbelaar.tansu.servers.Servers
 import io.github.frankgrobbelaar.tansu.servers.StoredSecrets
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -106,7 +109,10 @@ class ServerFormViewModelTest {
         form.setPassword("elm")
 
         form.connect()
-        assertEquals(ServerFormUiState.Step.Trust(key, replaces = ""), form.state.value.step)
+        assertEquals(
+            ServerFormUiState.Step.Trust(key, replaces = "", host = "home-server", port = 22),
+            form.state.value.step,
+        )
         assertTrue(servers.all.first().isEmpty())
 
         form.trust()
@@ -152,5 +158,37 @@ class ServerFormViewModelTest {
         form.useKey("id_ed25519", "-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbg==\n")
         assertTrue(form.state.value.hasKey)
         assertEquals("id_ed25519", form.state.value.draft.keyName)
+    }
+
+    @Test
+    fun `a share typed with a folder after it starts in that folder`() = runTest {
+        val form = form(Server.Kind.Smb)
+        form.fillSmb()
+        form.edit { it.copy(share = "Media\\Photos", folder = "2026") }
+
+        form.connect()
+
+        val saved = servers.all.first().single()
+        assertEquals("Media" to "Photos/2026", saved.share to saved.folder)
+    }
+
+    @Test
+    fun `a check given up on can't change the form`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val stubborn = ServerCheck { _, _ ->
+            withContext(NonCancellable) {
+                gate.await()
+                throw FileSystemException.HostKeyUnknown(HostKey("ED25519", "SHA256:typo"))
+            }
+        }
+        val form =
+            ServerFormViewModel(Server.Kind.Sftp, null, servers, stubborn, SavedStateHandle())
+        form.edit { it.copy(host = "typo-host", username = "sam") }
+
+        form.connect()
+        form.cancel()
+        gate.complete(Unit)
+
+        assertEquals(ServerFormUiState.Step.Filling, form.state.value.step)
     }
 }

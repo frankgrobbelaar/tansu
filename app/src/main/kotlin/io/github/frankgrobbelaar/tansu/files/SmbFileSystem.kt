@@ -25,8 +25,6 @@ import java.util.EnumSet
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** An SMB share (SMB 2 or 3) through smbj, with one connection kept open and reused. */
@@ -36,17 +34,25 @@ class SmbFileSystem(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : FileSystem, Closeable {
 
+    // No socket timeout: smbj treats one as a dead connection, so an idle minute would end it.
+    // Each request still has its own.
     private val client =
         SMBClient(
             SmbConfig.builder()
                 .withSecurityProvider(BCSecurityProvider())
                 .withTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .withSoTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .build()
         )
-    private val lock = Mutex()
-    private var connection: Connection? = null
-    private var share: DiskShare? = null
+
+    /** A connection signed in to the server, with the share open. */
+    private class Session(val connection: Connection, val share: DiskShare)
+
+    private val sessions =
+        Reconnecting(
+            open = ::connect,
+            alive = { it.connection.isConnected && it.share.isConnected },
+            end = { session -> quietly { session.connection.close(true) } },
+        )
 
     override suspend fun list(path: String): List<Entry> =
         onShare(path) { share ->
@@ -132,42 +138,42 @@ class SmbFileSystem(
         }
     }
 
-    override fun close() {
-        try {
-            connection?.close()
-        } catch (_: IOException) {
-            // Closing a connection that's already gone is fine.
-        }
-        connection = null
-        share = null
-    }
+    override fun close() = sessions.close()
 
     /** Runs [block] on the share, off the main thread, connecting first if need be. */
     private suspend fun <T> onShare(path: String, block: (DiskShare) -> T): T =
-        withContext(io) {
-            val share = share()
-            mapErrors(path) { block(share) }
-        }
+        withContext(io) { sessions.use { session -> mapErrors(path) { block(session.share) } } }
 
-    private suspend fun share(): DiskShare = lock.withLock {
-        share?.takeIf { it.isConnected }
-            ?: run {
-                close()
-                connect().also { share = it }
-            }
-    }
-
-    private suspend fun connect(): DiskShare {
-        val secret = secrets.read(server.id)
-        return mapErrors("") {
-            val connection = client.connect(server.host, server.port).also { connection = it }
+    private suspend fun connect(): Session {
+        val secret = secretOf(secrets, server)
+        val connection = mapErrors("") { client.connect(server.host, server.port) }
+        var connected = false
+        try {
             val login =
                 if (server.signIn == Server.SignIn.Guest) AuthenticationContext.guest()
                 else AuthenticationContext(server.username, secret.password.toCharArray(), null)
-            connection.authenticate(login).connectShare(server.share) as? DiskShare
-                ?: throw FileSystemException.ShareMissing(server.share)
+            // Any refusal while signing in is about the login, whatever status it comes with.
+            val session =
+                try {
+                    connection.authenticate(login)
+                } catch (e: SMBApiException) {
+                    throw FileSystemException.AuthFailed(server.host, e)
+                }
+            val share = mapErrors("") { openShare(session) }
+            connected = true
+            return Session(connection, share)
+        } finally {
+            if (!connected) quietly { connection.close(true) }
         }
     }
+
+    private fun openShare(session: com.hierynomus.smbj.session.Session): DiskShare =
+        try {
+            session.connectShare(server.share) as? DiskShare
+        } catch (_: IllegalArgumentException) {
+            // smbj won't take a share name with a backslash in it.
+            null
+        } ?: throw FileSystemException.ShareMissing(server.share)
 
     /** Turns smbj's and the network's failures into the ones the UI explains. */
     private inline fun <T> mapErrors(path: String, block: () -> T): T =
@@ -181,14 +187,14 @@ class SmbFileSystem(
                 "STATUS_OBJECT_NAME_COLLISION" -> FileSystemException.Exists(path)
                 "STATUS_DISK_FULL" -> FileSystemException.NoSpace(path)
                 in NOT_FOUND -> FileSystemException.NotFound(path)
+                // The server ended the session or the share: connect again.
+                in GONE -> FileSystemException.Unreachable(server.host, e)
                 else -> FileSystemException.Unreadable(path, e)
             }
         } catch (e: SMBRuntimeException) {
             // smbj's own failures that aren't the server answering no: a dropped connection.
-            close()
             throw FileSystemException.Unreachable(server.host, e)
         } catch (e: IOException) {
-            close()
             throw FileSystemException.Unreachable(server.host, e)
         }
 
@@ -208,9 +214,19 @@ class SmbFileSystem(
         val LOGIN_REFUSED =
             setOf(
                 "STATUS_LOGON_FAILURE",
+                "STATUS_WRONG_PASSWORD",
                 "STATUS_ACCOUNT_DISABLED",
                 "STATUS_ACCOUNT_RESTRICTION",
+                "STATUS_ACCOUNT_LOCKED_OUT",
+                "STATUS_ACCOUNT_EXPIRED",
                 "STATUS_PASSWORD_EXPIRED",
+                "STATUS_PASSWORD_MUST_CHANGE",
+            )
+        val GONE =
+            setOf(
+                "STATUS_USER_SESSION_DELETED",
+                "STATUS_NETWORK_SESSION_EXPIRED",
+                "STATUS_NETWORK_NAME_DELETED",
             )
         val NOT_FOUND =
             setOf(
@@ -254,6 +270,17 @@ private class SmbOutput(private val file: File) : OutputStream() {
 }
 
 private const val BYTE = 0xFF
+
+/** Ends a connection without waiting on the server; one that's already gone is ended enough. */
+private inline fun quietly(block: () -> Unit) {
+    try {
+        block()
+    } catch (_: IOException) {
+        // Gone already.
+    } catch (_: SMBRuntimeException) {
+        // The server answered the goodbye with an error: still gone.
+    }
+}
 
 /** Runs smbj [block], turning its runtime failures into the I/O failures streams promise. */
 private inline fun <T> smbIo(block: () -> T): T =

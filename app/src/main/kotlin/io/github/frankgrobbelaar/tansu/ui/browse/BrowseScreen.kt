@@ -97,7 +97,7 @@ fun BrowseRoute(
                     dialog = it
                 },
             selectionActions = viewModel.selectionActions(state, outside) { dialog = it },
-            localNetworkBlocked = !localNetwork.allowed,
+            localNetworkBlocked = !localNetwork.allowed && state.serverLooksLocal,
         )
         SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter))
     }
@@ -182,7 +182,7 @@ private fun BrowseViewModel.actions(
         onGrantAccess = { openAllFilesAccess(outside.context) },
         onTrustKey = ::trustNewKey,
         onKeepBlocked = ::keepBlocked,
-        onAllowLocalNetwork = { localNetwork.ask(::refresh) },
+        onAllowLocalNetwork = { localNetwork.allow(::refresh) },
         onClearSelection = ::clearSelection,
         onSelectAll = ::selectAll,
         onPaste = {

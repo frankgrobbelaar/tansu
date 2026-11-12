@@ -43,4 +43,7 @@ data class Secret(
     val password: String = "",
     val privateKey: String = "",
     val passphrase: String = "",
-)
+) {
+    /** Never the secret itself, should one ever be printed. */
+    override fun toString() = "Secret(…)"
+}

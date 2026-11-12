@@ -1,5 +1,9 @@
 package io.github.frankgrobbelaar.tansu.files
 
+import io.github.frankgrobbelaar.tansu.servers.Secret
+import io.github.frankgrobbelaar.tansu.servers.SecretLost
+import io.github.frankgrobbelaar.tansu.servers.Secrets
+import io.github.frankgrobbelaar.tansu.servers.Server
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -108,3 +112,11 @@ fun nameOf(path: String): String = path.substringAfterLast('/')
 /** Whether [this] path is [root] or somewhere inside it. */
 internal fun String.isWithin(root: String) =
     this == root || startsWith(if (root.endsWith('/')) root else "$root/")
+
+/** The secret that signs in to [server]. One that can't be opened is a login to enter again. */
+internal suspend fun secretOf(secrets: Secrets, server: Server): Secret =
+    try {
+        secrets.read(server.id)
+    } catch (e: SecretLost) {
+        throw FileSystemException.AuthFailed(server.host, e)
+    }

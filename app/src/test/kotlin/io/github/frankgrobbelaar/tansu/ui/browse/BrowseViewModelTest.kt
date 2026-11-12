@@ -6,11 +6,14 @@ import io.github.frankgrobbelaar.tansu.MainDispatcherRule
 import io.github.frankgrobbelaar.tansu.MemoryStore
 import io.github.frankgrobbelaar.tansu.TansuSettings
 import io.github.frankgrobbelaar.tansu.files.Drawer
+import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FakeFileSystem
 import io.github.frankgrobbelaar.tansu.files.FakeFileSystem.Companion.file
 import io.github.frankgrobbelaar.tansu.files.FakeFileSystem.Companion.folder
+import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
+import io.github.frankgrobbelaar.tansu.files.MemoryFileSystem
 import io.github.frankgrobbelaar.tansu.jobs.Clipboard
 import io.github.frankgrobbelaar.tansu.jobs.Job
 import io.github.frankgrobbelaar.tansu.jobs.Jobs
@@ -18,10 +21,12 @@ import io.github.frankgrobbelaar.tansu.servers.SavedServers
 import io.github.frankgrobbelaar.tansu.servers.Server
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -348,6 +353,32 @@ class BrowseViewModelTest {
             assertEquals(Job.Kind.Move, job.kind)
             assertEquals(download, job.to?.folder)
             assertNull(expectMostRecentItem().held)
+        }
+    }
+
+    @Test
+    fun `a listing given up on can't land on the drawer you moved to`() = runTest {
+        // smbj and sshj can't be stopped: the old listing still ends, here with a failure.
+        val gate = CompletableDeferred<Unit>()
+        val stubborn =
+            object : FileSystem by MemoryFileSystem() {
+                override suspend fun list(path: String): List<Entry> =
+                    withContext(NonCancellable) {
+                        gate.await()
+                        throw FileSystemException.Unreachable("nas")
+                    }
+            }
+        drawers.value = listOf(phone, nas.copy(fileSystem = stubborn))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("nas")
+            browse.select("phone")
+            gate.complete(Unit)
+
+            val state = expectMostRecentItem()
+            assertEquals("phone", state.drawer.id)
+            assertNull(state.problem)
+            assertFalse(state.drawers.single { it.id == "nas" }.troubled)
         }
     }
 }

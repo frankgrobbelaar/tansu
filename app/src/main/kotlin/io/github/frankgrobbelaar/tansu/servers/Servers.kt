@@ -47,7 +47,7 @@ class Servers(private val store: ServerStore, private val secrets: Secrets) : Sa
     }
 
     override suspend fun trustKey(serverId: String, fingerprint: String) {
-        find(serverId)?.let { store.save(it.copy(hostKey = fingerprint)) }
+        store.update(serverId) { it.copy(hostKey = fingerprint) }
     }
 
     override suspend fun remove(serverId: String) {

@@ -30,8 +30,10 @@ import io.github.frankgrobbelaar.tansu.servers.SavedServers
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.kit.Crumb
 import io.github.frankgrobbelaar.tansu.ui.kit.DrawerTab
+import io.github.frankgrobbelaar.tansu.ui.servers.LocalNetwork
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +64,8 @@ data class BrowseUiState(
     val notice: Notice? = null,
     /** How the drawer's files are addressed outside tansu, such as smb://nas/Media. */
     val address: String = "",
+    /** Whether the drawer's server is on the home network, by its name. */
+    val serverLooksLocal: Boolean = false,
 ) {
     val selecting: Boolean
         get() = selected.isNotEmpty()
@@ -181,6 +185,8 @@ class BrowseViewModel(
                     job = tools.job,
                     notice = tools.notice,
                     address = addressOf(here.drawer),
+                    serverLooksLocal =
+                        here.drawer.server?.let { LocalNetwork.looksLocal(it.host) } == true,
                 )
             }
             .stateIn(
@@ -364,6 +370,9 @@ class BrowseViewModel(
         loading = viewModelScope.launch {
             listing.update { if (fresh) Listing(loading = true) else it.copy(loading = true) }
             val result = fetch(here)
+            // smbj and sshj can't be stopped part-way: a listing someone moved on from may still
+            // finish, or fail. It mustn't land on the folder they're looking at now.
+            ensureActive()
             val drawerId = here.drawer.id
             troubled.update {
                 if (result.problem.isServerWide()) it + drawerId else it - drawerId

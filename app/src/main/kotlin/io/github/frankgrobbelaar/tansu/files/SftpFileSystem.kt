@@ -15,8 +15,6 @@ import java.util.Base64
 import java.util.EnumSet
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
@@ -45,13 +43,19 @@ class SftpFileSystem(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : FileSystem, Closeable {
 
-    private val lock = Mutex()
-    private var ssh: SSHClient? = null
-    private var sftp: SFTPClient? = null
+    /** An SSH connection, signed in, with its SFTP channel open. */
+    private class Session(val ssh: SSHClient, val sftp: SFTPClient)
+
+    private val sessions =
+        Reconnecting(
+            open = { connect(secretOf(secrets, server)) },
+            alive = { it.ssh.isConnected && it.ssh.isAuthenticated },
+            end = ::hangUp,
+        )
 
     override suspend fun list(path: String): List<Entry> =
         onServer(path) { sftp ->
-            sftp.ls(path).map(::entryOf)
+            sftp.ls(path).map { info -> entryOf(info, sftp) }
         }
 
     override suspend fun stat(path: String): Entry? =
@@ -120,51 +124,48 @@ class SftpFileSystem(
         }
     }
 
-    override fun close() {
-        try {
-            sftp?.close()
-            ssh?.disconnect()
-        } catch (_: IOException) {
-            // Closing a connection that's already gone is fine.
-        }
-        sftp = null
-        ssh = null
-    }
+    override fun close() = sessions.close()
 
     /** Runs [block] on the server, off the main thread, connecting first if need be. */
     private suspend fun <T> onServer(path: String, block: (SFTPClient) -> T): T =
-        withContext(io) {
-            val sftp = sftp()
-            mapErrors(path) { block(sftp) }
-        }
+        withContext(io) { sessions.use { session -> mapErrors(path) { block(session.sftp) } } }
 
-    private suspend fun sftp(): SFTPClient = lock.withLock {
-        sftp?.takeIf { ssh?.isConnected == true }
-            ?: run {
-                close()
-                connect(secrets.read(server.id)).also { sftp = it }
-            }
-    }
-
-    private fun connect(secret: Secret): SFTPClient {
+    private fun connect(secret: Secret): Session {
         val verifier = PinnedKey(server.hostKey)
         val client =
             SSHClient(DefaultConfig()).apply {
                 connectTimeout = TIMEOUT_MILLIS
                 timeout = TIMEOUT_MILLIS
+                // The key exchange and each request wait this long too, not sshj's 30 seconds.
+                transport.timeoutMs = TIMEOUT_MILLIS
+                connection.timeoutMs = TIMEOUT_MILLIS
                 addHostKeyVerifier(verifier)
             }
-        ssh = client
-        mapErrors("") {
-            try {
-                client.connect(server.host, server.port)
-            } catch (e: IOException) {
-                verifier.refusal()?.let { throw it }
-                throw e
+        var connected = false
+        try {
+            mapErrors("") {
+                try {
+                    client.connect(server.host, server.port)
+                } catch (e: IOException) {
+                    verifier.refusal()?.let { throw it }
+                    throw e
+                }
+                signIn(client, secret)
             }
-            signIn(client, secret)
+            val sftp =
+                mapErrors("") {
+                    client.newSFTPClient().apply { sftpEngine.timeoutMs = TIMEOUT_MILLIS }
+                }
+            connected = true
+            return Session(client, sftp)
+        } finally {
+            if (!connected) quietly { client.disconnect() }
         }
-        return mapErrors("") { client.newSFTPClient() }
+    }
+
+    private fun hangUp(session: Session) {
+        quietly { session.sftp.close() }
+        quietly { session.ssh.disconnect() }
     }
 
     private fun signIn(client: SSHClient, secret: Secret) {
@@ -195,11 +196,7 @@ class SftpFileSystem(
     private inline fun <T> mapErrors(path: String, block: () -> T): T =
         try {
             block()
-        } catch (e: FileSystemException) {
-            close()
-            throw e
         } catch (e: UserAuthException) {
-            close()
             throw FileSystemException.AuthFailed(server.host, e)
         } catch (e: SFTPException) {
             throw when (e.statusCode) {
@@ -209,25 +206,36 @@ class SftpFileSystem(
                 Response.StatusCode.FILE_ALREADY_EXISTS -> FileSystemException.Exists(path)
                 Response.StatusCode.NO_SPACE_ON_FILESYSTEM,
                 Response.StatusCode.QUOTA_EXCEEDED -> FileSystemException.NoSpace(path)
+                // sshj's word for a request that timed out or a channel that closed.
+                Response.StatusCode.UNKNOWN,
+                Response.StatusCode.NO_CONNECTION,
+                Response.StatusCode.CONNECITON_LOST ->
+                    FileSystemException.Unreachable(server.host, e)
                 else -> FileSystemException.Unreadable(path, e)
             }
         } catch (e: IOException) {
-            close()
             throw FileSystemException.Unreachable(server.host, e)
         } catch (e: SSHRuntimeException) {
             // sshj's own failures that aren't the server answering no: a broken connection.
-            close()
             throw FileSystemException.Unreachable(server.host, e)
         }
 
-    private fun entryOf(info: RemoteResourceInfo) =
-        Entry(
+    /** An entry for [info]. A link to a folder opens as one, so it's looked up. */
+    private fun entryOf(info: RemoteResourceInfo, sftp: SFTPClient): Entry {
+        val isFolder =
+            if (info.attributes.type == FileMode.Type.SYMLINK) {
+                sftp.statExistence(info.path)?.type == FileMode.Type.DIRECTORY
+            } else {
+                info.isDirectory
+            }
+        return Entry(
             name = info.name,
             path = info.path,
-            isFolder = info.isDirectory,
-            size = if (info.isDirectory) 0 else info.attributes.size,
+            isFolder = isFolder,
+            size = if (isFolder) 0 else info.attributes.size,
             modified = info.attributes.mtime * MILLIS_PER_SECOND,
         )
+    }
 
     private companion object {
         const val TIMEOUT_MILLIS = 15_000
@@ -235,6 +243,17 @@ class SftpFileSystem(
         /** Requests kept in flight, so a transfer isn't one round trip per chunk. */
         const val READ_AHEAD = 16
         const val UNCONFIRMED_WRITES = 16
+    }
+}
+
+/** Ends what's left of a connection; one that's already gone is ended enough. */
+private inline fun quietly(block: () -> Unit) {
+    try {
+        block()
+    } catch (_: IOException) {
+        // Gone already.
+    } catch (_: SSHRuntimeException) {
+        // Gone already.
     }
 }
 

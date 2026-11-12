@@ -25,6 +25,14 @@ class ServerStore(private val store: DataStore<Preferences>) {
         }
     }
 
+    /** Changes the server with [id], if there is one, in a single write. */
+    suspend fun update(id: String, change: (Server) -> Server) {
+        store.edit { prefs ->
+            prefs[SERVERS] =
+                json.encodeToString(decode(prefs).map { if (it.id == id) change(it) else it })
+        }
+    }
+
     suspend fun remove(id: String) {
         store.edit { prefs ->
             prefs[SERVERS] = json.encodeToString(decode(prefs).filterNot { it.id == id })

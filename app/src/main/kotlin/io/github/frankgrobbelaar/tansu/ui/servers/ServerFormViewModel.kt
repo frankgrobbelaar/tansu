@@ -12,11 +12,13 @@ import io.github.frankgrobbelaar.tansu.TansuApplication
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
 import io.github.frankgrobbelaar.tansu.servers.Secret
+import io.github.frankgrobbelaar.tansu.servers.SecretLost
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.servers.ServerCheck
 import io.github.frankgrobbelaar.tansu.servers.Servers
 import java.util.UUID
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -68,8 +70,11 @@ data class ServerFormUiState(
 
         data object Connecting : Step
 
-        /** The server sent [key]; [replaces] is the key trusted before, if any. */
-        data class Trust(val key: HostKey, val replaces: String) : Step
+        /**
+         * The server at [host] and [port] sent [key]; [replaces] is the key trusted before, if any.
+         */
+        data class Trust(val key: HostKey, val replaces: String, val host: String, val port: Int) :
+            Step
     }
 
     enum class Failure {
@@ -152,10 +157,13 @@ class ServerFormViewModel(
             _state.update { it.copy(step = ServerFormUiState.Step.Connecting, failure = null) }
             try {
                 check.check(server, secret)
+                // A check can't be stopped part-way: one that was cancelled may still finish.
+                ensureActive()
                 servers.save(server, secret)
                 _state.update { it.copy(done = true) }
             } catch (e: FileSystemException) {
-                _state.update { it.withRefusal(e) }
+                ensureActive()
+                _state.update { it.withRefusal(e, server) }
             }
         }
     }
@@ -163,8 +171,7 @@ class ServerFormViewModel(
     /** Trusts the key the server sent, then connects again with it pinned. */
     fun trust() {
         val trust = _state.value.step as? ServerFormUiState.Step.Trust ?: return
-        val (host, port) = addressOf(_state.value)
-        pinned = Pinned(trust.key.fingerprint, host, port)
+        pinned = Pinned(trust.key.fingerprint, trust.host, trust.port)
         _state.update { it.copy(step = ServerFormUiState.Step.Filling) }
         connect()
     }
@@ -177,7 +184,13 @@ class ServerFormViewModel(
 
     private suspend fun load(serverId: String) {
         val server = servers.find(serverId) ?: return
-        val secret = servers.secret(serverId)
+        // A secret the phone can no longer open: the login is simply entered again.
+        val secret =
+            try {
+                servers.secret(serverId)
+            } catch (_: SecretLost) {
+                Secret()
+            }
         privateKey = secret.privateKey
         if (server.hostKey.isNotEmpty()) pinned = Pinned(server.hostKey, server.host, server.port)
         _state.update {
@@ -204,8 +217,8 @@ class ServerFormViewModel(
             kind = form.kind,
             host = host,
             port = port,
-            share = if (form.kind == Server.Kind.Smb) draft.share.trim().trim('/', '\\') else "",
-            folder = draft.folder.trim().trim('/', '\\'),
+            share = if (form.kind == Server.Kind.Smb) shareOf(draft) else "",
+            folder = folderOf(draft, form.kind),
             username = if (signIn == Server.SignIn.Guest) "" else draft.username.trim(),
             signIn = signIn,
             keyName = if (signIn == Server.SignIn.Key) draft.keyName else "",
@@ -281,6 +294,19 @@ private fun draftOf(server: Server) =
         keyName = server.keyName,
     )
 
+/** The share's own name: Media/Photos is the Media share, starting in Photos. */
+private fun shareOf(draft: ServerDraft): String =
+    draft.share.trim().trim('/', '\\').split('/', '\\').first()
+
+/** The folder to start in, with anything typed after the share's name in front. */
+private fun folderOf(draft: ServerDraft, kind: Server.Kind): String {
+    val afterShare =
+        if (kind == Server.Kind.Smb) draft.share.trim().trim('/', '\\').split('/', '\\').drop(1)
+        else emptyList()
+    val folder = draft.folder.trim().trim('/', '\\').replace('\\', '/')
+    return (afterShare + listOfNotNull(folder.ifEmpty { null })).joinToString("/")
+}
+
 /** OpenSSH, PEM and PuTTY private keys all say what they are on their first line. */
 private fun looksLikePrivateKey(text: String): Boolean {
     val start = text.trimStart().take(KEY_HEADER_CHARS)
@@ -289,13 +315,19 @@ private fun looksLikePrivateKey(text: String): Boolean {
 
 private const val KEY_HEADER_CHARS = 64
 
-private fun ServerFormUiState.withRefusal(e: FileSystemException): ServerFormUiState {
+private fun ServerFormUiState.withRefusal(
+    e: FileSystemException,
+    server: Server,
+): ServerFormUiState {
     val filling = copy(step = ServerFormUiState.Step.Filling)
     return when (e) {
         is FileSystemException.HostKeyUnknown ->
-            copy(step = ServerFormUiState.Step.Trust(e.key, replaces = ""))
+            copy(step = ServerFormUiState.Step.Trust(e.key, "", server.host, server.port))
         is FileSystemException.HostKeyChanged ->
-            copy(step = ServerFormUiState.Step.Trust(e.presented, replaces = e.trusted))
+            copy(
+                step =
+                    ServerFormUiState.Step.Trust(e.presented, e.trusted, server.host, server.port)
+            )
         is FileSystemException.Unreachable ->
             filling.copy(failure = ServerFormUiState.Failure.Unreachable)
         is FileSystemException.AuthFailed ->

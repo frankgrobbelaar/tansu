@@ -6,6 +6,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.util.Base64
 import javax.crypto.Cipher
@@ -24,6 +25,9 @@ interface Secrets {
     suspend fun forget(serverId: String)
 }
 
+/** A secret that can't be opened, as when the phone's key for it was lost. */
+class SecretLost(cause: Throwable) : Exception("A secret can't be opened", cause)
+
 /** Seals and opens bytes with a key that never leaves the phone. */
 interface SecretCipher {
     fun seal(plain: ByteArray): ByteArray
@@ -39,8 +43,14 @@ class StoredSecrets(
 
     override suspend fun read(serverId: String): Secret {
         val sealed = store.data.first()[keyFor(serverId)] ?: return Secret()
-        val plain = cipher.open(Base64.getDecoder().decode(sealed))
-        return json.decodeFromString(plain.decodeToString())
+        return try {
+            val plain = cipher.open(Base64.getDecoder().decode(sealed))
+            json.decodeFromString(plain.decodeToString())
+        } catch (e: GeneralSecurityException) {
+            throw SecretLost(e)
+        } catch (e: IllegalArgumentException) {
+            throw SecretLost(e)
+        }
     }
 
     override suspend fun write(serverId: String, secret: Secret) {
