@@ -79,6 +79,23 @@ class SmbFileSystemTest {
         smb().use { files -> refusal<FileSystemException.NotFound>(files, "/Gone") }
     }
 
+    @Test
+    fun `a new file never writes over one that's there, in any case, unless told to replace it`() {
+        smb().use { files ->
+            runBlocking { files.write("/notes.txt").use { it.write("mine".toByteArray()) } }
+            assertThrows(FileSystemException.Exists::class.java) {
+                runBlocking { files.write("/NOTES.TXT").close() }
+            }
+            runBlocking {
+                files.write("/notes.txt", replace = true).use { it.write("new".toByteArray()) }
+            }
+            val text = runBlocking {
+                files.read("/notes.txt").use { it.readBytes().decodeToString() }
+            }
+            assertEquals("new", text)
+        }
+    }
+
     companion object {
         private const val SMB_PORT = 445
         private lateinit var samba: GenericContainer<*>
