@@ -66,6 +66,6 @@
     <string name="details_changed">Changed</string>
     <string name="details_path">Full path</string>
 
-    <string name="share_server_not_yet">Tansu can\'t share files from servers yet.</string>
+    <string name="fetching_title">Getting %1$s</string>
     <string name="share_chooser">Share with</string>
 </resources>

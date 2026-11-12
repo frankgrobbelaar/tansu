@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Drawers
+import io.github.frankgrobbelaar.tansu.files.Fetcher
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.LocalFileSystem
 import io.github.frankgrobbelaar.tansu.files.SftpFileSystem
@@ -65,6 +66,8 @@ class AppContainer(
     val jobs = Jobs(drawers.all, scope, onBusy = { TransferService.start(context) })
 
     val clipboard = Clipboard()
+
+    val fetcher = Fetcher(context.cacheDir)
 
     companion object {
         const val PHONE = "phone"

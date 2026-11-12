@@ -10,6 +10,7 @@ import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FakeFileSystem
 import io.github.frankgrobbelaar.tansu.files.FakeFileSystem.Companion.file
 import io.github.frankgrobbelaar.tansu.files.FakeFileSystem.Companion.folder
+import io.github.frankgrobbelaar.tansu.files.Fetcher
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
@@ -33,9 +34,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class BrowseViewModelTest {
     @get:Rule val main = MainDispatcherRule()
+    @get:Rule val folder = TemporaryFolder()
 
     private class FakeServers : SavedServers {
         override val all = MutableStateFlow(emptyList<Server>())
@@ -92,6 +95,7 @@ class BrowseViewModelTest {
             settings = settings,
             jobs = jobs,
             clipboard = clipboard,
+            fetcher = Fetcher(folder.root, io = main.dispatcher),
             savedState = saved,
             compute = main.dispatcher,
         )
@@ -379,6 +383,24 @@ class BrowseViewModelTest {
             assertEquals("phone", state.drawer.id)
             assertNull(state.problem)
             assertFalse(state.drawers.single { it.id == "nas" }.troubled)
+        }
+    }
+
+    @Test
+    fun `a server file comes to the phone before another app can open it`() = runTest {
+        val serverFiles = MemoryFileSystem().file("/notes.md", "hello")
+        drawers.value = listOf(phone, nas.copy(fileSystem = serverFiles))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("nas")
+            browse.fetch(listOf(serverFiles.stat("/notes.md")!!), BrowseUiState.Purpose.Open)
+
+            val fetched = expectMostRecentItem().fetched
+            assertEquals(BrowseUiState.Purpose.Open, fetched?.purpose)
+            assertEquals("hello", fetched?.files?.single()?.readText())
+
+            browse.fetchedHandled()
+            assertNull(expectMostRecentItem().fetched)
         }
     }
 }

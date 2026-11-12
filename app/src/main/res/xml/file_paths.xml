@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Files on the phone's shared storage can be handed to other apps to open. -->
+<!-- Files tansu hands other apps to open or share: the phone's shared storage, and files fetched
+     from servers into the cache (files/Fetcher.kt). -->
 <paths>
     <external-path name="phone" path="." />
+    <cache-path name="fetched" path="fetched/" />
 </paths>

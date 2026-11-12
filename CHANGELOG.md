@@ -5,6 +5,9 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- Open and share files on servers: tansu brings them to the phone first, with their progress and
+  Cancel, then hands them to the app you pick.
+
 ## 0.1.0 - 2026-11-13
 
 The first version.

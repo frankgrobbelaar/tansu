@@ -36,7 +36,6 @@
     <string name="browse_missing_title">This folder isn\'t here any more</string>
     <string name="browse_missing_body">It may have been moved, renamed or deleted.</string>
     <string name="browse_no_app">No app on this phone can open that file.</string>
-    <string name="browse_server_files_not_yet">Tansu can\'t open files on servers yet.</string>
 
     <string name="browse_unreadable_title">Tansu couldn\'t read this folder</string>
     <string name="browse_unreadable_body">Something went wrong while reading it. Trying again often works.</string>

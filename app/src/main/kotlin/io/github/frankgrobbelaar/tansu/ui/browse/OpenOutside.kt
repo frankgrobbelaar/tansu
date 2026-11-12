@@ -7,18 +7,13 @@ import android.provider.Settings
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
-import io.github.frankgrobbelaar.tansu.files.Entry
 import java.io.File
 
 /** Hands a file on the phone to the app Android picks for it. False when no app takes it. */
-fun openOutside(context: Context, entry: Entry): Boolean {
-    val file = File(entry.path)
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-    val type =
-        MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
+fun openOutside(context: Context, file: File): Boolean {
     val view =
         Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, type)
+            .setDataAndType(uriOf(context, file), typeOf(file))
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     return try {
         context.startActivity(view)
@@ -29,11 +24,9 @@ fun openOutside(context: Context, entry: Entry): Boolean {
 }
 
 /** Offers files on the phone to any app that takes them, through Android's share sheet. */
-fun shareOutside(context: Context, entries: List<Entry>, chooserTitle: String) {
-    val uris = entries.map {
-        FileProvider.getUriForFile(context, "${context.packageName}.files", File(it.path))
-    }
-    val types = entries.map { typeOf(File(it.path)) }.distinct()
+fun shareOutside(context: Context, files: List<File>, chooserTitle: String) {
+    if (files.isEmpty()) return
+    val uris = files.map { uriOf(context, it) }
     val share =
         if (uris.size == 1) {
             Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris.single())
@@ -41,10 +34,13 @@ fun shareOutside(context: Context, entries: List<Entry>, chooserTitle: String) {
             Intent(Intent.ACTION_SEND_MULTIPLE)
                 .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
         }
-    share.type = types.singleOrNull() ?: "*/*"
+    share.type = files.map(::typeOf).distinct().singleOrNull() ?: "*/*"
     share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     context.startActivity(Intent.createChooser(share, chooserTitle))
 }
+
+private fun uriOf(context: Context, file: File) =
+    FileProvider.getUriForFile(context, "${context.packageName}.files", file)
 
 private fun typeOf(file: File): String =
     MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"

@@ -52,6 +52,7 @@ import io.github.frankgrobbelaar.tansu.ui.kit.TansuTopBar
 import io.github.frankgrobbelaar.tansu.ui.rememberNotificationAsk
 import io.github.frankgrobbelaar.tansu.ui.servers.LocalNetworkAccess
 import io.github.frankgrobbelaar.tansu.ui.servers.rememberLocalNetworkAccess
+import java.io.File
 import kotlinx.coroutines.launch
 
 /** Browse, wired to its ViewModel: folders open in place, files open in another app. */
@@ -73,8 +74,6 @@ fun BrowseRoute(
             context = context,
             say = { text -> scope.launch { snackbar.showSnackbar(text) } },
             noApp = stringResource(R.string.browse_no_app),
-            notYet = stringResource(R.string.browse_server_files_not_yet),
-            shareNotYet = stringResource(R.string.share_server_not_yet),
             chooser = stringResource(R.string.share_chooser),
         )
     val localNetwork = rememberLocalNetworkAccess()
@@ -89,6 +88,7 @@ fun BrowseRoute(
         onClearNotice = viewModel::noticeShown,
     )
     val places = Places(onAddServer, { onEditServer(state.drawer) }, onOpenTransfers)
+    FetchedEffect(state.fetched, outside, onConsume = viewModel::fetchedHandled)
     Box(modifier = modifier.fillMaxSize()) {
         BrowseScreen(
             state = state,
@@ -101,6 +101,7 @@ fun BrowseRoute(
         )
         SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter))
     }
+    state.fetching?.let { FetchingDialog(it, onCancel = viewModel::cancelFetch) }
     BrowseDialogHost(
         dialog = dialog,
         state = state,
@@ -125,6 +126,26 @@ internal class DialogDecisions(
     val onPaste: (Map<String, Clash>) -> Unit,
 )
 
+/** Hands fetched server files to another app, once, as they arrive. */
+@Composable
+private fun FetchedEffect(
+    fetched: BrowseUiState.Fetched?,
+    outside: Outside,
+    onConsume: () -> Unit,
+) {
+    val consume by rememberUpdatedState(onConsume)
+    val hand by rememberUpdatedState(outside)
+    LaunchedEffect(fetched) {
+        if (fetched != null) {
+            when (fetched.purpose) {
+                BrowseUiState.Purpose.Open -> hand.open(fetched.files.first())
+                BrowseUiState.Purpose.Share -> hand.share(fetched.files)
+            }
+            consume()
+        }
+    }
+}
+
 /** Where Browse's tasks lead: other screens and places. */
 private class Places(
     val onAddServer: () -> Unit,
@@ -137,19 +158,14 @@ private class Outside(
     val context: android.content.Context,
     val say: (String) -> Unit,
     val noApp: String,
-    val notYet: String,
-    val shareNotYet: String,
     val chooser: String,
 ) {
-    fun open(entry: Entry, onServer: Boolean) {
-        when {
-            onServer -> say(notYet)
-            !openOutside(context, entry) -> say(noApp)
-        }
+    fun open(file: File) {
+        if (!openOutside(context, file)) say(noApp)
     }
 
-    fun share(entries: List<Entry>, onServer: Boolean) {
-        if (onServer) say(shareNotYet) else shareOutside(context, entries, chooser)
+    fun share(files: List<File>) {
+        shareOutside(context, files, chooser)
     }
 }
 
@@ -172,7 +188,9 @@ private fun BrowseViewModel.actions(
             when {
                 state.selecting -> toggle(entry)
                 entry.isFolder -> open(entry)
-                else -> outside.open(entry, state.onServer)
+                // Another app can't read a server: the file comes to the phone first.
+                state.onServer -> fetch(listOf(entry), BrowseUiState.Purpose.Open)
+                else -> outside.open(File(entry.path))
             }
         },
         onPick = ::toggle,
@@ -202,12 +220,26 @@ private fun BrowseViewModel.selectionActions(
     SelectionActions(
         onCut = ::cut,
         onCopy = ::copy,
-        onShare = { outside.share(state.picked.filterNot { it.isFolder }, state.onServer) },
+        onShare = {
+            val files = state.picked.filterNot { it.isFolder }
+            when {
+                files.isEmpty() -> Unit
+                state.onServer -> fetch(files, BrowseUiState.Purpose.Share)
+                else -> outside.share(files.map { File(it.path) })
+            }
+            clearSelection()
+        },
         onDelete = { onDialog(BrowseDialog.Delete) },
         onRename = { state.picked.singleOrNull()?.let { onDialog(BrowseDialog.Rename(it)) } },
         onDetails = { state.picked.singleOrNull()?.let { onDialog(BrowseDialog.Details(it)) } },
         onOpenOutside = {
-            state.picked.firstOrNull { !it.isFolder }?.let { outside.open(it, state.onServer) }
+            state.picked
+                .firstOrNull { !it.isFolder }
+                ?.let { entry ->
+                    if (state.onServer) fetch(listOf(entry), BrowseUiState.Purpose.Open)
+                    else outside.open(File(entry.path))
+                }
+            clearSelection()
         },
     )
 

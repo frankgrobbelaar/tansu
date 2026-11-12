@@ -10,6 +10,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -176,6 +177,37 @@ private fun Version(label: String, entry: Entry, modifier: Modifier = Modifier) 
         )
         Text(text = Human.meta(entry), style = MaterialTheme.typography.bodyMedium)
     }
+}
+
+/** A server file on its way to the phone: what, how far, and Cancel. */
+@Composable
+internal fun FetchingDialog(fetching: BrowseUiState.Fetching, onCancel: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.fetching_title, fetching.name)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LinearProgressIndicator(
+                    progress = { fetching.fraction },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text =
+                        stringResource(
+                            R.string.job_size_of,
+                            Human.size(fetching.bytesDone),
+                            Human.size(fetching.bytesTotal),
+                        ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+        },
+    )
 }
 
 /** Size, where it lives and when it changed, with the full path for when it's needed. */

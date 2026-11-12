@@ -13,6 +13,7 @@ import io.github.frankgrobbelaar.tansu.TansuSettings
 import io.github.frankgrobbelaar.tansu.files.BrowseOrder
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
+import io.github.frankgrobbelaar.tansu.files.Fetcher
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
@@ -31,6 +32,7 @@ import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.kit.Crumb
 import io.github.frankgrobbelaar.tansu.ui.kit.DrawerTab
 import io.github.frankgrobbelaar.tansu.ui.servers.LocalNetwork
+import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -66,6 +68,10 @@ data class BrowseUiState(
     val address: String = "",
     /** Whether the drawer's server is on the home network, by its name. */
     val serverLooksLocal: Boolean = false,
+    /** Server files on their way to the phone, to open or share. */
+    val fetching: Fetching? = null,
+    /** Files fetched and ready to hand to another app, once. */
+    val fetched: Fetched? = null,
 ) {
     val selecting: Boolean
         get() = selected.isNotEmpty()
@@ -76,6 +82,19 @@ data class BrowseUiState(
     /** The folder as a person reads it, such as "NAS › Media › Photos". */
     val label: String
         get() = crumbs.joinToString(" › ") { it.name }
+
+    /** What [fetching] is for: opening one file, or sharing them. */
+    enum class Purpose {
+        Open,
+        Share,
+    }
+
+    data class Fetching(val name: String, val bytesDone: Long, val bytesTotal: Long) {
+        val fraction: Float
+            get() = if (bytesTotal > 0) (bytesDone.toFloat() / bytesTotal).coerceIn(0f, 1f) else 0f
+    }
+
+    data class Fetched(val files: List<File>, val purpose: Purpose)
 
     sealed interface Notice {
         data class JobEnded(val job: Job) : Notice
@@ -130,6 +149,7 @@ class BrowseViewModel(
     private val settings: TansuSettings,
     private val jobs: Jobs,
     private val clipboard: Clipboard,
+    private val fetcher: Fetcher,
     savedState: SavedStateHandle,
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
@@ -142,7 +162,10 @@ class BrowseViewModel(
     private val added = MutableStateFlow<String?>(null)
     private val picked = MutableStateFlow(emptySet<String>())
     private val notice = MutableStateFlow<BrowseUiState.Notice?>(null)
+    private val fetching = MutableStateFlow<BrowseUiState.Fetching?>(null)
+    private val fetched = MutableStateFlow<BrowseUiState.Fetched?>(null)
     private var loading: kotlinx.coroutines.Job? = null
+    private var fetchingJob: kotlinx.coroutines.Job? = null
 
     /** The drawer and folder on show. A drawer that's gone falls back to the phone. */
     private val here: StateFlow<Here> =
@@ -163,10 +186,17 @@ class BrowseViewModel(
             News(offerServers = saved.isEmpty() && !dismissed, added = added, drawers = drawers)
         }
 
-    /** Selection, the clipboard, the job under way, and anything to say. */
+    private val fetches = combine(fetching, fetched, ::Pair)
+
+    /** Selection, the clipboard, the job under way, fetches, and anything to say. */
     private val tools =
-        combine(picked, clipboard.contents, jobs.all, notice) { picked, held, all, notice ->
-            Tools(picked, held, all.firstOrNull { it.active }, notice)
+        combine(picked, clipboard.contents, jobs.all, notice, fetches) {
+            picked,
+            held,
+            all,
+            notice,
+            (fetching, fetched) ->
+            Tools(picked, held, all.firstOrNull { it.active }, notice, fetching, fetched)
         }
 
     val state: StateFlow<BrowseUiState> =
@@ -187,6 +217,8 @@ class BrowseViewModel(
                     address = addressOf(here.drawer),
                     serverLooksLocal =
                         here.drawer.server?.let { LocalNetwork.looksLocal(it.host) } == true,
+                    fetching = tools.fetching,
+                    fetched = tools.fetched,
                 )
             }
             .stateIn(
@@ -316,6 +348,39 @@ class BrowseViewModel(
         notice.value = null
     }
 
+    /** Fetches files from this drawer's server to the phone, to open or share them. */
+    fun fetch(entries: List<Entry>, purpose: BrowseUiState.Purpose) {
+        val files = here.value.drawer.fileSystem
+        val drawer = here.value.drawer.name
+        val total = entries.sumOf { it.size }
+        fetchingJob?.cancel()
+        fetchingJob = viewModelScope.launch {
+            fetching.value = BrowseUiState.Fetching(entries.first().name, 0, total)
+            try {
+                val got =
+                    fetcher.fetch(files, entries) { bytes ->
+                        fetching.update { it?.copy(bytesDone = bytes) }
+                    }
+                ensureActive()
+                fetched.value = BrowseUiState.Fetched(got, purpose)
+            } catch (e: FileSystemException) {
+                ensureActive()
+                notice.value = BrowseUiState.Notice.Refused(reasonOf(e), drawer)
+            } finally {
+                fetching.value = null
+            }
+        }
+    }
+
+    fun cancelFetch() {
+        fetchingJob?.cancel()
+        fetching.value = null
+    }
+
+    fun fetchedHandled() {
+        fetched.value = null
+    }
+
     private fun hold(cut: Boolean) {
         clipboard.hold(state.value.picked, whereHere(), cut)
         clearSelection()
@@ -414,6 +479,8 @@ class BrowseViewModel(
         val held: Held?,
         val job: Job?,
         val notice: BrowseUiState.Notice?,
+        val fetching: BrowseUiState.Fetching?,
+        val fetched: BrowseUiState.Fetched?,
     )
 
     private data class Listing(
@@ -437,6 +504,7 @@ class BrowseViewModel(
                     settings = container.settings,
                     jobs = container.jobs,
                     clipboard = container.clipboard,
+                    fetcher = container.fetcher,
                     savedState = createSavedStateHandle(),
                 )
             }
