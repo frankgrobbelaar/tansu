@@ -5,21 +5,23 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-13
+
+A safer copy again, steadier viewers, and the small things.
+
 - Copying is safer again. A file is checked against where it came from before it takes its
   name, so one still being written is caught rather than copied short; a move never replaces
   the very file it's moving; a server's lost answer no longer leaves a second copy; two folders
   whose names differ only in case stay apart on the phone and SMB; and long names fit.
-- Videos keep the screen on, keep playing when the phone turns, and pause for a call or when
-  headphones come out. Pictures, videos and PDFs reach the screen's edges.
-- A PDF with very tall pages no longer stops tansu, nor does leaving one while it draws.
-- Replace works on SFTP servers that can't rename over a file in one step.
-
+- A job's detail lists what was picked, each with where it stands: waiting, on it now, done,
+  skipped or not done. A refusal names the drawer that said no, and a refused login or a changed
+  key says so.
 - Tapping a finished job's notification opens the folder its files went to. While tansu is in
   front it says how a job ended itself, without a notification too.
-
-- A job's detail lists what was picked, each with where it stands: waiting, on it now, done,
-  skipped or not done. A refusal names the drawer that said no.
-
+- Videos keep the screen on, keep playing when the phone turns, and pause for a call or when
+  headphones come out. Pictures, videos and PDFs reach the screen's edges, and a PDF with very
+  tall pages no longer stops tansu.
+- Replace works on SFTP servers that can't rename over a file in one step.
 - Settings › About lists the open-source work tansu is built with, and its licences.
 
 ## 0.3.0 - 2026-11-13
