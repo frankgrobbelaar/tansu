@@ -238,13 +238,14 @@ ${hero(latest, repository)}
     <li>If Play Protect says it doesn't know the app, choose to install anyway.</li>
     <li>Open tansu and give it <strong>All files access</strong>, so it can show your phone's files.</li>
   </ol>
-  <p>To update, download the newest version here and install it over the one you have: your servers and settings stay.</p>
+  <p>After that, tansu updates itself: a new version shows in Settings, and one tap downloads it and hands it to Android to install. Your servers and settings stay. You can always download the newest version here too, and install it over the one you have.</p>
 </section>
 <section class="panel" aria-labelledby="what">
   <h2 id="what">What tansu does</h2>
   <ul>
     <li>Browses your phone's storage, and your own SMB and SFTP servers, at home or over Tailscale.</li>
     <li>Cuts, copies, pastes, renames, shares and deletes, on the phone and on servers alike, with every job's progress in the app and in a notification.</li>
+    <li>Opens pictures, videos and PDFs itself, streaming them straight from your servers, and takes files shared from any app.</li>
     <li>Keeps server passwords and keys encrypted on your phone. No sign-in, no accounts, no ads and no tracking: it talks only to your servers, and to GitHub to look for a new version.</li>
   </ul>
 </section>
