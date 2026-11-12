@@ -22,8 +22,11 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -99,6 +102,12 @@ fun TansuApp(modifier: Modifier = Modifier) {
         )
     val backStack = histories.of(place)
     val entries = rememberEntries(place, histories, onOpenTransfers = { place = Place.Transfers })
+    ShowRequestedFolders(
+        onShow = {
+            place = Place.Browse
+            histories.browse.retainAll(listOf(BrowseHome))
+        }
+    )
 
     // Jobs still to finish, counted on the Transfers tab; a new version, marked on Settings.
     val container = appContainer()
@@ -131,6 +140,23 @@ fun TansuApp(modifier: Modifier = Modifier) {
             popTransitionSpec = { fade() },
             predictivePopTransitionSpec = { fade() },
         )
+    }
+}
+
+/**
+ * Goes to Browse for a folder asked for from outside, such as where a finished job's files went.
+ */
+@Composable
+private fun ShowRequestedFolders(onShow: () -> Unit) {
+    val request by appContainer().folderRequests.collectAsStateWithLifecycle()
+    var shown by rememberSaveable { mutableLongStateOf(0L) }
+    val show by rememberUpdatedState(onShow)
+    LaunchedEffect(request) {
+        val asked = request ?: return@LaunchedEffect
+        if (asked.id != shown) {
+            shown = asked.id
+            show()
+        }
     }
 }
 

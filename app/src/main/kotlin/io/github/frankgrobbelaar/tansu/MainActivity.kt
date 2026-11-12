@@ -1,5 +1,7 @@
 package io.github.frankgrobbelaar.tansu
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,5 +23,34 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) { updates.checkIfDue() }
         }
         setContent { ChosenTheme { TansuRoot() } }
+        showAsked(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        showAsked(intent)
+    }
+
+    /** A finished job's notification opens the folder its files went to. */
+    private fun showAsked(intent: Intent) {
+        if (intent.action != ACTION_SHOW_FOLDER) return
+        val drawer = intent.getStringExtra(EXTRA_DRAWER) ?: return
+        val folder = intent.getStringExtra(EXTRA_FOLDER) ?: return
+        (application as TansuApplication).container.showFolder(drawer, folder)
+        // Handled once: turning the phone mustn't show it again.
+        setIntent(Intent(this, MainActivity::class.java))
+    }
+
+    companion object {
+        private const val ACTION_SHOW_FOLDER = "io.github.frankgrobbelaar.tansu.SHOW_FOLDER"
+        private const val EXTRA_DRAWER = "drawer"
+        private const val EXTRA_FOLDER = "folder"
+
+        /** Opens tansu on [folder] of the drawer [drawerId]. */
+        fun showFolder(context: Context, drawerId: String, folder: String): Intent =
+            Intent(context, MainActivity::class.java)
+                .setAction(ACTION_SHOW_FOLDER)
+                .putExtra(EXTRA_DRAWER, drawerId)
+                .putExtra(EXTRA_FOLDER, folder)
     }
 }

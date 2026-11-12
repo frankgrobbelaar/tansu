@@ -110,12 +110,24 @@ class TransferService : Service() {
             .build()
     }
 
-    private fun endingNotification(job: Job): Notification =
-        base()
+    /** How the last job ended; tapping it opens the folder its files went to. */
+    private fun endingNotification(job: Job): Notification {
+        val landed = job.to ?: job.from
+        val show = MainActivity.showFolder(this, landed.drawerId, landed.folder)
+        return base()
             .setContentTitle(JobWords.title(job, resources))
             .setContentText(JobWords.detail(job, resources))
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this,
+                    1,
+                    show,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            )
             .setAutoCancel(true)
             .build()
+    }
 
     private fun quietNotification(): Notification =
         base().setContentTitle(getString(R.string.job_getting_ready)).build()
