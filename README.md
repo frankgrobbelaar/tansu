@@ -23,15 +23,16 @@ encrypted.
 
 ## Getting it
 
-Tansu isn't on any store. Once it's released, the
-[downloads page](https://frankgrobbelaar.github.io/tansu/) always has the newest APK, and the app
-keeps itself up to date from there. [docs/releasing.md](docs/releasing.md) explains installing it
-the first time.
+Tansu isn't on any store, on purpose. The
+[downloads page](https://frankgrobbelaar.github.io/tansu/) always has the newest APK and explains
+installing it the first time. Tansu needs Android 14 or newer.
 
 ## Status
 
-Being designed. The [spec](docs/spec.md), the [architecture](docs/architecture.md) and the
-[design](docs/design.md) are in [docs/](docs/README.md). Tansu needs Android 14 or newer.
+Being built in iterations, tracked in [docs/plan.md](docs/plan.md); what changed in each version
+is in [CHANGELOG.md](CHANGELOG.md). The [spec](docs/spec.md), the
+[architecture](docs/architecture.md) and the [design](docs/design.md) are in
+[docs/](docs/README.md).
 
 ## License
 

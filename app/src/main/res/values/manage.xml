@@ -29,6 +29,7 @@
         <item quantity="other">%1$d items to move</item>
     </plurals>
     <string name="held_from">%1$s from %2$s</string>
+    <string name="held_from_only">From %1$s</string>
     <string name="paste_here">Paste here</string>
     <string name="drop_held">Let go of these</string>
 

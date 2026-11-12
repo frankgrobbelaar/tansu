@@ -1,0 +1,102 @@
+# Releases tansu when `release` moves forward: builds the APK signed with the release key, checks
+# the signature, publishes it as a GitHub release with its notes from CHANGELOG.md, and refreshes
+# the downloads page. `release` only ever moves to a commit on main (git push origin main:release).
+# See docs/releasing.md.
+name: Release
+
+on:
+  push:
+    branches: [release]
+  workflow_dispatch:
+
+permissions:
+  contents: write # to tag the commit and publish the release
+  actions: write # to refresh the downloads page
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # every tag, to check the version is new
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Read the version
+        run: |
+          version=$(sed -n 's/^tansu.version=//p' gradle.properties)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      # An installed tansu only takes a newer version, so a release must be newer than every
+      # earlier one.
+      - name: Check the version is new
+        run: |
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::v$VERSION is already out. Raise tansu.version in gradle.properties."
+            exit 1
+          fi
+          newest=$(git tag --list 'v*' | sed 's/^v//' | sort -V | tail -n 1)
+          if [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            echo "::error::$VERSION isn't newer than $newest, so installed copies wouldn't update to it."
+            exit 1
+          fi
+
+      - name: Write the notes
+        run: node scripts/release-notes.mjs "$VERSION" notes.md
+
+      - name: Run every check
+        run: ./gradlew check
+
+      - name: Build the signed APK
+        env:
+          TANSU_KEYSTORE_BASE64: ${{ secrets.TANSU_KEYSTORE_BASE64 }}
+          TANSU_KEYSTORE_PASSWORD: ${{ secrets.TANSU_KEYSTORE_PASSWORD }}
+          TANSU_KEY_ALIAS: ${{ secrets.TANSU_KEY_ALIAS }}
+          TANSU_KEY_PASSWORD: ${{ secrets.TANSU_KEY_PASSWORD }}
+        run: |
+          if [ -z "$TANSU_KEYSTORE_BASE64" ]; then
+            echo "::error::The release key isn't in the repository's secrets. See docs/releasing.md."
+            exit 1
+          fi
+          export TANSU_KEYSTORE="$RUNNER_TEMP/tansu-release.jks"
+          printf '%s' "$TANSU_KEYSTORE_BASE64" | base64 --decode > "$TANSU_KEYSTORE"
+          ./gradlew assembleRelease
+          rm "$TANSU_KEYSTORE"
+          cp app/build/outputs/apk/release/app-release.apk tansu.apk
+
+      # Signed with the release key and nothing else: Android won't update an installed tansu
+      # from an APK signed with any other.
+      - name: Check the signature
+        run: |
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)apksigner
+          "$apksigner" verify --print-certs tansu.apk | tee certs.txt
+          signer=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' certs.txt)
+          expected=$(tr -d '[:space:]' < .github/release-certificate.sha256)
+          if [ "$signer" != "$expected" ]; then
+            echo "::error::tansu.apk is signed by $signer, not the release key ($expected)."
+            exit 1
+          fi
+          sha256sum tansu.apk | cut -d ' ' -f 1 > tansu.apk.sha256
+
+      - name: Publish the release
+        run: |
+          git tag "v$VERSION" "$GITHUB_SHA"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" tansu.apk tansu.apk.sha256 \
+            --title "tansu $VERSION" --notes-file notes.md --latest
+
+      - name: Refresh the downloads page
+        run: gh workflow run downloads.yml --ref main

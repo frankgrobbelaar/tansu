@@ -1,0 +1,48 @@
+# Publishes the downloads page (https://frankgrobbelaar.github.io/tansu/): the newest tansu.apk,
+# how to install it, and every version's notes, built by scripts/downloads-page.mjs from the GitHub
+# releases. The release workflow starts it after each release; it also runs when the page's code
+# changes, and by hand. See docs/releasing.md.
+name: Downloads page
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/downloads-page.mjs
+      - .github/workflows/downloads.yml
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the page from the releases
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/downloads-page.mjs site
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

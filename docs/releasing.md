@@ -5,7 +5,7 @@ the app updates itself from GitHub Releases.
 
 ## Versions
 
-- `versionName` is semantic: `1.2.0`.
+- `versionName` is semantic: `1.2.0`. It lives in `gradle.properties` as `tansu.version`.
 - `versionCode` is derived from it (`major × 10000 + minor × 100 + patch`), so it always rises.
   Android refuses an update whose code isn't higher than the installed one.
 - Every change someone would notice gets one plain line under "Unreleased" in `CHANGELOG.md`, in
@@ -15,9 +15,13 @@ the app updates itself from GitHub Releases.
 
 Android installs an update only if it's signed with the same key as the app already installed.
 
-- One release keystore, made once, kept outside the repo, with a backup somewhere safe.
-- CI gets it as repository secrets: the keystore (base64), its password, the key alias and the key
-  password.
+- One release keystore, made once (12 Nov 2026), kept outside the repo, with a backup somewhere
+  safe. On the owner's PC it's in `%USERPROFILE%\tansu-release-key\`, with a note on keeping it.
+- CI gets it as repository secrets: `TANSU_KEYSTORE_BASE64`, `TANSU_KEYSTORE_PASSWORD`,
+  `TANSU_KEY_ALIAS` and `TANSU_KEY_PASSWORD`. `app/build.gradle.kts` signs a release build only
+  when `TANSU_KEYSTORE` (the keystore's path) and those passwords are set.
+- The certificate's SHA-256 is in `.github/release-certificate.sha256`. The release workflow
+  refuses to publish an APK signed by anything else.
 - **Lose it and every installed copy has to be uninstalled before a new one goes on**, losing its
   saved servers. Treat it like a house key.
 
@@ -31,9 +35,11 @@ Android installs an update only if it's signed with the same key as the app alre
 
 1. On `main`, raise the version and move "Unreleased" in `CHANGELOG.md` under it.
 2. Fast-forward `release` to that commit: `git push origin main:release`.
-3. The release workflow checks the version is newer than the last release, builds the signed APK
-   (minified with R8), tags the commit (`v1.2.0`), and publishes a GitHub Release with the notes,
-   `tansu.apk` and `tansu.apk.sha256`.
+3. The release workflow (`.github/workflows/release.yml`) checks the version is newer than every
+   release so far, writes the notes from `CHANGELOG.md` (`scripts/release-notes.mjs`), runs every
+   check, builds the signed APK (minified with R8), checks its signature, tags the commit
+   (`v1.2.0`), and publishes a GitHub Release with the notes, `tansu.apk` and `tansu.apk.sha256`.
+   Then it refreshes the downloads page.
 4. The asset keeps the same name in every release, so one link always fetches the newest:
    `https://github.com/frankgrobbelaar/tansu/releases/latest/download/tansu.apk`.
 
@@ -67,7 +73,8 @@ For the people you share it with:
 - When tansu opens, at most once a day, it asks GitHub for the latest release. That request carries
   nothing about the user, and the check can be turned off in Settings › About.
 - A newer version shows in Settings with its notes. Download and install runs as a job, checks the
-  file against `tansu.apk.sha256`, then hands it to Android's installer.
+  file against `tansu.apk.sha256`, then hands it to Android's installer. Until that lands in the
+  app, an update is installed from the downloads page over the version already there.
 - The first time, Android asks the user to let tansu install apps. Android then checks the update
   is signed with the same key and keeps every setting and saved server.
 

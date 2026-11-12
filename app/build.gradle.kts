@@ -21,8 +21,23 @@ android {
         versionCode = versionCodeOf(tansuVersion)
     }
 
+    // The release key comes from the environment: the release workflow sets these from the
+    // repository's secrets (docs/releasing.md). Without them a release build is left unsigned.
+    val keystore = providers.environmentVariable("TANSU_KEYSTORE").orNull
+    signingConfigs {
+        if (keystore != null) {
+            create("release") {
+                storeFile = file(keystore)
+                storePassword = providers.environmentVariable("TANSU_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("TANSU_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("TANSU_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (keystore != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

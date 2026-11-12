@@ -215,7 +215,11 @@ internal fun PasteBar(
                 color = MaterialTheme.colorScheme.inverseOnSurface,
             )
             Text(
-                text = stringResource(R.string.held_from, Human.size(held.bytes), folder),
+                // A folder's size isn't known until it's walked: then just where it's from.
+                text =
+                    if (held.picks.any { it.isFolder })
+                        stringResource(R.string.held_from_only, folder)
+                    else stringResource(R.string.held_from, Human.size(held.bytes), folder),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.inverseOnSurface,
                 maxLines = 1,

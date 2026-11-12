@@ -19,11 +19,11 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 | 5 | Share in | Tansu in the share sheet, and the Save to picker | |
 | 6 | Open files | Pictures, videos and PDFs in tansu; other files in another app | |
 | 7 | Browse extras and Settings | Search, sort and view, grid, hidden files, and Settings | |
-| 8 | Releases and updates | The `release` branch and its workflow, signing, the downloads page, and the in-app update | |
+| 8 | Releases and updates | The `release` branch and its workflow, signing, the downloads page, and the in-app update | Releases and the downloads page done; the in-app update next |
 | 9 | Polish | Accessibility, performance, dark theme and the small things | |
 
-Two things wait for the owner: making the release signing key (and its GitHub secrets), and the
-first push to `release`.
+The release signing key and its GitHub secrets were made on 12 Nov 2026 (see
+[releasing.md](releasing.md)); the owner keeps the backup.
 
 ## Left for later
 
