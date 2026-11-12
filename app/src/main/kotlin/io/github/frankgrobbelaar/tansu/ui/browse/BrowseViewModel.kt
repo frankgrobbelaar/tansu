@@ -10,13 +10,14 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.frankgrobbelaar.tansu.StorageAccess
 import io.github.frankgrobbelaar.tansu.TansuApplication
 import io.github.frankgrobbelaar.tansu.TansuSettings
-import io.github.frankgrobbelaar.tansu.files.BrowseOrder
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.Fetcher
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
+import io.github.frankgrobbelaar.tansu.files.Sort
+import io.github.frankgrobbelaar.tansu.files.browseOrder
 import io.github.frankgrobbelaar.tansu.files.isWithin
 import io.github.frankgrobbelaar.tansu.files.join
 import io.github.frankgrobbelaar.tansu.jobs.Clash
@@ -45,7 +46,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 data class BrowseUiState(
     val drawers: List<DrawerTab>,
@@ -74,7 +74,17 @@ data class BrowseUiState(
     val fetching: Fetching? = null,
     /** Files fetched and ready to hand to another app, once. */
     val fetched: Fetched? = null,
+    /** How every folder is ordered. */
+    val sort: Sort = Sort(),
+    /** This folder is shown as a grid rather than a list. */
+    val grid: Boolean = false,
+    val showHidden: Boolean = false,
+    /** What the folder is being searched for; null when it isn't being searched. */
+    val search: String? = null,
 ) {
+    val searching: Boolean
+        get() = search != null
+
     val selecting: Boolean
         get() = selected.isNotEmpty()
 
@@ -166,6 +176,7 @@ class BrowseViewModel(
     private val notice = MutableStateFlow<BrowseUiState.Notice?>(null)
     private val fetching = MutableStateFlow<BrowseUiState.Fetching?>(null)
     private val fetched = MutableStateFlow<BrowseUiState.Fetched?>(null)
+    private val search = MutableStateFlow<String?>(null)
     private var loading: kotlinx.coroutines.Job? = null
     private var fetchingJob: kotlinx.coroutines.Job? = null
 
@@ -178,23 +189,52 @@ class BrowseViewModel(
                 hereOf(drawers.value, drawerId.value, paths.value),
             )
 
-    /** The listing as Browse shows it: hidden files only when Settings says so. */
+    /**
+     * The listing as Browse shows it: hidden files only when Settings says so, what matches a
+     * search, in the order chosen. Sorting thousands of names is real work, so it's done off the
+     * main thread.
+     */
     private val shown: StateFlow<Listing> =
-        combine(listing, settings.showHidden) { listing, showHidden ->
-                if (showHidden) listing
-                else listing.copy(entries = listing.entries.filterNot { it.isHidden })
+        combine(listing, settings.showHidden, settings.sort, search) {
+                listing,
+                showHidden,
+                sort,
+                search ->
+                val entries =
+                    listing.entries
+                        .filter { showHidden || !it.isHidden }
+                        .filter { search.isNullOrEmpty() || it.name.contains(search, true) }
+                        .sortedWith(browseOrder(sort))
+                listing.copy(entries = entries)
             }
             .flowOn(compute)
             .stateIn(viewModelScope, SharingStarted.Eagerly, listing.value)
 
+    /** How the folder on show is arranged: its order, list or grid, and any search. */
+    private val arrangement =
+        combine(here, settings.grids, settings.choices, search) { here, grids, choices, search ->
+            Arrangement(
+                sort = choices.sort,
+                grid = gridKey(here) in grids,
+                showHidden = choices.showHidden,
+                search = search,
+            )
+        }
+
     /** Whether to offer a first server, and the name of one just added. */
     private val news =
-        combine(servers.all, settings.serverOfferDismissed, added, drawers) {
+        combine(servers.all, settings.serverOfferDismissed, added, drawers, troubled) {
             saved,
             dismissed,
             added,
-            drawers ->
-            News(offerServers = saved.isEmpty() && !dismissed, added = added, drawers = drawers)
+            drawers,
+            troubled ->
+            News(
+                offerServers = saved.isEmpty() && !dismissed,
+                added = added,
+                drawers = drawers,
+                troubled = troubled,
+            )
         }
 
     private val fetches = combine(fetching, fetched, ::Pair)
@@ -211,10 +251,10 @@ class BrowseViewModel(
         }
 
     val state: StateFlow<BrowseUiState> =
-        combine(here, shown, troubled, news, tools) { here, listing, troubled, news, tools ->
+        combine(here, shown, news, tools, arrangement) { here, listing, news, tools, arranged ->
                 BrowseUiState(
-                    drawers = news.drawers.map { tabOf(it, troubled) },
-                    drawer = tabOf(here.drawer, troubled),
+                    drawers = news.drawers.map { tabOf(it, news.troubled) },
+                    drawer = tabOf(here.drawer, news.troubled),
                     crumbs = crumbsOf(here),
                     entries = listing.entries,
                     loading = listing.loading,
@@ -230,6 +270,10 @@ class BrowseViewModel(
                         here.drawer.server?.let { LocalNetwork.looksLocal(it.host) } == true,
                     fetching = tools.fetching,
                     fetched = tools.fetched,
+                    sort = arranged.sort,
+                    grid = arranged.grid,
+                    showHidden = arranged.showHidden,
+                    search = arranged.search,
                 )
             }
             .stateIn(
@@ -246,6 +290,8 @@ class BrowseViewModel(
         viewModelScope.launch {
             here.collect {
                 picked.value = emptySet()
+                // A search is of one folder: moving on ends it.
+                search.value = null
                 load(it, fresh = true)
             }
         }
@@ -441,6 +487,27 @@ class BrowseViewModel(
         added.value = null
     }
 
+    // Arranging the folder
+
+    /** Searches the folder for [text] in names; an empty one starts a search, null ends it. */
+    fun search(text: String?) {
+        search.value = text
+    }
+
+    fun setSort(sort: Sort) {
+        viewModelScope.launch { settings.setSort(sort) }
+    }
+
+    /** Shows this folder as a grid, or as a list; each folder remembers which. */
+    fun setGrid(on: Boolean) {
+        val folder = gridKey(here.value)
+        viewModelScope.launch { settings.setGrid(folder, on) }
+    }
+
+    fun setShowHidden(on: Boolean) {
+        viewModelScope.launch { settings.setShowHidden(on) }
+    }
+
     private fun goTo(path: String) {
         val drawerId = here.value.drawer.id
         paths.update { it + (drawerId to path) }
@@ -467,11 +534,7 @@ class BrowseViewModel(
             Listing(problem = BrowseUiState.Problem.NoAccess)
         } else {
             try {
-                val entries = here.drawer.fileSystem.list(here.path)
-                // Sorting thousands of names is real work: keep it off the main thread.
-                withContext(compute) {
-                    Listing(entries.sortedWith(BrowseOrder))
-                }
+                Listing(here.drawer.fileSystem.list(here.path))
             } catch (e: FileSystemException) {
                 Listing(problem = problemOf(e))
             }
@@ -488,6 +551,15 @@ class BrowseViewModel(
         val offerServers: Boolean,
         val added: String?,
         val drawers: List<Drawer>,
+        /** The drawers whose servers aren't answering. */
+        val troubled: Set<String>,
+    )
+
+    private data class Arrangement(
+        val sort: Sort,
+        val grid: Boolean,
+        val showHidden: Boolean,
+        val search: String?,
     )
 
     private data class Tools(
@@ -576,3 +648,6 @@ private fun BrowseUiState.Problem?.isServerWide() =
         this is BrowseUiState.Problem.LoginRefused ||
         this is BrowseUiState.Problem.ShareMissing ||
         this is BrowseUiState.Problem.KeyChanged
+
+/** A folder as the grid setting names it: its drawer and path. */
+private fun gridKey(here: Here) = "${here.drawer.id}:${here.path}"

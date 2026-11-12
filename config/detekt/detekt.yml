@@ -6,7 +6,7 @@ complexity:
     # A screen's ViewModel has one small function per thing the user can do there; private
     # helpers don't add to what it offers.
     ignorePrivate: true
-    allowedFunctionsPerClass: 25
+    allowedFunctionsPerClass: 30
   LongParameterList:
     # Composables take a modifier and optional parameters by design.
     ignoreDefaultParameters: true

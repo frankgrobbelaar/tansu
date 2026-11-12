@@ -9,6 +9,7 @@ import io.github.frankgrobbelaar.tansu.Choices
 import io.github.frankgrobbelaar.tansu.TansuApplication
 import io.github.frankgrobbelaar.tansu.TansuSettings
 import io.github.frankgrobbelaar.tansu.Theme
+import io.github.frankgrobbelaar.tansu.files.Sort
 import io.github.frankgrobbelaar.tansu.servers.SavedServers
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.updates.Update
@@ -37,6 +38,7 @@ class SettingsActions(
     val onTheme: (Theme) -> Unit,
     val onDynamicColor: (Boolean) -> Unit,
     val onShowHidden: (Boolean) -> Unit,
+    val onSort: (Sort) -> Unit,
     val onCheckUpdates: (Boolean) -> Unit,
     val onCheckNow: () -> Unit,
     val onDownload: () -> Unit,
@@ -80,6 +82,10 @@ class SettingsViewModel(
 
     fun setShowHidden(on: Boolean) {
         viewModelScope.launch { settings.setShowHidden(on) }
+    }
+
+    fun setSort(sort: Sort) {
+        viewModelScope.launch { settings.setSort(sort) }
     }
 
     fun setCheckUpdates(on: Boolean) {

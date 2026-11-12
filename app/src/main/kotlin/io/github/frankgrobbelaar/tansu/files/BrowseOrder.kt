@@ -1,12 +1,39 @@
 package io.github.frankgrobbelaar.tansu.files
 
+/** What Browse sorts by. Folders always come first. */
+enum class SortBy {
+    Name,
+    Modified,
+    Size,
+    Type,
+}
+
+/** Browse's order: what it sorts by, and whether it's the other way round. */
+data class Sort(val by: SortBy = SortBy.Name, val descending: Boolean = false)
+
 /**
- * Browse's order: folders first, then files, each by name as a person reads it. Case doesn't matter
- * and numbers count up, so `IMG_2` comes before `IMG_10`.
+ * Browse's order for [sort]: folders first, then files. Names read as a person reads them: case
+ * doesn't matter and numbers count up, so `IMG_2` comes before `IMG_10`. They also settle ties.
  */
-val BrowseOrder: Comparator<Entry> =
-    compareByDescending<Entry> { it.isFolder }
-        .thenComparator { a, b -> naturalCompare(a.name, b.name) }
+fun browseOrder(sort: Sort): Comparator<Entry> {
+    val byName = Comparator<Entry> { a, b -> naturalCompare(a.name, b.name) }
+    val within =
+        when (sort.by) {
+            SortBy.Name -> byName
+            SortBy.Modified -> compareBy<Entry> { it.modified }.then(byName)
+            SortBy.Size -> compareBy<Entry> { it.size }.then(byName)
+            SortBy.Type -> compareBy<Entry> { it.type }.then(byName)
+        }
+    return compareByDescending<Entry> { it.isFolder }
+        .then(if (sort.descending) within.reversed() else within)
+}
+
+/** Browse's usual order: folders first, then files, each by name. */
+val BrowseOrder: Comparator<Entry> = browseOrder(Sort())
+
+/** A file's type, by its extension; folders have none. */
+private val Entry.type: String
+    get() = if (isFolder) "" else name.substringAfterLast('.', "").lowercase()
 
 /**
  * Compares names character by character, ignoring case, but reads each run of the digits 0 to 9 as

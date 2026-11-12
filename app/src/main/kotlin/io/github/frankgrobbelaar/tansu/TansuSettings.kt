@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import io.github.frankgrobbelaar.tansu.files.Sort
+import io.github.frankgrobbelaar.tansu.files.SortBy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -24,6 +27,8 @@ data class Choices(
     val dynamicColor: Boolean = false,
     /** Files whose names start with a dot, shown in Browse. */
     val showHidden: Boolean = false,
+    /** How Browse orders every folder. */
+    val sort: Sort = Sort(),
     /** Asking GitHub once a day for a new version. */
     val checkUpdates: Boolean = true,
     /** When tansu last asked GitHub, in milliseconds since the epoch; 0 if never. */
@@ -40,6 +45,11 @@ class TansuSettings(private val store: DataStore<Preferences>) {
                     theme = Theme.entries.find { it.name == prefs[THEME] } ?: Theme.System,
                     dynamicColor = prefs[DYNAMIC_COLOR] ?: false,
                     showHidden = prefs[SHOW_HIDDEN] ?: false,
+                    sort =
+                        Sort(
+                            by = SortBy.entries.find { it.name == prefs[SORT_BY] } ?: SortBy.Name,
+                            descending = prefs[SORT_DESCENDING] ?: false,
+                        ),
                     checkUpdates = prefs[CHECK_UPDATES] ?: true,
                     lastUpdateCheck = prefs[LAST_UPDATE_CHECK] ?: 0,
                 )
@@ -47,6 +57,11 @@ class TansuSettings(private val store: DataStore<Preferences>) {
             .distinctUntilChanged()
 
     val showHidden: Flow<Boolean> = choices.map { it.showHidden }.distinctUntilChanged()
+
+    val sort: Flow<Sort> = choices.map { it.sort }.distinctUntilChanged()
+
+    /** The folders shown as a grid, each as its drawer's id and path; the rest are lists. */
+    val grids: Flow<Set<String>> = store.data.map { it[GRIDS].orEmpty() }.distinctUntilChanged()
 
     suspend fun setTheme(theme: Theme) {
         store.edit { it[THEME] = theme.name }
@@ -58,6 +73,20 @@ class TansuSettings(private val store: DataStore<Preferences>) {
 
     suspend fun setShowHidden(on: Boolean) {
         store.edit { it[SHOW_HIDDEN] = on }
+    }
+
+    suspend fun setSort(sort: Sort) {
+        store.edit {
+            it[SORT_BY] = sort.by.name
+            it[SORT_DESCENDING] = sort.descending
+        }
+    }
+
+    /** Shows the [folder], as [grids] names it, as a grid or back as a list. */
+    suspend fun setGrid(folder: String, on: Boolean) {
+        store.edit {
+            it[GRIDS] = if (on) it[GRIDS].orEmpty() + folder else it[GRIDS].orEmpty() - folder
+        }
     }
 
     suspend fun setCheckUpdates(on: Boolean) {
@@ -106,5 +135,8 @@ class TansuSettings(private val store: DataStore<Preferences>) {
         val SHOW_HIDDEN = booleanPreferencesKey("show_hidden")
         val CHECK_UPDATES = booleanPreferencesKey("check_updates")
         val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
+        val SORT_BY = stringPreferencesKey("sort_by")
+        val SORT_DESCENDING = booleanPreferencesKey("sort_descending")
+        val GRIDS = stringSetPreferencesKey("grids")
     }
 }

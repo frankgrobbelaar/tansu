@@ -55,7 +55,10 @@ import io.github.frankgrobbelaar.tansu.Choices
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.Theme
 import io.github.frankgrobbelaar.tansu.servers.Server
+import io.github.frankgrobbelaar.tansu.ui.browse.SortSheet
+import io.github.frankgrobbelaar.tansu.ui.browse.label
 import io.github.frankgrobbelaar.tansu.ui.browse.openOutside
+import io.github.frankgrobbelaar.tansu.ui.browse.orderLabel
 import io.github.frankgrobbelaar.tansu.ui.format.Human
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuTopBar
@@ -83,6 +86,7 @@ fun SettingsRoute(
                 onTheme = viewModel::setTheme,
                 onDynamicColor = viewModel::setDynamicColor,
                 onShowHidden = viewModel::setShowHidden,
+                onSort = viewModel::setSort,
                 onCheckUpdates = viewModel::setCheckUpdates,
                 onCheckNow = viewModel::checkNow,
                 onDownload = viewModel::downloadAndInstall,
@@ -103,6 +107,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var choosingTheme by rememberSaveable { mutableStateOf(false) }
+    var sorting by rememberSaveable { mutableStateOf(false) }
     val choices = state.choices
     Column(modifier = modifier.fillMaxSize()) {
         TansuTopBar(title = stringResource(R.string.nav_settings))
@@ -126,12 +131,7 @@ fun SettingsScreen(
                 Appearance(choices, onTheme = { choosingTheme = true }, actions.onDynamicColor)
             }
             Group(stringResource(R.string.nav_browse)) {
-                Toggle(
-                    title = stringResource(R.string.settings_show_hidden),
-                    detail = stringResource(R.string.settings_show_hidden_detail),
-                    checked = choices.showHidden,
-                    onChange = actions.onShowHidden,
-                )
+                BrowseChoices(choices, actions.onShowHidden, onOpenSort = { sorting = true })
             }
             Group(stringResource(R.string.settings_servers)) {
                 state.servers.forEach { server ->
@@ -142,6 +142,9 @@ fun SettingsScreen(
             }
             Group(stringResource(R.string.settings_about)) { About(state, actions) }
         }
+    }
+    if (sorting) {
+        SortSheet(sort = choices.sort, onSort = actions.onSort, onDismiss = { sorting = false })
     }
     if (choosingTheme) {
         ThemeDialog(
@@ -175,6 +178,33 @@ private fun Appearance(
             detail = stringResource(R.string.settings_dynamic_color_detail),
             checked = choices.dynamicColor,
             onChange = onDynamicColor,
+        )
+    }
+}
+
+@Composable
+private fun BrowseChoices(
+    choices: Choices,
+    onShowHiddenChange: (Boolean) -> Unit,
+    onOpenSort: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Toggle(
+            title = stringResource(R.string.settings_show_hidden),
+            detail = stringResource(R.string.settings_show_hidden_detail),
+            checked = choices.showHidden,
+            onChange = onShowHiddenChange,
+        )
+        RowDivider()
+        Setting(
+            title = stringResource(R.string.sort),
+            detail =
+                stringResource(choices.sort.by.label) +
+                    ", " +
+                    orderLabel(choices.sort.by, choices.sort.descending),
+            modifier = Modifier.clickable(role = Role.Button, onClick = onOpenSort),
+            trailing = { Chevron() },
         )
     }
 }

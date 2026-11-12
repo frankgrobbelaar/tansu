@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.frankgrobbelaar.tansu.R
@@ -45,6 +46,8 @@ fun FileRow(
     onLongClick: (() -> Unit)? = null,
     selecting: Boolean = false,
     selected: Boolean = false,
+    /** The name as shown, such as with what a search matched in bold. */
+    name: AnnotatedString = AnnotatedString(entry.name),
 ) {
     Row(
         modifier =
@@ -64,7 +67,7 @@ fun FileRow(
         FileTile(kind = FileKind.of(entry))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = entry.name,
+                text = name,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

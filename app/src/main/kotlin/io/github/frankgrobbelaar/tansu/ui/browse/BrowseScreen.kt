@@ -12,12 +12,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -38,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.files.Entry
+import io.github.frankgrobbelaar.tansu.files.Sort
 import io.github.frankgrobbelaar.tansu.jobs.Clash
 import io.github.frankgrobbelaar.tansu.ui.format.Human
 import io.github.frankgrobbelaar.tansu.ui.format.JobWords
@@ -84,6 +88,7 @@ fun BrowseRoute(
         onResume = viewModel::refresh,
         onUp = { viewModel.up() },
         onClearSelection = viewModel::clearSelection,
+        onEndSearch = { viewModel.search(null) },
         onAnnounce = viewModel::addedShown,
         onClearNotice = viewModel::noticeShown,
     )
@@ -112,6 +117,9 @@ fun BrowseRoute(
                 onDelete = { askNotifications(viewModel::delete) },
                 onRename = viewModel::rename,
                 onPaste = { choices -> askNotifications { viewModel.paste(choices) } },
+                onSort = viewModel::setSort,
+                onGrid = viewModel::setGrid,
+                onShowHidden = viewModel::setShowHidden,
             ),
         onDialog = { dialog = it },
     )
@@ -124,6 +132,9 @@ internal class DialogDecisions(
     val onDelete: () -> Unit,
     val onRename: (Entry, String) -> Unit,
     val onPaste: (Map<String, Clash>) -> Unit,
+    val onSort: (Sort) -> Unit,
+    val onGrid: (Boolean) -> Unit,
+    val onShowHidden: (Boolean) -> Unit,
 )
 
 /** Hands fetched server files to another app, once, as they arrive. */
@@ -183,6 +194,8 @@ private fun BrowseViewModel.actions(
         onEditServer = places.onEditServer,
         onRemoveServer = { onDialog(BrowseDialog.RemoveServer) },
         onNewFolder = { onDialog(BrowseDialog.NewFolder) },
+        onSortAndView = { onDialog(BrowseDialog.SortAndView) },
+        onSearch = ::search,
         onDismissOffer = ::dismissServerOffer,
         onOpen = { entry ->
             when {
@@ -249,6 +262,8 @@ internal sealed interface BrowseDialog {
 
     data object NewFolder : BrowseDialog
 
+    data object SortAndView : BrowseDialog
+
     data object Delete : BrowseDialog
 
     data class Rename(val entry: Entry) : BrowseDialog
@@ -273,6 +288,7 @@ private fun BrowseEffects(
     onResume: () -> Unit,
     onUp: () -> Unit,
     onClearSelection: () -> Unit,
+    onEndSearch: () -> Unit,
     onAnnounce: () -> Unit,
     onClearNotice: () -> Unit,
 ) {
@@ -288,7 +304,8 @@ private fun BrowseEffects(
         onPauseOrDispose {}
     }
     BackHandler(enabled = !state.atRoot, onBack = onUp)
-    // Registered after going up, so it wins: back first leaves selection.
+    // Registered after going up, so they win: back first leaves selection, then the search.
+    BackHandler(enabled = state.searching, onBack = onEndSearch)
     BackHandler(enabled = state.selecting, onBack = onClearSelection)
     // Shown first and cleared after: clearing changes the key, which would end the snackbar early.
     LaunchedEffect(added) {
@@ -319,6 +336,9 @@ class BrowseActions(
     val onEditServer: () -> Unit,
     val onRemoveServer: () -> Unit,
     val onNewFolder: () -> Unit,
+    val onSortAndView: () -> Unit,
+    /** Searches the folder: "" starts, null ends. */
+    val onSearch: (String?) -> Unit,
     val onDismissOffer: () -> Unit,
     val onOpen: (Entry) -> Unit,
     val onPick: (Entry) -> Unit,
@@ -354,7 +374,8 @@ internal fun BrowseScreen(
                 onSelectAll = actions.onSelectAll,
             )
         } else {
-            BrowseTopBar(state, actions)
+            if (state.searching) SearchTopBar(folder = state.title, onSearch = actions.onSearch)
+            else BrowseTopBar(state, actions)
             DrawerChips(
                 drawers = state.drawers,
                 selected = state.drawer.id,
@@ -366,32 +387,74 @@ internal fun BrowseScreen(
             ServerOffer(onAdd = actions.onAddServer, onDismiss = actions.onDismissOffer)
         }
         if (state.problem == null) {
-            PathBar(
-                crumbs = state.crumbs,
-                info =
-                    if (state.loading && state.entries.isEmpty()) ""
-                    else Human.count(state.entries.size),
-                onCrumb = actions.onCrumb,
-            )
+            PathBar(crumbs = state.crumbs, info = pathInfo(state), onCrumb = actions.onCrumb)
         }
-        Box(modifier = Modifier.weight(1f)) {
-            when {
-                state.problem != null -> ProblemState(state, actions, localNetworkBlocked)
-                !state.loading && state.entries.isEmpty() ->
-                    EmptyState(
-                        icon = TansuIcons.Folder,
-                        title = stringResource(R.string.browse_empty_title),
-                        body = stringResource(R.string.browse_empty_body),
-                    )
-                else -> Entries(state, actions)
-            }
-            if (state.loading) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter)
-                )
-            }
+        Refreshable(state, actions.onRetry, modifier = Modifier.weight(1f)) {
+            FolderBody(state, actions, localNetworkBlocked)
         }
         BrowseFoot(state, actions, selectionActions)
+    }
+}
+
+/**
+ * The folder, pulled down to list it again. A pull shows its own spinner; any other listing shows a
+ * thin bar along the top.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Refreshable(
+    state: BrowseUiState,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    var pulled by remember { mutableStateOf(false) }
+    LaunchedEffect(state.loading) { if (!state.loading) pulled = false }
+    PullToRefreshBox(
+        isRefreshing = pulled && state.loading,
+        onRefresh = {
+            pulled = true
+            onRefresh()
+        },
+        modifier = modifier,
+    ) {
+        content()
+        if (state.loading && !pulled) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter))
+        }
+    }
+}
+
+/** How much the folder holds, or how much of it matches a search. */
+@Composable
+private fun pathInfo(state: BrowseUiState): String =
+    when {
+        state.loading && state.entries.isEmpty() -> ""
+        !state.search.isNullOrEmpty() ->
+            pluralStringResource(R.plurals.browse_matches, state.entries.size, state.entries.size)
+        else -> Human.count(state.entries.size)
+    }
+
+/** The files, as a list or a grid, or why there are none to show. */
+@Composable
+private fun FolderBody(state: BrowseUiState, actions: BrowseActions, localNetworkBlocked: Boolean) {
+    val empty = !state.loading && state.entries.isEmpty()
+    when {
+        state.problem != null -> ProblemState(state, actions, localNetworkBlocked)
+        empty && !state.search.isNullOrEmpty() ->
+            EmptyState(
+                icon = TansuIcons.Search,
+                title = stringResource(R.string.search_empty_title),
+                body = stringResource(R.string.search_empty_body, state.search),
+            )
+        empty ->
+            EmptyState(
+                icon = TansuIcons.Folder,
+                title = stringResource(R.string.browse_empty_title),
+                body = stringResource(R.string.browse_empty_body),
+            )
+        state.grid -> EntryGrid(state, actions)
+        else -> Entries(state, actions)
     }
 }
 
@@ -423,7 +486,12 @@ private fun BrowseTopBar(state: BrowseUiState, actions: BrowseActions) {
                 }
             }
         },
-        actions = { MoreMenu(onServer = state.onServer, actions = actions) },
+        actions = {
+            IconButton(onClick = { actions.onSearch("") }) {
+                Icon(TansuIcons.Search, contentDescription = stringResource(R.string.search))
+            }
+            MoreMenu(onServer = state.onServer, actions = actions)
+        },
     )
 }
 
@@ -441,6 +509,7 @@ private fun MoreMenu(onServer: Boolean, actions: BrowseActions, modifier: Modifi
             Icon(TansuIcons.More, contentDescription = stringResource(R.string.more_options))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            MenuItem(TansuIcons.Sort, R.string.sort_and_view, choose(actions.onSortAndView))
             MenuItem(TansuIcons.NewFolder, R.string.new_folder, choose(actions.onNewFolder))
             MenuItem(TansuIcons.Plus, R.string.add_server, choose(actions.onAddServer))
             if (onServer) {
@@ -474,8 +543,10 @@ private fun Entries(state: BrowseUiState, actions: BrowseActions, modifier: Modi
                 onLongClick = { actions.onPick(entry) },
                 selecting = state.selecting,
                 selected = entry.path in state.selected,
+                name = marked(entry.name, state.search),
                 modifier = Modifier.animateItem(),
             )
         }
+        if (!state.search.isNullOrEmpty()) item(key = "search note") { SearchNote() }
     }
 }

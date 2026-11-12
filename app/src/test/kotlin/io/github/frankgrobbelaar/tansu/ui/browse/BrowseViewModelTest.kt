@@ -15,6 +15,8 @@ import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
 import io.github.frankgrobbelaar.tansu.files.MemoryFileSystem
+import io.github.frankgrobbelaar.tansu.files.Sort
+import io.github.frankgrobbelaar.tansu.files.SortBy
 import io.github.frankgrobbelaar.tansu.jobs.Clipboard
 import io.github.frankgrobbelaar.tansu.jobs.Job
 import io.github.frankgrobbelaar.tansu.jobs.Jobs
@@ -133,6 +135,44 @@ class BrowseViewModelTest {
                 )
             }
         }
+
+    @Test
+    fun `searching shows what matches, in any case, and ends with the folder`() = runTest {
+        val browse = viewModel()
+        browse.state.test {
+            browse.search("")
+            assertEquals(3, expectMostRecentItem().entries.size)
+            browse.search("NOTES")
+            val found = expectMostRecentItem()
+            assertEquals("NOTES", found.search)
+            assertEquals(listOf("notes.txt"), found.entries.map { it.name })
+
+            browse.open(folder(root, "Download"))
+            val moved = expectMostRecentItem()
+            assertFalse(moved.searching)
+            assertEquals(listOf("Receipts", "a.pdf", "b.pdf"), moved.entries.map { it.name })
+        }
+    }
+
+    @Test
+    fun `the order applies to every folder, and each folder keeps its own view`() = runTest {
+        val browse = viewModel()
+        browse.state.test {
+            browse.setSort(Sort(SortBy.Name, descending = true))
+            browse.setGrid(true)
+            val top = expectMostRecentItem()
+            assertEquals(listOf("Pictures", "Download", "notes.txt"), top.entries.map { it.name })
+            assertTrue(top.grid)
+
+            browse.open(folder(root, "Download"))
+            val inside = expectMostRecentItem()
+            assertEquals(listOf("Receipts", "b.pdf", "a.pdf"), inside.entries.map { it.name })
+            assertFalse(inside.grid)
+
+            browse.up()
+            assertTrue(expectMostRecentItem().grid)
+        }
+    }
 
     @Test
     fun `opening a folder lists it and puts it on the path, and up comes back`() = runTest {

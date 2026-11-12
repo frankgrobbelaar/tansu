@@ -48,6 +48,7 @@ internal fun BrowseDialogHost(
                 },
                 onCancel = onClose,
             )
+        BrowseDialog.SortAndView -> SortAndView(state, decisions, onClose)
         is BrowseDialog.Rename ->
             RenameDialog(
                 entry = dialog.entry,
@@ -70,6 +71,19 @@ internal fun BrowseDialogHost(
                 ClashSteps(dialog, state, decisions.onPaste, onDialog)
             }
     }
+}
+
+@Composable
+private fun SortAndView(state: BrowseUiState, decisions: DialogDecisions, onClose: () -> Unit) {
+    SortSheet(
+        sort = state.sort,
+        onSort = decisions.onSort,
+        onDismiss = onClose,
+        grid = state.grid,
+        onGrid = decisions.onGrid,
+        showHidden = state.showHidden,
+        onShowHiddenChange = decisions.onShowHidden,
+    )
 }
 
 /** One clash at a time, until each is settled or one answer settles the rest; then the paste. */

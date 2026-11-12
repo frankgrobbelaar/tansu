@@ -5,6 +5,10 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- Search a folder by name as you type, with what matched in bold.
+- Sort by name, date, size or type, either way round, from Sort and view in the menu or in
+  Settings. Any folder can be a grid instead of a list, and remembers it.
+
 ## 0.2.0 - 2026-11-13
 
 Settings, updates that arrive in the app, and safer copying.

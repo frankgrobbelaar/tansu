@@ -123,4 +123,33 @@
 
     <string name="transfers_empty_title">Nothing moving</string>
     <string name="transfers_empty_body">Copies, moves and deletes show up here while they run.</string>
+
+    <string name="search">Search</string>
+    <string name="search_folder">Search %1$s</string>
+    <string name="clear_search">Clear search</string>
+    <string name="close_search">Close search</string>
+    <string name="search_note">Searching this folder by name. Clear the search to see everything again.</string>
+    <string name="search_empty_title">No matches</string>
+    <string name="search_empty_body">Nothing in this folder has “%1$s” in its name.</string>
+    <plurals name="browse_matches">
+        <item quantity="one">%1$d match</item>
+        <item quantity="other">%1$d matches</item>
+    </plurals>
+    <string name="sort_and_view">Sort and view</string>
+    <string name="sort">Sort</string>
+    <string name="sort_by">Sort by</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_modified">Date modified</string>
+    <string name="sort_size">Size</string>
+    <string name="sort_type">Type</string>
+    <string name="order">Order</string>
+    <string name="order_a_z">A to Z</string>
+    <string name="order_z_a">Z to A</string>
+    <string name="order_oldest">Oldest first</string>
+    <string name="order_newest">Newest first</string>
+    <string name="order_smallest">Smallest first</string>
+    <string name="order_largest">Largest first</string>
+    <string name="view">View</string>
+    <string name="view_list">List</string>
+    <string name="view_grid">Grid</string>
 </resources>
