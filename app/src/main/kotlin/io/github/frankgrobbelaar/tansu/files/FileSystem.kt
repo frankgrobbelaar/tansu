@@ -33,8 +33,11 @@ interface FileSystem {
 
     suspend fun createFolder(path: String)
 
-    /** Moves [from] to [to] within this file system. Fails with Exists if [to] is taken. */
-    suspend fun rename(from: String, to: String)
+    /**
+     * Moves [from] to [to] within this file system. Fails with Exists if [to] is taken, in any case
+     * on the phone and SMB, unless told to [replace] the file there, in one step.
+     */
+    suspend fun rename(from: String, to: String, replace: Boolean = false)
 
     /** Deletes the file, the empty folder or the link at [path]; a link's target stays. */
     suspend fun delete(path: String)

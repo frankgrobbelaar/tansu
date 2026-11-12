@@ -17,6 +17,14 @@
     <!-- Updates come from GitHub, not a store: tansu hands them to Android's installer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- To hand an update to Android's own installer rather than any app that takes APKs. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
+
     <application
         android:name=".TansuApplication"
         android:allowBackup="false"

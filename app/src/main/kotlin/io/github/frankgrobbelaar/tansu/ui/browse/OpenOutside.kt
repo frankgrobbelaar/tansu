@@ -3,6 +3,7 @@ package io.github.frankgrobbelaar.tansu.ui.browse
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.provider.Settings
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
@@ -17,6 +18,28 @@ fun openOutside(context: Context, file: File): Boolean {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     return try {
         context.startActivity(view)
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    }
+}
+
+/**
+ * Hands a downloaded update to Android's own installer, rather than to any app that says it takes
+ * APKs. False when there's none to take it.
+ */
+fun installUpdate(context: Context, apk: File): Boolean {
+    val install =
+        Intent(Intent.ACTION_VIEW)
+            .setDataAndType(uriOf(context, apk), APK)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.packageManager
+        .queryIntentActivities(install, PackageManager.MATCH_SYSTEM_ONLY)
+        .firstOrNull()
+        ?.activityInfo
+        ?.let { install.setClassName(it.packageName, it.name) }
+    return try {
+        context.startActivity(install)
         true
     } catch (_: ActivityNotFoundException) {
         false
@@ -38,6 +61,8 @@ fun shareOutside(context: Context, files: List<File>, chooserTitle: String) {
     share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     context.startActivity(Intent.createChooser(share, chooserTitle))
 }
+
+private const val APK = "application/vnd.android.package-archive"
 
 private fun uriOf(context: Context, file: File) =
     FileProvider.getUriForFile(context, "${context.packageName}.files", file)

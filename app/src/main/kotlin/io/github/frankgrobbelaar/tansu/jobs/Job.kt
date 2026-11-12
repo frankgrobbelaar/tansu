@@ -26,7 +26,12 @@ data class Job(
      * under a new name. A resumed or retried job carries on there instead of asking again.
      */
     val placed: Map<String, Placement> = emptyMap(),
-    /** A file this job was half way through writing when it stopped: cancelling removes it. */
+    /**
+     * Files a move has copied but not yet checked and removed from where they came from: the
+     * source's path, and where its copy is.
+     */
+    val copied: Map<String, String> = emptyMap(),
+    /** This job's hidden file, half written when it stopped: cancelling removes it. */
     val partial: String? = null,
     /** Read from another app, which only lends its files while it shares them: no retrying. */
     val outside: Boolean = false,
@@ -60,7 +65,7 @@ data class Job(
 
     /** Finished with failures that running it again could fix. */
     val canRetry: Boolean
-        get() = status == Status.Done && failures.isNotEmpty() && !outside
+        get() = status == Status.Done && failures.any { it.reason.retryable } && !outside
 
     /** Ended early for [reason]: every pick still to go fails with it. */
     internal fun ended(at: Long, reason: Failure.Reason): Job {
@@ -135,6 +140,10 @@ data class Failure(val name: String, val path: String, val reason: Reason) {
         /** The copy's size didn't match, so the original was kept. */
         Mismatch,
         /** A link inside a folder points somewhere else entirely, so it's left where it is. */
-        Link,
+        Link;
+
+        /** Whether trying again could go differently. */
+        val retryable: Boolean
+            get() = this != IntoItself && this != Link
     }
 }

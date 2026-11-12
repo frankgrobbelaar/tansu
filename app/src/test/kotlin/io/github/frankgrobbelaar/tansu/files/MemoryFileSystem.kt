@@ -19,7 +19,7 @@ class MemoryFileSystem(
     private val folders = mutableSetOf(root)
     private val links = mutableMapOf<String, String>()
 
-    /** Fails any call that touches the path. */
+    /** Fails any call that touches the path, as where it comes from or goes to. */
     val failures = mutableMapOf<String, FileSystemException>()
 
     /** Holds the next read of the path until the test completes it. */
@@ -34,8 +34,11 @@ class MemoryFileSystem(
     /** Makes every write say the disk is full, until set back to false. */
     var full = false
 
-    /** Paths whose writing is refused, though everything else about them works. */
-    val refusedWrites = mutableSetOf<String>()
+    /** Folders that can be listed and read, but not written in. */
+    val readOnly = mutableSetOf<String>()
+
+    /** Fails deleting the path, though everything else about it works. */
+    val deleteFailures = mutableMapOf<String, FileSystemException>()
 
     fun file(path: String, text: String) = apply {
         folderAt(parentOf(path))
@@ -50,17 +53,17 @@ class MemoryFileSystem(
     /** Makes [path] a link to the folder [target], as SFTP shows one. */
     fun link(path: String, target: String) = apply { links[path] = target }
 
-    fun text(path: String): String? = files[real(path)]?.decodeToString()
+    fun text(path: String): String? = held(real(path))?.let { files[it] }?.decodeToString()
 
-    fun exists(path: String) = path in links || real(path).let { it in files || it in folders }
+    fun exists(path: String) = path in links || held(real(path)) != null
 
     /** Every path, folders, files and links, under the root. */
     fun paths(): Set<String> = (files.keys + folders + links.keys - root).toSortedSet()
 
     override suspend fun list(path: String): List<Entry> {
         check(path)
-        val at = real(path)
-        if (at !in folders) throw FileSystemException.NotFound(path)
+        val at =
+            held(real(path))?.takeIf { it in folders } ?: throw FileSystemException.NotFound(path)
         val inside = childrenOf(at).map { entryOf(join(path, nameOf(it))) }
         val linked = links.keys.filter { parentOf(it) == path }.map(::entryOf)
         return inside + linked
@@ -74,7 +77,7 @@ class MemoryFileSystem(
     override suspend fun read(path: String, offset: Long): InputStream {
         check(path)
         gates.remove(path)?.await()
-        val bytes = files[real(path)] ?: throw FileSystemException.NotFound(path)
+        val bytes = held(real(path))?.let { files[it] } ?: throw FileSystemException.NotFound(path)
         return object : ByteArrayInputStream(bytes) {
                 override fun read(b: ByteArray, off: Int, len: Int): Int {
                     if (broken) throw IOException("Connection reset")
@@ -87,11 +90,11 @@ class MemoryFileSystem(
     override suspend fun write(path: String, replace: Boolean): OutputStream {
         check(path)
         val at = real(path)
-        val there = taken(at)
+        val there = held(at)
         val refusal =
             when {
-                path in refusedWrites -> FileSystemException.AccessDenied(path)
-                parentOf(at) !in folders -> FileSystemException.NotFound(path)
+                parentOf(at) in readOnly -> FileSystemException.AccessDenied(path)
+                held(parentOf(at)) !in folders -> FileSystemException.NotFound(path)
                 there != null && (!replace || there in folders) -> FileSystemException.Exists(path)
                 else -> null
             }
@@ -113,25 +116,38 @@ class MemoryFileSystem(
     override suspend fun createFolder(path: String) {
         check(path)
         val at = real(path)
-        if (taken(at) != null || path in links) throw FileSystemException.Exists(path)
-        if (parentOf(at) !in folders) throw FileSystemException.NotFound(path)
+        val refusal =
+            when {
+                held(at) != null || path in links -> FileSystemException.Exists(path)
+                held(parentOf(at)) !in folders -> FileSystemException.NotFound(path)
+                parentOf(at) in readOnly -> FileSystemException.AccessDenied(path)
+                else -> null
+            }
+        refusal?.let { throw it }
         folders += at
     }
 
-    override suspend fun rename(from: String, to: String) {
+    override suspend fun rename(from: String, to: String, replace: Boolean) {
         check(from)
-        if (exists(to)) throw FileSystemException.Exists(to)
-        if (!exists(from)) throw FileSystemException.NotFound(from)
+        check(to)
         links.remove(from)?.let {
             links[to] = it
             return
         }
-        val moved = { path: String -> to + path.removePrefix(from) }
+        val source = held(real(from)) ?: throw FileSystemException.NotFound(from)
+        val there = held(real(to))
+        if (there != null && there != source) {
+            if (!replace || there in folders || source in folders) {
+                throw FileSystemException.Exists(to)
+            }
+            files -= there
+        }
+        val moved = { path: String -> real(to) + path.removePrefix(source) }
         files.keys
-            .filter { it == from || it.isWithin(from) }
+            .filter { it == source || it.isWithin(source) }
             .forEach { files[moved(it)] = files.remove(it)!! }
         folders
-            .filter { it == from || it.isWithin(from) }
+            .filter { it == source || it.isWithin(source) }
             .forEach {
                 folders -= it
                 folders += moved(it)
@@ -140,14 +156,14 @@ class MemoryFileSystem(
 
     override suspend fun delete(path: String) {
         check(path)
+        check(path, deleteFailures)
         // A link goes on its own, as SFTP's remove does.
         if (links.remove(path) != null) return
-        val at = real(path)
+        val at = held(real(path)) ?: throw FileSystemException.NotFound(path)
         when {
             at in files -> files -= at
-            at in folders && childrenOf(at).isEmpty() -> folders -= at
-            at in folders -> throw FileSystemException.Unreadable(path)
-            else -> throw FileSystemException.NotFound(path)
+            childrenOf(at).isEmpty() -> folders -= at
+            else -> throw FileSystemException.Unreadable(path)
         }
     }
 
@@ -157,24 +173,25 @@ class MemoryFileSystem(
         return links.getValue(link) + path.removePrefix(link)
     }
 
-    /** What already has [path]'s name, telling case apart or not. */
-    private fun taken(path: String): String? =
-        (files.keys + folders).firstOrNull { it.equals(path, ignoreCase = ignoreCase) }
+    /** The file or folder that has [path]'s name, telling case apart or not. */
+    private fun held(path: String): String? =
+        if (path in files || path in folders) path
+        else (files.keys + folders).firstOrNull { it.equals(path, ignoreCase = ignoreCase) }
 
     private fun childrenOf(path: String) =
         (files.keys + folders).filter { it != path && parentOf(it) == path }
 
-    private fun check(path: String) {
-        failures[path]?.let { throw it }
+    private fun check(path: String, failing: Map<String, FileSystemException> = failures) {
+        failing[path]?.let { throw it }
     }
 
     private fun entryOf(path: String): Entry {
-        val at = real(path)
+        val at = held(real(path))
         return Entry(
             name = nameOf(path),
             path = path,
             isFolder = at in folders,
-            size = files[at]?.size?.toLong() ?: 0,
+            size = at?.let { files[it] }?.size?.toLong() ?: 0,
             modified = 0,
             isLink = path in links,
         )

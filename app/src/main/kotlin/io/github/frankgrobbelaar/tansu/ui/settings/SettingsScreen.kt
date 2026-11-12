@@ -56,8 +56,8 @@ import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.Theme
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.browse.SortSheet
+import io.github.frankgrobbelaar.tansu.ui.browse.installUpdate
 import io.github.frankgrobbelaar.tansu.ui.browse.label
-import io.github.frankgrobbelaar.tansu.ui.browse.openOutside
 import io.github.frankgrobbelaar.tansu.ui.browse.orderLabel
 import io.github.frankgrobbelaar.tansu.ui.format.Human
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
@@ -76,7 +76,7 @@ fun SettingsRoute(
     // Android's installer takes it from here: it asks to confirm, and checks the signature.
     LaunchedEffect(state.install) {
         val apk = state.install ?: return@LaunchedEffect
-        openOutside(context, apk)
+        installUpdate(context, apk)
         viewModel.installHandled()
     }
     SettingsScreen(

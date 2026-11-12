@@ -97,6 +97,13 @@ class TansuSettings(private val store: DataStore<Preferences>) {
         store.edit { it[LAST_UPDATE_CHECK] = at }
     }
 
+    /** The newer release the last check found, as the updater keeps it; null when there's none. */
+    val offer: Flow<String?> = store.data.map { it[OFFER] }
+
+    suspend fun setOffer(release: String?) {
+        store.edit { if (release == null) it.remove(OFFER) else it[OFFER] = release }
+    }
+
     /** Whether the first-run screens have been seen, so they don't come back. */
     val welcomeDone: Flow<Boolean> = store.data.map { it[WELCOME_DONE] ?: false }
 
@@ -138,5 +145,6 @@ class TansuSettings(private val store: DataStore<Preferences>) {
         val SORT_BY = stringPreferencesKey("sort_by")
         val SORT_DESCENDING = booleanPreferencesKey("sort_descending")
         val GRIDS = stringSetPreferencesKey("grids")
+        val OFFER = stringPreferencesKey("update_offer")
     }
 }

@@ -84,8 +84,9 @@ class Jobs(
     }
 
     fun cancel(id: Long) {
-        // A job paused part-way through a file leaves it half written: that goes too.
-        val paused = jobs.value.find { it.id == id && it.status is Job.Status.Paused }
+        // A job that stopped part-way through a file, paused or waiting to go again, leaves its
+        // hidden half of it behind: that goes too. The running job cleans up after itself.
+        val waiting = jobs.value.find { it.id == id && it.active && running?.id != id }
         stop(id, Stop.Cancel) {
             if (it.active) {
                 it.copy(status = Job.Status.Cancelled, finishedAt = clock(), partial = null)
@@ -93,8 +94,8 @@ class Jobs(
                 it
             }
         }
-        val partial = paused?.partial ?: return
-        val target = paused.to?.let(::sideOf) ?: return
+        val partial = waiting?.partial ?: return
+        val target = waiting.to?.let(::sideOf) ?: return
         scope.launch(io) { removeHalfWritten(target, partial) }
     }
 

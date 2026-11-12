@@ -14,6 +14,7 @@ import java.nio.file.NoSuchFileException
 import java.nio.file.NotDirectoryException
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 import kotlin.io.path.invariantSeparatorsPathString
@@ -64,8 +65,15 @@ class LocalFileSystem(private val io: CoroutineDispatcher = Dispatchers.IO) : Fi
         withContext(io) { mapErrors(path) { Files.createDirectory(Paths.get(path)) } }
     }
 
-    override suspend fun rename(from: String, to: String) {
-        withContext(io) { mapErrors(to) { Files.move(Paths.get(from), Paths.get(to)) } }
+    override suspend fun rename(from: String, to: String, replace: Boolean) {
+        withContext(io) {
+            mapErrors(to) {
+                // An atomic move is one rename(2): the old file is replaced, never first removed.
+                if (replace)
+                    Files.move(Paths.get(from), Paths.get(to), StandardCopyOption.ATOMIC_MOVE)
+                else Files.move(Paths.get(from), Paths.get(to))
+            }
+        }
     }
 
     override suspend fun delete(path: String) {

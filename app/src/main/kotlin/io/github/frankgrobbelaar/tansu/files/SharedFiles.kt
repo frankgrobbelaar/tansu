@@ -52,7 +52,7 @@ class SharedFiles(
 
     override suspend fun createFolder(path: String) = throw readOnly(path)
 
-    override suspend fun rename(from: String, to: String) = throw readOnly(from)
+    override suspend fun rename(from: String, to: String, replace: Boolean) = throw readOnly(from)
 
     override suspend fun delete(path: String) = throw readOnly(path)
 

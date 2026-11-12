@@ -7,6 +7,7 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +53,7 @@ sealed interface Update {
 }
 
 /** A newer release on GitHub, as far as an update needs to know it. */
+@Serializable
 data class Release(
     val version: String,
     /** What changed, one line each, as the release's notes list them. */
@@ -77,7 +79,20 @@ class Updates(
     private val state = MutableStateFlow<Update>(Update.Unknown)
     private var downloading: Job? = null
 
+    /** Which download is the current one: one that was cancelled or replaced keeps quiet. */
+    private val downloads = AtomicInteger()
+
     val update: StateFlow<Update> = state.asStateFlow()
+
+    init {
+        // A version found before tansu last closed is still on offer, without asking again.
+        scope.launch {
+            val offered = settings.offer.first()?.let(::releaseOf)
+            if (offered != null && isNewer(offered.version, installed)) {
+                state.compareAndSet(Update.Unknown, Update.Available(offered))
+            }
+        }
+    }
 
     /** Asks GitHub if a day has gone by since it was last asked, unless that's turned off. */
     suspend fun checkIfDue() {
@@ -95,7 +110,7 @@ class Updates(
         }
         scope.launch {
             settings.updateChecked(clock())
-            state.value =
+            val found =
                 try {
                     val release = latest()
                     if (release != null && isNewer(release.version, installed)) {
@@ -108,6 +123,12 @@ class Updates(
                 } catch (_: SerializationException) {
                     Update.CheckFailed
                 }
+            when (found) {
+                is Update.Available -> settings.setOffer(format.encodeToString(found.release))
+                Update.UpToDate -> settings.setOffer(null)
+                else -> Unit
+            }
+            state.value = found
         }
     }
 
@@ -119,20 +140,24 @@ class Updates(
                 is Update.DownloadFailed -> now.release
                 else -> return
             }
+        val download = downloads.incrementAndGet()
+        downloading?.cancel()
         state.value = Update.Downloading(release)
         downloading = scope.launch {
-            state.value =
+            val ended =
                 try {
-                    Update.Ready(release, fetch(release))
+                    Update.Ready(release, fetch(release, download))
                 } catch (_: IOException) {
                     Update.DownloadFailed(release)
                 }
+            if (download == downloads.get()) state.value = ended
         }
     }
 
     /** Stops a download; the release stays on offer. */
     fun cancel() {
         val now = state.value as? Update.Downloading ?: return
+        downloads.incrementAndGet()
         downloading?.cancel()
         state.value = Update.Available(now.release)
     }
@@ -157,18 +182,22 @@ class Updates(
             )
         }
 
-    private suspend fun fetch(release: Release): File =
+    /**
+     * Downloads [release]'s APK as the [download]th try, checks it against its SHA-256, and only
+     * then gives it its name.
+     */
+    private suspend fun fetch(release: Release, download: Int): File =
         withContext(io) {
             val folder =
                 File(cache, FOLDER).apply {
                     deleteRecursively()
                     mkdirs()
                 }
-            val apk = File(folder, APK)
+            val part = File(folder, "$APK.$download.part")
             val digest = MessageDigest.getInstance("SHA-256")
             val started = clock()
             get(release.apkUrl).use { input ->
-                apk.outputStream().use { output ->
+                part.outputStream().use { output ->
                     val buffer = ByteArray(CHUNK)
                     var done = 0L
                     while (true) {
@@ -180,7 +209,7 @@ class Updates(
                         done += read
                         val left = secondsLeft(done, release.apkSize, clock() - started)
                         state.update {
-                            if (it is Update.Downloading)
+                            if (it is Update.Downloading && download == downloads.get())
                                 it.copy(bytesDone = done, secondsLeft = left)
                             else it
                         }
@@ -190,10 +219,10 @@ class Updates(
             val expected = get(release.checksumUrl).bufferedReader().use { it.readText() }
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
             if (!actual.equals(expected.trim().substringBefore(' '), ignoreCase = true)) {
-                apk.delete()
+                part.delete()
                 throw IOException("The download doesn't match its SHA-256")
             }
-            apk
+            File(folder, APK).also { apk -> if (!part.renameTo(apk)) throw IOException("No room") }
         }
 
     @Serializable
@@ -221,6 +250,14 @@ class Updates(
         private const val DAY_MILLIS = 24 * 60 * 60 * 1000L
         private const val MILLIS = 1000
         private val format = Json { ignoreUnknownKeys = true }
+
+        /** A release kept from before, or null if it can't be read back. */
+        private fun releaseOf(json: String): Release? =
+            try {
+                format.decodeFromString<Release>(json)
+            } catch (_: SerializationException) {
+                null
+            }
 
         /** Seconds to go at the speed so far, once there's a second of it to go by. */
         private fun secondsLeft(done: Long, total: Long, elapsedMillis: Long): Long? =

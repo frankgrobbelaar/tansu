@@ -114,7 +114,7 @@ class SmbFileSystem(
         onShare(path) { share -> share.mkdir(smbPath(path)) }
     }
 
-    override suspend fun rename(from: String, to: String) {
+    override suspend fun rename(from: String, to: String, replace: Boolean) {
         onShare(to) { share ->
             share
                 .open(
@@ -125,7 +125,7 @@ class SmbFileSystem(
                     SMB2CreateDisposition.FILE_OPEN,
                     null,
                 )
-                .use { it.rename(smbPath(to)) }
+                .use { it.rename(smbPath(to), replace) }
         }
     }
 
@@ -208,6 +208,9 @@ class SmbFileSystem(
             isFolder = isFolder,
             size = if (isFolder) 0 else info.endOfFile,
             modified = info.lastWriteTime.toEpochMillis(),
+            // A Windows link or junction: removing it removes only the link.
+            isLink =
+                EnumUtils.isSet(info.fileAttributes, FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT),
         )
     }
 

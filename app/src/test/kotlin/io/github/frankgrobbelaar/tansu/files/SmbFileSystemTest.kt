@@ -96,6 +96,24 @@ class SmbFileSystemTest {
         }
     }
 
+    @Test
+    fun `a rename replaces the file there only when told to, in any case`() {
+        smb().use { files ->
+            runBlocking {
+                files.write("/first.txt").use { it.write("first".toByteArray()) }
+                files.write("/second.txt").use { it.write("second".toByteArray()) }
+            }
+            assertThrows(FileSystemException.Exists::class.java) {
+                runBlocking { files.rename("/second.txt", "/FIRST.TXT") }
+            }
+            runBlocking { files.rename("/second.txt", "/first.txt", replace = true) }
+            val text = runBlocking {
+                files.read("/first.txt").use { it.readBytes().decodeToString() }
+            }
+            assertEquals("second", text)
+        }
+    }
+
     companion object {
         private const val SMB_PORT = 445
         private lateinit var samba: GenericContainer<*>

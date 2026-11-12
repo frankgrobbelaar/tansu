@@ -27,7 +27,9 @@ The release signing key and its GitHub secrets were made on 12 Nov 2026 (see
 
 A review of iterations 3 to 5 found a crash when a folder couldn't be listed or made, SFTP
 uploads over 256 KiB failing against OpenSSH, and three ways to lose a file (names differing only
-in case, Cancel after a refused Replace, and deleting a link on SFTP). They're fixed and tested.
+in case, Cancel after a refused Replace, and deleting a link on SFTP). They're fixed and tested. A second review of those fixes found more ways a paused, resumed or
+case-blind job could write over a file; every file is now written under a hidden name and only
+takes its real name once it's whole, never over anything the user didn't choose to replace.
 
 ## Left for later
 

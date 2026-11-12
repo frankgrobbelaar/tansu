@@ -6,16 +6,22 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.security.MessageDigest
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -144,6 +150,56 @@ class UpdatesTest {
     }
 
     @Test
+    fun `a version found before tansu closed is still on offer after, without asking again`() =
+        runTest {
+            updates().check()
+            asked.clear()
+
+            val later = updates()
+            assertTrue(later.update.value is Update.Available)
+            assertTrue(asked.isEmpty())
+        }
+
+    @Test
+    fun `a cancelled download that fails later keeps quiet`() = runBlocking {
+        val stalled = CountDownLatch(1)
+        val firstTry = AtomicBoolean(true)
+        val reading = { url: String ->
+            if (url == APK_URL && firstTry.getAndSet(false)) {
+                object : InputStream() {
+                    override fun read(): Int {
+                        stalled.await()
+                        throw IOException("timed out")
+                    }
+                }
+            } else {
+                get(url)
+            }
+        }
+        val updates =
+            Updates(
+                installed = "0.1.0",
+                cache = folder.root,
+                settings = settings,
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+                get = reading,
+                clock = { now },
+            )
+        updates.check()
+        withTimeout(TIMEOUT) { updates.update.first { it is Update.Available } }
+        updates.download()
+        // The first download is stuck reading when it's cancelled and tried again.
+        withTimeout(TIMEOUT) { while (firstTry.get()) yield() }
+        updates.cancel()
+        updates.download()
+        withTimeout(TIMEOUT) { updates.update.first { it is Update.Ready } }
+
+        stalled.countDown()
+        Thread.sleep(SETTLE_MILLIS)
+        assertTrue(updates.update.value is Update.Ready)
+    }
+
+    @Test
     fun `versions are compared part by part`() {
         assertTrue(isNewer("0.2.0", "0.1.0"))
         assertTrue(isNewer("0.10.0", "0.9.9"))
@@ -173,6 +229,8 @@ class UpdatesTest {
         """
 
     private companion object {
+        const val TIMEOUT = 5_000L
+        const val SETTLE_MILLIS = 300L
         const val DAY = 24 * 60 * 60 * 1000L
         const val APK_URL = "${Updates.DOWNLOADS}v0.2.0/tansu.apk"
         const val CHECKSUM_URL = "$APK_URL.sha256"

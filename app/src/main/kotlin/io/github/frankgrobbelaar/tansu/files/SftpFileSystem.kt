@@ -24,6 +24,7 @@ import net.schmizz.sshj.common.SSHRuntimeException
 import net.schmizz.sshj.sftp.FileMode
 import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.RemoteResourceInfo
+import net.schmizz.sshj.sftp.RenameFlags
 import net.schmizz.sshj.sftp.Response
 import net.schmizz.sshj.sftp.SFTPClient
 import net.schmizz.sshj.sftp.SFTPException
@@ -106,13 +107,37 @@ class SftpFileSystem(
         }
 
     override suspend fun createFolder(path: String) {
-        onServer(path) { sftp -> sftp.mkdir(path) }
+        onServer(path) { sftp ->
+            try {
+                sftp.mkdir(path)
+            } catch (e: SFTPException) {
+                // As with files, OpenSSH says only that it failed when the folder is there.
+                if (sftp.statExistence(path) != null) throw FileSystemException.Exists(path)
+                throw e
+            }
+        }
     }
 
-    override suspend fun rename(from: String, to: String) {
+    override suspend fun rename(from: String, to: String, replace: Boolean) {
         onServer(to) { sftp ->
-            // SFTP's rename quietly replaces on some servers: refuse if the name is taken.
-            if (sftp.statExistence(to) != null) throw FileSystemException.Exists(to)
+            if (replace) {
+                replaceWith(sftp, from, to)
+            } else {
+                // SFTP's rename quietly replaces on some servers: refuse if the name is taken.
+                if (sftp.statExistence(to) != null) throw FileSystemException.Exists(to)
+                sftp.rename(from, to)
+            }
+        }
+    }
+
+    /** [from] takes [to]'s place in one step where the server can, as OpenSSH's can. */
+    private fun replaceWith(sftp: SFTPClient, from: String, to: String) {
+        try {
+            sftp.rename(from, to, EnumSet.of(RenameFlags.OVERWRITE))
+        } catch (e: SFTPException) {
+            if (e.statusCode != Response.StatusCode.OP_UNSUPPORTED) throw e
+            // A server without posix-rename: the old one goes first.
+            if (sftp.statExistence(to) != null) sftp.rm(to)
             sftp.rename(from, to)
         }
     }
@@ -221,21 +246,18 @@ class SftpFileSystem(
             throw FileSystemException.Unreachable(server.host, e)
         }
 
-    /** An entry for [info]. A link to a folder opens as one, so it's looked up. */
+    /** An entry for [info]. A link shows as what it points to, so that's looked up. */
     private fun entryOf(info: RemoteResourceInfo, sftp: SFTPClient): Entry {
-        val isFolder =
-            if (info.attributes.type == FileMode.Type.SYMLINK) {
-                sftp.statExistence(info.path)?.type == FileMode.Type.DIRECTORY
-            } else {
-                info.isDirectory
-            }
+        val isLink = info.attributes.type == FileMode.Type.SYMLINK
+        val attributes = (if (isLink) sftp.statExistence(info.path) else null) ?: info.attributes
+        val isFolder = attributes.type == FileMode.Type.DIRECTORY
         return Entry(
             name = info.name,
             path = info.path,
             isFolder = isFolder,
-            size = if (isFolder) 0 else info.attributes.size,
-            modified = info.attributes.mtime * MILLIS_PER_SECOND,
-            isLink = info.attributes.type == FileMode.Type.SYMLINK,
+            size = if (isFolder) 0 else attributes.size,
+            modified = attributes.mtime * MILLIS_PER_SECOND,
+            isLink = isLink,
         )
     }
 
@@ -287,6 +309,9 @@ private class SftpOutput(
                     StreamRefused(FileSystemException.NoSpace(path))
                 Response.StatusCode.PERMISSION_DENIED ->
                     StreamRefused(FileSystemException.AccessDenied(path))
+                // OpenSSH's word for a full disk, a quota, a file too big or a read-only one.
+                Response.StatusCode.FAILURE ->
+                    StreamRefused(FileSystemException.Unreadable(path, e))
                 else -> e
             }
         }

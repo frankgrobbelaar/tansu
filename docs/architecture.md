@@ -55,16 +55,24 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
   names apart without case, as the phone and SMB do. A job remembers where each pick went and
   which files are done, so a paused, resumed or retried job carries on without asking again or
   doing anything twice.
-- Nothing is written over by accident: `FileSystem.write` makes a new file and fails if the name
-  is taken, so a clash the listing missed keeps both. Replace writes the new copy beside the
-  original under a hidden name and swaps it in only once it's whole.
+- Nothing is written over by accident. Every file is written under a hidden name of the job's
+  own (`.name.<job>.tansu`) beside where it goes, and only takes its name once it's whole: with a
+  rename that fails if the name is taken, so a clash the listing missed (or a file that arrived
+  while the job was paused) keeps both, or, when the user chose Replace, with a rename that
+  replaces the old file in one step. A half-written file is never visible under a real name, and
+  it's the only thing Cancel removes. Two names that differ only in case are never merged into
+  one.
+- A move remembers each copy it has made until it has checked it and removed the original, so a
+  move that stops in between checks that copy rather than making another.
 - Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.
   A full disk or a refusal fails the file at once; a server that stops answering is retried for
   30 seconds, then the job pauses and says which server it lost. Cancelling, even a paused job,
   deletes the file half written; finished files stay.
 - Links on SFTP are never gone through to delete or move what they point to. A picked link is
   followed for what's in it, and a move removes only the link; links inside a folder are left.
-- Writes to SFTP go in 32 KiB pieces: OpenSSH refuses any message over 256 KiB.
+- Writes to SFTP go in 32 KiB pieces: OpenSSH refuses any message over 256 KiB. OpenSSH speaks
+  SFTP 3, which can't say "already there" or "disk full": a folder or file that fails is looked
+  up to tell the two apart, and a write that fails isn't waited out.
 - Saving shared files can't be retried: the other app only lends them while it shares them.
 - Progress is a `StateFlow` read by the Browse card, the Transfers tab and the notification (which
   updates at most once a second).
@@ -98,9 +106,10 @@ on, `updates/` reads GitHub's latest release and compares its version with the i
 request names only tansu in its User-Agent. A newer version shows in Settings with the changes from
 its release notes, and a dot marks the Settings tab.
 
-Download and install fetches `tansu.apk` into the cache with its progress and Cancel, checks it
-against the release's `tansu.apk.sha256`, and hands it to Android's installer through the
-`FileProvider`. That needs `REQUEST_INSTALL_PACKAGES`. The first time, Android asks the user to let
+A version found is kept in settings, so it's still on offer after tansu closes without asking
+GitHub again. Download and install fetches `tansu.apk` into the cache with its progress and
+Cancel, checks it against the release's `tansu.apk.sha256`, and hands it to Android's own
+installer through the `FileProvider`. That needs `REQUEST_INSTALL_PACKAGES`. The first time, Android asks the user to let
 tansu install apps and comes back to tansu, where Install offers the download again. Android checks
 the update is signed with tansu's key. The download isn't a job: it's one file that Settings owns,
 and the next check clears it away. See [releasing.md](releasing.md).

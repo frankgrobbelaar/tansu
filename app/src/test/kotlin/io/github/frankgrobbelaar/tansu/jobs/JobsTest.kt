@@ -355,7 +355,7 @@ class JobsTest {
     @Test
     fun `a refused write leaves the file that was there, even after a cancel`() = runTest {
         nas.file("/Photos/IMG_1.jpg", "theirs")
-        nas.refusedWrites += "/Photos/.IMG_1.jpg.tansu"
+        nas.readOnly += "/Photos"
         val held = CompletableDeferred<Unit>()
         phone.gates["/DCIM/Camera/IMG_2.jpg"] = held
         val jobs = jobs()
@@ -400,7 +400,9 @@ class JobsTest {
         val id = jobs.copy(picks, camera, photos, mapOf("IMG_2.jpg" to Clash.Replace))
         advanceUntilIdle()
         assertEquals(Job.Status.Paused(lost = "NAS"), jobs.job(id).status)
-        assertTrue(nas.exists("/Photos/IMG_1.jpg"))
+        // Half written under a hidden name of the job's own, never under the real one.
+        assertFalse(nas.exists("/Photos/IMG_1.jpg"))
+        assertTrue(nas.paths().any { it.startsWith("/Photos/.IMG_1.jpg.") })
 
         jobs.cancel(id)
         advanceUntilIdle()
@@ -470,7 +472,124 @@ class JobsTest {
         assertEquals(Job.Status.Done, job.status)
         assertEquals(Failure.Reason.NoSpace, job.failures.single().reason)
         assertTrue(testScheduler.currentTime < JobRun.RETRY_FOR_MILLIS)
-        assertFalse(nas.exists("/Photos/IMG_1.jpg"))
+        assertEquals(setOf("/Photos"), nas.paths())
+    }
+
+    // What the review of the safety fixes found
+
+    @Test
+    fun `a file that arrives while a job is paused is kept beside, not written over`() = runTest {
+        val jobs = jobs()
+        val picks = listOf("IMG_1.jpg", "IMG_2.jpg").map { entry(phone, "/DCIM/Camera/$it") }
+        phone.broken = true
+        val id = jobs.copy(picks, camera, photos, emptyMap())
+        advanceUntilIdle()
+        assertEquals(Job.Status.Paused(lost = "NAS"), jobs.job(id).status)
+
+        // Another job moves a different IMG_2.jpg in while this one waits.
+        nas.file("/Photos/IMG_2.jpg", "other two")
+        phone.broken = false
+        jobs.resume(id)
+        advanceUntilIdle()
+
+        assertEquals("other two", nas.text("/Photos/IMG_2.jpg"))
+        assertEquals("two!", nas.text("/Photos/IMG_2 (1).jpg"))
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+    }
+
+    @Test
+    fun `two names that differ only in case both survive a merge where case is ignored`() =
+        runTest {
+            share.folderAt("/Media/Pair")
+            nas.file("/Photos/Pair/a.jpg", "lower").file("/Photos/Pair/A.jpg", "upper")
+            val jobs = jobs()
+
+            jobs.move(
+                listOf(entry(nas, "/Photos/Pair")),
+                photos,
+                media,
+                mapOf("Pair" to Clash.Replace),
+            )
+            advanceUntilIdle()
+
+            val pair = share.paths().filter { it.startsWith("/Media/Pair/") }
+            assertEquals(setOf("lower", "upper"), pair.map { share.text(it) }.toSet())
+        }
+
+    @Test
+    fun `cancelling a paused job never removes a file someone else put there`() = runTest {
+        val jobs = jobs()
+        phone.broken = true
+        val id =
+            jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, photos, emptyMap())
+        advanceUntilIdle()
+        assertEquals(Job.Status.Paused(lost = "NAS"), jobs.job(id).status)
+
+        nas.file("/Photos/IMG_1.jpg", "someone else's")
+        jobs.cancel(id)
+        advanceUntilIdle()
+
+        assertEquals(setOf("/Photos", "/Photos/IMG_1.jpg"), nas.paths())
+        assertEquals("someone else's", nas.text("/Photos/IMG_1.jpg"))
+    }
+
+    @Test
+    fun `cancelling a job that was resumed but still waits removes what it half wrote`() = runTest {
+        val jobs = jobs()
+        phone.broken = true
+        val first =
+            jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, photos, emptyMap())
+        advanceUntilIdle()
+        phone.broken = false
+        val held = CompletableDeferred<Unit>()
+        phone.gates["/DCIM/Camera/IMG_2.jpg"] = held
+        jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_2.jpg")), camera, photos, emptyMap())
+        runCurrent()
+
+        jobs.resume(first)
+        assertEquals(Job.Status.Queued, jobs.job(first).status)
+        jobs.cancel(first)
+        held.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(setOf("/Photos", "/Photos/IMG_2.jpg"), nas.paths())
+    }
+
+    @Test
+    fun `a move that stopped after its copy checks that copy instead of making another`() =
+        runTest {
+            val jobs = jobs()
+            phone.deleteFailures["/DCIM/Camera/IMG_1.jpg"] = FileSystemException.Unreachable("x")
+            val id =
+                jobs.move(
+                    listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")),
+                    camera,
+                    photos,
+                    emptyMap(),
+                )
+            advanceUntilIdle()
+            assertTrue(jobs.job(id).status is Job.Status.Paused)
+
+            phone.deleteFailures.clear()
+            jobs.resume(id)
+            advanceUntilIdle()
+
+            assertEquals(setOf("/Photos", "/Photos/IMG_1.jpg"), nas.paths())
+            assertFalse(phone.exists("/DCIM/Camera/IMG_1.jpg"))
+        }
+
+    @Test
+    fun `a job whose failures trying again can't fix offers no retry`() = runTest {
+        nas.file("/Photos/Old/a.jpg", "a").link("/Photos/Old/also", "/Photos")
+        phone.folderAt("/Backup")
+        val jobs = jobs()
+        val backup = Where("phone", "/Backup", "Phone", "Phone › Backup")
+
+        val id = jobs.copy(listOf(entry(nas, "/Photos/Old")), photos, backup, emptyMap())
+        advanceUntilIdle()
+
+        assertEquals(Failure.Reason.Link, jobs.job(id).failures.single().reason)
+        assertFalse(jobs.job(id).canRetry)
     }
 
     @Test

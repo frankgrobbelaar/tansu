@@ -4,6 +4,7 @@ import io.github.frankgrobbelaar.tansu.servers.Secret
 import io.github.frankgrobbelaar.tansu.servers.Secrets
 import io.github.frankgrobbelaar.tansu.servers.Server
 import java.io.File
+import java.nio.file.FileAlreadyExistsException
 import java.security.KeyPairGenerator
 import java.util.Base64
 import kotlinx.coroutines.runBlocking
@@ -14,6 +15,9 @@ import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.auth.pubkey.PublickeyAuthenticator
 import org.apache.sshd.sftp.SftpModuleProperties
+import org.apache.sshd.sftp.common.SftpConstants
+import org.apache.sshd.sftp.server.SftpErrorStatusDataHandler
+import org.apache.sshd.sftp.server.SftpSubsystemEnvironment
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -55,7 +59,12 @@ class SftpFileSystemTest {
                 publickeyAuthenticator = PublickeyAuthenticator { user, key, _ ->
                     user == "sam" && hostKeyOf(key).fingerprint == CLIENT_FINGERPRINT
                 }
-                subsystemFactories = listOf(SftpSubsystemFactory())
+                subsystemFactories =
+                    listOf(
+                        SftpSubsystemFactory.Builder()
+                            .withSftpErrorStatusDataHandler(LikeOpenSsh)
+                            .build()
+                    )
                 // OpenSSH refuses an SFTP message over 256 KiB; MINA takes bigger unless told.
                 SftpModuleProperties.MAX_WRITEDATA_PACKET_LENGTH.set(this, OPENSSH_MAX_WRITE)
                 fileSystemFactory = VirtualFileSystemFactory(folder.root.toPath())
@@ -178,11 +187,56 @@ class SftpFileSystemTest {
     }
 
     @Test
+    fun `a folder that's there says so, though OpenSSH only says it failed`() {
+        sftp().use { files ->
+            assertThrows(FileSystemException.Exists::class.java) {
+                runBlocking { files.createFolder("/photos") }
+            }
+        }
+    }
+
+    @Test
+    fun `a rename replaces the file there only when told to`() {
+        File(folder.root, "new.txt").writeText("new")
+        sftp().use { files ->
+            assertThrows(FileSystemException.Exists::class.java) {
+                runBlocking { files.rename("/new.txt", "/notes.txt") }
+            }
+            runBlocking { files.rename("/new.txt", "/notes.txt", replace = true) }
+        }
+        assertEquals("new", File(folder.root, "notes.txt").readText())
+        assertTrue(!File(folder.root, "new.txt").exists())
+    }
+
+    @Test
     fun `fingerprints read the way ssh-keygen prints them`() {
         val blob = Base64.getDecoder().decode(CLIENT_PUBLIC_KEY)
         val key = Buffer.PlainBuffer(blob).readPublicKey()
 
         assertEquals(HostKey("ED25519", CLIENT_FINGERPRINT), hostKeyOf(key))
+    }
+
+    /**
+     * OpenSSH speaks SFTP 3, which has no word for "already there": it answers with a plain
+     * failure, where MINA would say more.
+     */
+    private object LikeOpenSsh : SftpErrorStatusDataHandler {
+        override fun resolveSubStatus(
+            sftpSubsystem: SftpSubsystemEnvironment,
+            cmd: Int,
+            e: Throwable,
+            id: Int,
+            vararg args: Any?,
+        ): Int =
+            if (e is FileAlreadyExistsException) SftpConstants.SSH_FX_FAILURE
+            else
+                SftpErrorStatusDataHandler.DEFAULT.resolveSubStatus(
+                    sftpSubsystem,
+                    cmd,
+                    e,
+                    id,
+                    *args,
+                )
     }
 
     private companion object {
