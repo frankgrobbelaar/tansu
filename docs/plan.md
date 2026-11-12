@@ -18,8 +18,8 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 | 4 | Select and paste | Selection, cut, copy and paste across drawers, clashes, rename, new folder, details, delete, share out | Done, apart from sharing files from servers |
 | 5 | Share in | Tansu in the share sheet, and the Save to picker | Done |
 | 6 | Open files | Pictures, videos and PDFs in tansu; other files in another app | Every file opens in another app, server files fetched first; viewers in tansu still to come |
-| 7 | Browse extras and Settings | Search, sort and view, grid, hidden files, and Settings | |
-| 8 | Releases and updates | The `release` branch and its workflow, signing, the downloads page, and the in-app update | Releases and the downloads page done; the in-app update next |
+| 7 | Browse extras and Settings | Search, sort and view, grid, hidden files, and Settings | Settings and hidden files done; search, sort and view, and grid still to come |
+| 8 | Releases and updates | The `release` branch and its workflow, signing, the downloads page, and the in-app update | Done |
 | 9 | Polish | Accessibility, performance, dark theme and the small things | |
 
 The release signing key and its GitHub secrets were made on 12 Nov 2026 (see
@@ -32,6 +32,8 @@ The release signing key and its GitHub secrets were made on 12 Nov 2026 (see
 - Sharing files from a server out to other apps needs them fetched first, which comes with opening
   server files (iteration 6).
 
+- Settings › About should list the open-source licences (spec). It lists the version and updates
+  for now.
 - A missing SMB share should list the shares the server does have (spec, flow 8). Listing shares
   needs SMB's RPC calls, which smbj leaves to another library; until then the message offers Edit
   server.

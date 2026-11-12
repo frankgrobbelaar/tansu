@@ -8,6 +8,11 @@ What changed in each version of tansu, newest first, in plain words. A release m
 - Tansu is in the share sheet: share any number of files from Gallery, My Files or any app, pick
   a drawer and folder (it starts where you saved last time), and tap Save here. The save runs in
   the background and you're back where you were.
+- Settings: light, dark or as the phone is; your wallpaper's colours if you like; hidden files in
+  Browse; and your servers, to edit or add.
+- Tansu updates itself. Once a day it asks GitHub for a new version (you can turn that off in
+  Settings), shows what's new, and Download and install hands it to Android to confirm. Nothing
+  about you is sent.
 
 ## 0.1.0 - 2026-11-13
 

@@ -40,6 +40,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -176,6 +178,15 @@ class BrowseViewModel(
                 hereOf(drawers.value, drawerId.value, paths.value),
             )
 
+    /** The listing as Browse shows it: hidden files only when Settings says so. */
+    private val shown: StateFlow<Listing> =
+        combine(listing, settings.showHidden) { listing, showHidden ->
+                if (showHidden) listing
+                else listing.copy(entries = listing.entries.filterNot { it.isHidden })
+            }
+            .flowOn(compute)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, listing.value)
+
     /** Whether to offer a first server, and the name of one just added. */
     private val news =
         combine(servers.all, settings.serverOfferDismissed, added, drawers) {
@@ -200,7 +211,7 @@ class BrowseViewModel(
         }
 
     val state: StateFlow<BrowseUiState> =
-        combine(here, listing, troubled, news, tools) { here, listing, troubled, news, tools ->
+        combine(here, shown, troubled, news, tools) { here, listing, troubled, news, tools ->
                 BrowseUiState(
                     drawers = news.drawers.map { tabOf(it, troubled) },
                     drawer = tabOf(here.drawer, troubled),
@@ -238,6 +249,8 @@ class BrowseViewModel(
                 load(it, fresh = true)
             }
         }
+        // Nothing stays picked that can't be seen.
+        viewModelScope.launch { settings.showHidden.drop(1).collect { picked.value = emptySet() } }
         viewModelScope.launch {
             servers.added.collect { server ->
                 drawerId.value = server.id
@@ -298,7 +311,7 @@ class BrowseViewModel(
     }
 
     fun selectAll() {
-        picked.value = listing.value.entries.map { it.path }.toSet()
+        picked.value = shown.value.entries.map { it.path }.toSet()
     }
 
     fun clearSelection() {
@@ -454,7 +467,7 @@ class BrowseViewModel(
                 val entries = here.drawer.fileSystem.list(here.path)
                 // Sorting thousands of names is real work: keep it off the main thread.
                 withContext(compute) {
-                    Listing(entries.filterNot { it.isHidden }.sortedWith(BrowseOrder))
+                    Listing(entries.sortedWith(BrowseOrder))
                 }
             } catch (e: FileSystemException) {
                 Listing(problem = problemOf(e))

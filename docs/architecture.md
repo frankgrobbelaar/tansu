@@ -79,11 +79,17 @@ files are fetched to the cache.
 
 ## Updates
 
-When the app opens, at most once a day, `updates/` reads GitHub's latest release and compares its
-version with the installed one. Downloading the new `tansu.apk` is a job like any other; the file is
-checked against the release's SHA-256, then handed to Android's `PackageInstaller`. That needs the
-`REQUEST_INSTALL_PACKAGES` permission, and Android asks the user once to allow tansu to install
-apps. See [releasing.md](releasing.md).
+Each time tansu comes to the front, if a day has gone by since the last check and the check is
+on, `updates/` reads GitHub's latest release and compares its version with the installed one. The
+request names only tansu in its User-Agent. A newer version shows in Settings with the changes from
+its release notes, and a dot marks the Settings tab.
+
+Download and install fetches `tansu.apk` into the cache with its progress and Cancel, checks it
+against the release's `tansu.apk.sha256`, and hands it to Android's installer through the
+`FileProvider`. That needs `REQUEST_INSTALL_PACKAGES`. The first time, Android asks the user to let
+tansu install apps and comes back to tansu, where Install offers the download again. Android checks
+the update is signed with tansu's key. The download isn't a job: it's one file that Settings owns,
+and the next check clears it away. See [releasing.md](releasing.md).
 
 ## Servers and secrets
 

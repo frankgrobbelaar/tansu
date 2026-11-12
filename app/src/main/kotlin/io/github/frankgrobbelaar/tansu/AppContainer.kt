@@ -24,6 +24,7 @@ import io.github.frankgrobbelaar.tansu.servers.ServerCheck
 import io.github.frankgrobbelaar.tansu.servers.ServerStore
 import io.github.frankgrobbelaar.tansu.servers.Servers
 import io.github.frankgrobbelaar.tansu.servers.StoredSecrets
+import io.github.frankgrobbelaar.tansu.updates.Updates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,6 +69,12 @@ class AppContainer(
     val clipboard = Clipboard()
 
     val fetcher = Fetcher(context.cacheDir)
+
+    /** The version installed, as its release names it. */
+    val version: String =
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+
+    val updates = Updates(version, context.cacheDir, settings, scope)
 
     companion object {
         const val PHONE = "phone"

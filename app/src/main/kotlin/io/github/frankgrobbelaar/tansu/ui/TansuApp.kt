@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
+import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -50,9 +51,10 @@ import io.github.frankgrobbelaar.tansu.ui.browse.BrowseRoute
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.servers.AddServerScreen
 import io.github.frankgrobbelaar.tansu.ui.servers.ServerFormRoute
-import io.github.frankgrobbelaar.tansu.ui.settings.SettingsScreen
+import io.github.frankgrobbelaar.tansu.ui.settings.SettingsRoute
 import io.github.frankgrobbelaar.tansu.ui.transfers.JobRoute
 import io.github.frankgrobbelaar.tansu.ui.transfers.TransfersRoute
+import io.github.frankgrobbelaar.tansu.updates.Update
 import kotlinx.serialization.Serializable
 
 /** The three places in the navigation bar. Each keeps its own history. */
@@ -81,37 +83,20 @@ enum class Place(@param:StringRes val label: Int, val icon: ImageVector) {
 @Composable
 fun TansuApp(modifier: Modifier = Modifier) {
     var place by rememberSaveable { mutableStateOf(Place.Browse) }
-    val browse = rememberNavBackStack(BrowseHome)
-    val transfers = rememberNavBackStack(TransfersHome)
-    val settings = rememberNavBackStack(SettingsHome)
-    val backStack =
-        when (place) {
-            Place.Browse -> browse
-            Place.Transfers -> transfers
-            Place.Settings -> settings
-        }
-
-    val decorators: List<NavEntryDecorator<NavKey>> =
-        listOf(
-            rememberSaveableStateHolderNavEntryDecorator(),
-            rememberViewModelStoreNavEntryDecorator(),
+    val histories =
+        Histories(
+            browse = rememberNavBackStack(BrowseHome),
+            transfers = rememberNavBackStack(TransfersHome),
+            settings = rememberNavBackStack(SettingsHome),
         )
-    val screens = screensFor(browse, transfers, onOpenTransfers = { place = Place.Transfers })
-    // Every history is decorated all the time, so a place out of sight keeps its screens' state.
-    val browseEntries = rememberDecoratedNavEntries(browse, decorators, screens)
-    val transfersEntries = rememberDecoratedNavEntries(transfers, decorators, screens)
-    val settingsEntries = rememberDecoratedNavEntries(settings, decorators, screens)
-    // Browse sits under the other places, so back from their first screen goes to Browse.
-    val entries =
-        when (place) {
-            Place.Browse -> browseEntries
-            Place.Transfers -> browseEntries + transfersEntries
-            Place.Settings -> browseEntries + settingsEntries
-        }
+    val backStack = histories.of(place)
+    val entries = rememberEntries(place, histories, onOpenTransfers = { place = Place.Transfers })
 
-    // Jobs still to finish, counted on the Transfers tab.
-    val jobs by appContainer().jobs.all.collectAsStateWithLifecycle()
+    // Jobs still to finish, counted on the Transfers tab; a new version, marked on Settings.
+    val container = appContainer()
+    val jobs by container.jobs.all.collectAsStateWithLifecycle()
     val toDo = jobs.count { it.status == Job.Status.Running || it.status == Job.Status.Queued }
+    val update by container.updates.update.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
@@ -119,7 +104,12 @@ fun TansuApp(modifier: Modifier = Modifier) {
         // The bar is for moving between places; a task opened from one has the screen to itself.
         bottomBar = {
             if (backStack.size == 1) {
-                TansuNavigationBar(current = place, toDo = toDo, onSelect = { place = it })
+                TansuNavigationBar(
+                    current = place,
+                    toDo = toDo,
+                    newVersion = update is Update.Available,
+                    onSelect = { place = it },
+                )
             }
         },
     ) { padding ->
@@ -136,40 +126,107 @@ fun TansuApp(modifier: Modifier = Modifier) {
     }
 }
 
-/** What each key shows. Browse's tasks, like adding a server, go on top of [browse]. */
+/** Each place's history of screens. */
+private class Histories(
+    val browse: NavBackStack<NavKey>,
+    val transfers: NavBackStack<NavKey>,
+    val settings: NavBackStack<NavKey>,
+) {
+    fun of(place: Place) =
+        when (place) {
+            Place.Browse -> browse
+            Place.Transfers -> transfers
+            Place.Settings -> settings
+        }
+}
+
+/**
+ * The screens to show in [place]. Every history is decorated all the time, so a place out of sight
+ * keeps its screens' state, and Browse sits under the other places, so back from their first screen
+ * goes to Browse.
+ */
+@Composable
+private fun rememberEntries(
+    place: Place,
+    histories: Histories,
+    onOpenTransfers: () -> Unit,
+): List<NavEntry<NavKey>> {
+    val decorators: List<NavEntryDecorator<NavKey>> =
+        listOf(
+            rememberSaveableStateHolderNavEntryDecorator(),
+            rememberViewModelStoreNavEntryDecorator(),
+        )
+    val browse = histories.browse
+    val browseEntries =
+        rememberDecoratedNavEntries(
+            browse,
+            decorators,
+            screensFor(Place.Browse, browse, onOpenTransfers),
+        )
+    val transfers = histories.transfers
+    val transfersEntries =
+        rememberDecoratedNavEntries(
+            transfers,
+            decorators,
+            screensFor(Place.Transfers, transfers, onOpenTransfers),
+        )
+    val settings = histories.settings
+    val settingsEntries =
+        rememberDecoratedNavEntries(
+            settings,
+            decorators,
+            screensFor(Place.Settings, settings, onOpenTransfers),
+        )
+    return when (place) {
+        Place.Browse -> browseEntries
+        Place.Transfers -> browseEntries + transfersEntries
+        Place.Settings -> browseEntries + settingsEntries
+    }
+}
+
+/** What each key shows in [place]. Its tasks, like adding a server, go on top of its [history]. */
 private fun screensFor(
-    browse: NavBackStack<NavKey>,
-    transfers: NavBackStack<NavKey>,
+    place: Place,
+    history: NavBackStack<NavKey>,
     onOpenTransfers: () -> Unit,
 ) = entryProvider {
-    entry<BrowseHome> {
+    // A task can be open in two places at once, like Add a server; each keeps its own state.
+    val keyIn: (NavKey) -> Any = { "${place.name}/$it" }
+    entry<BrowseHome>(keyIn) {
         BrowseRoute(
-            onAddServer = { browse.add(AddServer) },
+            onAddServer = { history.add(AddServer) },
             onEditServer = { drawer ->
                 val kind = if (drawer.kind == Drawer.Kind.Smb) Server.Kind.Smb else Server.Kind.Sftp
-                browse.add(ServerForm(kind, drawer.id))
+                history.add(ServerForm(kind, drawer.id))
             },
             onOpenTransfers = onOpenTransfers,
         )
     }
-    entry<AddServer> {
+    entry<AddServer>(keyIn) {
         AddServerScreen(
-            onPick = { kind -> browse.add(ServerForm(kind)) },
-            onBack = { browse.removeLastOrNull() },
+            onPick = { kind -> history.add(ServerForm(kind)) },
+            onBack = { history.removeLastOrNull() },
         )
     }
-    entry<ServerForm> { key ->
+    entry<ServerForm>(keyIn) { key ->
         ServerFormRoute(
             kind = key.kind,
             serverId = key.serverId,
-            // Saved: back to Browse, where a new server's drawer opens.
-            onDone = { browse.retainAll(listOf(BrowseHome)) },
-            onBack = { browse.removeLastOrNull() },
+            // Saved: back to the place's first screen. Browse opens a new server's drawer.
+            onDone = { history.retainAll(listOf(history.first())) },
+            onBack = { history.removeLastOrNull() },
         )
     }
-    entry<TransfersHome> { TransfersRoute(onOpenJob = { id -> transfers.add(JobDetail(id)) }) }
-    entry<JobDetail> { key -> JobRoute(id = key.id, onBack = { transfers.removeLastOrNull() }) }
-    entry<SettingsHome> { SettingsScreen() }
+    entry<TransfersHome>(keyIn) { TransfersRoute(onOpenJob = { id -> history.add(JobDetail(id)) }) }
+    entry<JobDetail>(keyIn) { key ->
+        JobRoute(id = key.id, onBack = { history.removeLastOrNull() })
+    }
+    entry<SettingsHome>(keyIn) {
+        SettingsRoute(
+            onAddServer = { history.add(AddServer) },
+            onEditServer = { server -> history.add(ServerForm(server.kind, server.id)) },
+        )
+    }
 }
 
 /** Screens change with a short, calm crossfade. */
@@ -182,6 +239,7 @@ private const val SCREEN_MILLIS = 250
 private fun TansuNavigationBar(
     current: Place,
     toDo: Int,
+    newVersion: Boolean,
     onSelect: (Place) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -199,26 +257,43 @@ private fun TansuNavigationBar(
                 selected = place == current,
                 onClick = { onSelect(place) },
                 icon = {
-                    if (place == Place.Transfers && toDo > 0) {
-                        val badge = stringResource(R.string.transfers_badge, toDo)
-                        BadgedBox(
-                            badge = {
-                                Badge(
-                                    modifier = Modifier.semantics { contentDescription = badge }
-                                ) {
-                                    Text(toDo.toString())
-                                }
-                            }
-                        ) {
-                            Icon(imageVector = place.icon, contentDescription = null)
-                        }
-                    } else {
-                        Icon(imageVector = place.icon, contentDescription = null)
+                    when {
+                        place == Place.Transfers && toDo > 0 ->
+                            Badged(
+                                icon = place.icon,
+                                description = stringResource(R.string.transfers_badge, toDo),
+                                count = toDo.toString(),
+                            )
+                        place == Place.Settings && newVersion ->
+                            Badged(
+                                icon = place.icon,
+                                description = stringResource(R.string.updates_badge),
+                            )
+                        else -> Icon(imageVector = place.icon, contentDescription = null)
                     }
                 },
                 label = { Text(text = stringResource(place.label)) },
                 colors = colors,
             )
         }
+    }
+}
+
+/** A place's icon with a badge: a count, or a dot when [count] is null. */
+@Composable
+private fun Badged(
+    icon: ImageVector,
+    description: String,
+    modifier: Modifier = Modifier,
+    count: String? = null,
+) {
+    BadgedBox(
+        modifier = modifier,
+        badge = {
+            val said = Modifier.semantics { contentDescription = description }
+            if (count != null) Badge(modifier = said) { Text(count) } else Badge(modifier = said)
+        },
+    ) {
+        Icon(imageVector = icon, contentDescription = null)
     }
 }

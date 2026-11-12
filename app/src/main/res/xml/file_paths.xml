@@ -4,4 +4,6 @@
 <paths>
     <external-path name="phone" path="." />
     <cache-path name="fetched" path="fetched/" />
+    <!-- A downloaded update, for Android's installer (updates/Updates.kt). -->
+    <cache-path name="update" path="update/" />
 </paths>

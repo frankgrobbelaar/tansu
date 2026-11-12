@@ -72,11 +72,14 @@ For the people you share it with:
 
 - When tansu opens, at most once a day, it asks GitHub for the latest release. That request carries
   nothing about the user, and the check can be turned off in Settings › About.
-- A newer version shows in Settings with its notes. Download and install runs as a job, checks the
-  file against `tansu.apk.sha256`, then hands it to Android's installer. Until that lands in the
-  app, an update is installed from the downloads page over the version already there.
-- The first time, Android asks the user to let tansu install apps. Android then checks the update
-  is signed with the same key and keeps every setting and saved server.
+- A newer version shows in Settings with what changed, from its notes, and a dot marks the
+  Settings tab. Download and install shows its progress and can be cancelled. The file is checked
+  against `tansu.apk.sha256`, then handed to Android's installer.
+- The first time, Android asks the user to let tansu install apps, then returns to tansu: tap
+  Install. Play Protect may offer to scan an app it doesn't know; either choice installs it. Android
+  checks the update is signed with the same key and keeps every setting and saved server.
+- Version 0.1.0 can't update itself. Anyone on it installs the next version from the downloads page
+  once, over the one they have.
 
 ## Android developer verification
 

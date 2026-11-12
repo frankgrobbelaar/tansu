@@ -111,6 +111,30 @@ class BrowseViewModelTest {
     }
 
     @Test
+    fun `hidden files show when Settings says so, and select all picks only what shows`() =
+        runTest {
+            val browse = viewModel()
+            browse.state.test {
+                settings.setShowHidden(true)
+                assertEquals(
+                    listOf("Download", "Pictures", ".hidden", "notes.txt"),
+                    expectMostRecentItem().entries.map { it.name },
+                )
+                browse.selectAll()
+                assertEquals(4, expectMostRecentItem().selected.size)
+
+                // Turned off: nothing stays picked that can't be seen.
+                settings.setShowHidden(false)
+                assertTrue(expectMostRecentItem().selected.isEmpty())
+                browse.selectAll()
+                assertEquals(
+                    setOf("$root/Download", "$root/Pictures", "$root/notes.txt"),
+                    expectMostRecentItem().selected,
+                )
+            }
+        }
+
+    @Test
     fun `opening a folder lists it and puts it on the path, and up comes back`() = runTest {
         val browse = viewModel()
         browse.state.test {

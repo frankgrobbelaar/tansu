@@ -157,6 +157,7 @@ class SaveToViewModel(
             )
         }
         viewModelScope.launch {
+            val showHidden = settings.showHidden.first()
             val folders =
                 if (drawer.kind == Drawer.Kind.Phone && !access.granted()) {
                     null
@@ -164,7 +165,7 @@ class SaveToViewModel(
                     try {
                         drawer.fileSystem
                             .list(path)
-                            .filter { it.isFolder && !it.isHidden }
+                            .filter { it.isFolder && (showHidden || !it.isHidden) }
                             .sortedWith(BrowseOrder)
                     } catch (_: FileSystemException) {
                         null

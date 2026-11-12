@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_system">Same as phone</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic colour</string>
+    <string name="settings_dynamic_color_detail">Use your wallpaper\'s colours</string>
+    <string name="settings_show_hidden">Show hidden files</string>
+    <string name="settings_show_hidden_detail">Files whose names start with a dot</string>
+    <string name="settings_servers">Servers</string>
+    <string name="settings_server_smb">SMB · %1$s</string>
+    <string name="settings_server_sftp">SFTP · %1$s, port %2$d</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_updates">Updates</string>
+    <string name="settings_check_daily">Check once a day</string>
+    <string name="settings_check_daily_detail">Asks GitHub for a new version. Nothing about you is sent.</string>
+
+    <string name="updates_checking">Checking…</string>
+    <string name="updates_up_to_date">Checked %1$s · You\'re up to date</string>
+    <string name="updates_checked">Checked %1$s · Tap to check again</string>
+    <string name="updates_never">Tap to check now</string>
+    <string name="updates_failed">Couldn\'t reach GitHub · Tap to try again</string>
+    <string name="updates_new">Tansu %1$s is out</string>
+    <string name="updates_badge">A new version of tansu</string>
+
+    <string name="update_ready">Tansu %1$s is ready</string>
+    <string name="update_ready_detail">You have %1$s · a %2$s download</string>
+    <string name="update_download">Download and install</string>
+    <string name="update_downloading">Downloading tansu %1$s</string>
+    <string name="update_confirm_next">Android asks you to confirm next. The first time, it also asks you to let tansu install updates.</string>
+    <string name="update_downloaded">Tansu %1$s is downloaded</string>
+    <string name="update_downloaded_detail">Android asks you to confirm it. Your servers and settings stay.</string>
+    <string name="update_install">Install</string>
+    <string name="update_failed">Tansu %1$s didn\'t download</string>
+    <string name="update_failed_detail">The connection dropped, or the file wasn\'t the one the release lists. Nothing was installed.</string>
+    <string name="update_try_again">Try again</string>
+</resources>

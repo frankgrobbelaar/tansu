@@ -15,11 +15,11 @@ import androidx.lifecycle.lifecycleScope
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.TansuApplication
 import io.github.frankgrobbelaar.tansu.files.SharedFiles
+import io.github.frankgrobbelaar.tansu.ui.ChosenTheme
 import io.github.frankgrobbelaar.tansu.ui.rememberNotificationAsk
 import io.github.frankgrobbelaar.tansu.ui.share.SaveToActions
 import io.github.frankgrobbelaar.tansu.ui.share.SaveToScreen
 import io.github.frankgrobbelaar.tansu.ui.share.SaveToViewModel
-import io.github.frankgrobbelaar.tansu.ui.theme.TansuTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -46,7 +46,7 @@ class ShareActivity : ComponentActivity() {
             return
         }
         setContent {
-            TansuTheme {
+            ChosenTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val askNotifications = rememberNotificationAsk()
                 LaunchedEffect(state.savedAs) { state.savedAs?.let(::stepBack) }
