@@ -78,7 +78,7 @@
     <string name="job_cancelled">Cancelled</string>
 
     <string name="failure_not_found">It wasn\'t there any more.</string>
-    <string name="failure_access_denied">%1$s said no: this login can\'t write there.</string>
+    <string name="failure_access_denied">%1$s said no: this login isn\'t allowed to.</string>
     <string name="failure_no_space">%1$s ran out of space.</string>
     <string name="failure_exists">Something with that name was already there.</string>
     <string name="failure_unreadable">It couldn\'t be read or written.</string>

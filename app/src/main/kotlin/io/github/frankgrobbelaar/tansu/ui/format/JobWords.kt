@@ -103,9 +103,11 @@ object JobWords {
         }
     }
 
-    /** Why a file in [job] didn't make it, in plain words. */
-    fun reason(failure: Failure, job: Job, res: Resources): String =
-        reason(failure.reason, job.to?.drawerName ?: job.from.drawerName, res)
+    /** Why a file in [job] didn't make it, in plain words, naming the drawer that said no. */
+    fun reason(failure: Failure, job: Job, res: Resources): String {
+        val drawer = job.to?.takeUnless { failure.atSource }?.drawerName ?: job.from.drawerName
+        return reason(failure.reason, drawer, res)
+    }
 
     /** Why something couldn't be done in [drawer], in plain words. */
     fun reason(reason: Failure.Reason, drawer: String, res: Resources): String =

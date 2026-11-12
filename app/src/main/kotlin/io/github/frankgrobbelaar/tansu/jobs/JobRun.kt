@@ -19,6 +19,9 @@ internal class Side(val files: FileSystem, val remote: Boolean, val name: String
 /** The server named [name] stopped answering for longer than a job waits. */
 internal class ConnectionLost(val name: String) : Exception("Lost $name")
 
+/** Where the files come from said no, rather than where they go: worded as that drawer's. */
+private class SourceRefused(val refusal: FileSystemException) : Exception(refusal)
+
 /**
  * Carries out one job, step by step, handing each new state of it to [report].
  *
@@ -214,7 +217,7 @@ internal class JobRun(
             try {
                 retrying { source.files.list(folder.path) }
             } catch (e: FileSystemException) {
-                fail(folder, reasonOf(e))
+                fail(folder, reasonOf(e), atSource = true)
                 return emptyList()
             }
         if (!keep) walked += folder
@@ -289,10 +292,9 @@ internal class JobRun(
                         place(step, target)
                     }
                 } catch (e: FileSystemException) {
-                    // What it half wrote goes with it.
-                    job.partial?.let { partial -> tryOrNull { target.files.delete(partial) } }
-                    job = job.copy(partial = null)
-                    throw e
+                    throw e.also { dropPartial(target) }
+                } catch (e: SourceRefused) {
+                    throw e.also { dropPartial(target) }
                 }
         if (job.kind == Job.Kind.Move && !step.keep) {
             // Remembered, so a job that stops here checks the copy rather than making another.
@@ -302,11 +304,27 @@ internal class JobRun(
                 fail(from, Failure.Reason.Mismatch)
                 return
             }
-            retrying { source.files.delete(from.path) }
+            atSource { retrying { source.files.delete(from.path) } }
         }
         // Its bytes were counted as they streamed.
         finished(from, bytes = 0)
     }
+
+    /** What the job half wrote goes with a file that failed. */
+    private suspend fun dropPartial(target: Side) {
+        job.partial?.let { partial -> tryOrNull { target.files.delete(partial) } }
+        job = job.copy(partial = null)
+    }
+
+    /** Runs [block] against where the files come from; a refusal there is said as such. */
+    private suspend fun <T> atSource(block: suspend () -> T): T =
+        try {
+            block()
+        } catch (e: FileSystemException) {
+            // A server that stops answering is waited out the same on either side.
+            if (e is FileSystemException.Unreachable) throw e
+            throw SourceRefused(e)
+        }
 
     /**
      * Writes [step]'s file under this job's hidden name beside where it goes, then gives it its
@@ -351,19 +369,20 @@ internal class JobRun(
 
     /** Streams [from] into [path], this job's own hidden file, from its start. */
     private suspend fun stream(from: Entry, path: String, target: Side) {
-        source.files.read(from.path).use { input ->
-            target.files.write(path, replace = true).use { output ->
-                job = job.copy(partial = path)
-                val buffer = ByteArray(CHUNK)
-                while (true) {
-                    currentCoroutineContext().ensureActive()
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    output.write(buffer, 0, read)
-                    progress { it.copy(bytesDone = it.bytesDone + read) }
+        atSource { source.files.read(from.path) }
+            .use { input ->
+                target.files.write(path, replace = true).use { output ->
+                    job = job.copy(partial = path)
+                    val buffer = ByteArray(CHUNK)
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        progress { it.copy(bytesDone = it.bytesDone + read) }
+                    }
                 }
             }
-        }
     }
 
     // Deleting
@@ -415,7 +434,7 @@ internal class JobRun(
                 // Gone already, with all it held.
                 return listOf(folder)
             } catch (e: FileSystemException) {
-                fail(folder, reasonOf(e))
+                fail(folder, reasonOf(e), atSource = true)
                 return emptyList()
             }
         val all = mutableListOf<Entry>()
@@ -432,7 +451,9 @@ internal class JobRun(
         try {
             block()
         } catch (e: FileSystemException) {
-            fail(entry, reasonOf(e))
+            fail(entry, reasonOf(e), atSource = job.kind == Job.Kind.Delete)
+        } catch (e: SourceRefused) {
+            fail(entry, reasonOf(e.refusal), atSource = true)
         }
     }
 
@@ -441,8 +462,9 @@ internal class JobRun(
         progress { it.copy(itemsDone = it.itemsDone + 1, bytesDone = it.bytesDone + bytes) }
     }
 
-    private fun fail(entry: Entry, reason: Failure.Reason) {
-        job = job.copy(failures = job.failures + Failure(entry.name, entry.path, reason))
+    private fun fail(entry: Entry, reason: Failure.Reason, atSource: Boolean = false) {
+        val failure = Failure(entry.name, entry.path, reason, atSource)
+        job = job.copy(failures = job.failures + failure)
         progress { it.copy(itemsDone = it.itemsDone + 1) }
     }
 

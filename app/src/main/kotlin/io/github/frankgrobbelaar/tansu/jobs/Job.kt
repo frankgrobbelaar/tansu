@@ -126,8 +126,16 @@ data class Progress(
             else (bytesTotal - bytesDone).coerceAtLeast(0) / bytesPerSecond
 }
 
-/** A file that didn't make it, and why. */
-data class Failure(val name: String, val path: String, val reason: Reason) {
+/**
+ * A file that didn't make it, and why: [atSource] when it was where it came from that said no, so
+ * it's that drawer the words name.
+ */
+data class Failure(
+    val name: String,
+    val path: String,
+    val reason: Reason,
+    val atSource: Boolean = false,
+) {
     enum class Reason {
         NotFound,
         AccessDenied,

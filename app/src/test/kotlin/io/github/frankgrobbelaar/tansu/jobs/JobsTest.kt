@@ -579,6 +579,22 @@ class JobsTest {
         }
 
     @Test
+    fun `a failure says which drawer said no`() = runTest {
+        phone.file("/DCIM/Camera/Locked/secret.jpg", "no")
+        val jobs = jobs()
+        val picks = listOf("Locked", "IMG_1.jpg").map { entry(phone, "/DCIM/Camera/$it") }
+        phone.failures["/DCIM/Camera/Locked"] = FileSystemException.AccessDenied("Locked")
+        nas.readOnly += "/Photos"
+
+        val id = jobs.copy(picks, camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        val failures = jobs.job(id).failures.associateBy { it.name }
+        assertTrue(failures.getValue("Locked").atSource)
+        assertFalse(failures.getValue("IMG_1.jpg").atSource)
+    }
+
+    @Test
     fun `a job whose failures trying again can't fix offers no retry`() = runTest {
         nas.file("/Photos/Old/a.jpg", "a").link("/Photos/Old/also", "/Photos")
         phone.folderAt("/Backup")
