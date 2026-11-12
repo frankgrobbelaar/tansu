@@ -30,6 +30,8 @@ Decided with the owner on 2026-11-12:
 
 - Public and MIT-licensed. Doesn't accept contributions, but forks are welcome.
 - Work directly on `main`. No feature branches or PRs, apart from the ones Dependabot opens.
+- `release` is the branch tansu's users get updates from (the owner, 2026-11-12: "The release branch will be what tansu will use to receive updates"). It only moves forward to a commit on `main`, which publishes that version; nothing is committed to it directly. Every release also refreshes a downloads page on GitHub Pages, as for Kura and Maku, so the owner can send people one link (2026-11-12: "In that way we can just send people the link to download the latest apk"). The page must look good and explain that tansu isn't on the Play Store on purpose, and how to install it. See [docs/releasing.md](docs/releasing.md).
+- Build in iterations (develop, test, review, repeat), tracked in [docs/plan.md](docs/plan.md). Push a slice only when every check passes.
 - LF line endings everywhere except Windows scripts (`*.bat`, `*.cmd`), enforced by `.gitattributes`. Editor settings are in `.editorconfig`.
 
 ## Tech stack

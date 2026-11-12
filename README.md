@@ -23,9 +23,10 @@ encrypted.
 
 ## Getting it
 
-Tansu isn't on any store. Each release is an APK on the
-[Releases](https://github.com/frankgrobbelaar/tansu/releases) page, and the app keeps itself up to
-date from there. [docs/releasing.md](docs/releasing.md) explains installing it the first time.
+Tansu isn't on any store. Once it's released, the
+[downloads page](https://frankgrobbelaar.github.io/tansu/) always has the newest APK, and the app
+keeps itself up to date from there. [docs/releasing.md](docs/releasing.md) explains installing it
+the first time.
 
 ## Status
 

@@ -21,13 +21,36 @@ Android installs an update only if it's signed with the same key as the app alre
 - **Lose it and every installed copy has to be uninstalled before a new one goes on**, losing its
   saved servers. Treat it like a house key.
 
+## Branches
+
+- `main` is where the work happens. Every push runs CI.
+- `release` is what tansu's users get, and the only source of updates. Moving it forward publishes
+  a version; nothing is committed to it directly.
+
 ## Cutting a release
 
-1. Move "Unreleased" in `CHANGELOG.md` under the new version, and push a tag such as `v1.2.0`.
-2. The release workflow builds the signed release APK (minified with R8) and publishes a GitHub
-   Release with the notes, `tansu.apk` and `tansu.apk.sha256`.
-3. The asset keeps the same name in every release, so one link always fetches the newest:
+1. On `main`, raise the version and move "Unreleased" in `CHANGELOG.md` under it.
+2. Fast-forward `release` to that commit: `git push origin main:release`.
+3. The release workflow checks the version is newer than the last release, builds the signed APK
+   (minified with R8), tags the commit (`v1.2.0`), and publishes a GitHub Release with the notes,
+   `tansu.apk` and `tansu.apk.sha256`.
+4. The asset keeps the same name in every release, so one link always fetches the newest:
    `https://github.com/frankgrobbelaar/tansu/releases/latest/download/tansu.apk`.
+
+## The downloads page
+
+[frankgrobbelaar.github.io/tansu](https://frankgrobbelaar.github.io/tansu/) is the one link to send
+people. It's drawn in Kiri and says, plainly:
+
+- what tansu is, with a Download button for the newest `tansu.apk`, its version and size;
+- that tansu isn't on the Play Store or any other store, on purpose: it's a personal app shared
+  with people the owner knows, so Android asks before installing it;
+- how to install it the first time (the steps below), and that updates then arrive in the app;
+- that it's open source, signed by the owner, and has no sign-in, ads or tracking;
+- what's new in each version, newest first, and that it needs Android 14 or newer.
+
+As with Kura and Maku, `scripts/downloads-page.mjs` builds it from the GitHub releases and
+`.github/workflows/downloads.yml` publishes it on GitHub Pages after every release, and by hand.
 
 ## First install
 
