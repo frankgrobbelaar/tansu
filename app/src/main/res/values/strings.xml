@@ -38,5 +38,5 @@
     <string name="browse_no_app">No app on this phone can open that file.</string>
 
     <string name="transfers_empty_title">Nothing moving</string>
-    <string name="transfers_empty_body">Copies, moves and deletes show up here while they run, and stay for a day after.</string>
+    <string name="transfers_empty_body">Copies, moves and deletes show up here while they run.</string>
 </resources>

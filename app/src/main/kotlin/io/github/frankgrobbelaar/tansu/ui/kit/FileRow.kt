@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileKind
+import io.github.frankgrobbelaar.tansu.ui.theme.KiriCorners
 
 /** One file or folder in a list: its tile, its name, and the line under it. */
 @Composable
@@ -66,7 +67,7 @@ fun FileTile(kind: FileKind, modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .size(42.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(KiriCorners.Tile)
                 .background(
                     if (isFolder) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                 ),

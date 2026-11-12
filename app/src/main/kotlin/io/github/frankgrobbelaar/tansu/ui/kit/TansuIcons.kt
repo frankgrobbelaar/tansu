@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
  * in black and tinted by `Icon`, so it takes the colour of whatever holds it.
  */
 object TansuIcons {
-    val Back by lazy { icon(line("M19 12H5"), line("M11 18l-6-6 6-6")) }
+    val Back by lazy { icon(line("M19 12H5"), line("M11 18l-6-6 6-6"), autoMirror = true) }
     val Close by lazy { icon(line("M6 6l12 12M18 6L6 18")) }
     val Search by lazy {
         icon(line("M4.5 11a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0 -13 0"), line("M20 20l-4.2-4.2"))
@@ -217,7 +217,7 @@ object TansuIcons {
     val Eye by lazy { icon(line(EYE), line("M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0")) }
     val EyeOff by lazy { icon(line(EYE), line("M4 4l16 16")) }
     val Refresh by lazy { icon(line("M19.5 12a7.5 7.5 0 1 1-2.2-5.3"), line("M19.5 4.5v4h-4")) }
-    val ChevronRight by lazy { icon(line("M9.5 6l6 6-6 6")) }
+    val ChevronRight by lazy { icon(line("M9.5 6l6 6-6 6"), autoMirror = true) }
     val OpenOutside by lazy {
         icon(
             line("M14 4.5h5.5V10"),
@@ -252,12 +252,14 @@ private fun line(path: String) = Part(path, filled = false)
 
 private fun solid(path: String) = Part(path, filled = true)
 
-private fun icon(vararg parts: Part): ImageVector =
+/** An icon; [autoMirror] flips one that points a way, such as back, in right-to-left languages. */
+private fun icon(vararg parts: Part, autoMirror: Boolean = false): ImageVector =
     ImageVector.Builder(
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
             viewportWidth = 24f,
             viewportHeight = 24f,
+            autoMirror = autoMirror,
         )
         .apply {
             parts.forEach { part ->

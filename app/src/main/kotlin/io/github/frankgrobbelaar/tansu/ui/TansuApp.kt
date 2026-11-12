@@ -1,9 +1,17 @@
 package io.github.frankgrobbelaar.tansu.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -20,8 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
@@ -59,32 +69,51 @@ fun TansuApp(modifier: Modifier = Modifier) {
             Place.Settings -> settings
         }
 
-    // Back from the root of Transfers or Settings goes to Browse before it leaves the app.
-    BackHandler(enabled = place != Place.Browse && backStack.size == 1) { place = Place.Browse }
+    val decorators: List<NavEntryDecorator<NavKey>> =
+        listOf(
+            rememberSaveableStateHolderNavEntryDecorator(),
+            rememberViewModelStoreNavEntryDecorator(),
+        )
+    val screens = entryProvider {
+        entry<BrowseHome> { BrowseRoute() }
+        entry<TransfersHome> { TransfersScreen() }
+        entry<SettingsHome> { SettingsScreen() }
+    }
+    // Every history is decorated all the time, so a place out of sight keeps its screens' state.
+    val browseEntries = rememberDecoratedNavEntries(browse, decorators, screens)
+    val transfersEntries = rememberDecoratedNavEntries(transfers, decorators, screens)
+    val settingsEntries = rememberDecoratedNavEntries(settings, decorators, screens)
+    // Browse sits under the other places, so back from their first screen goes to Browse.
+    val entries =
+        when (place) {
+            Place.Browse -> browseEntries
+            Place.Transfers -> browseEntries + transfersEntries
+            Place.Settings -> browseEntries + settingsEntries
+        }
 
     Scaffold(
         modifier = modifier,
-        contentWindowInsets = WindowInsets(0),
+        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
         bottomBar = { TansuNavigationBar(current = place, onSelect = { place = it }) },
     ) { padding ->
         NavDisplay(
-            backStack = backStack,
-            modifier = Modifier.padding(padding),
-            onBack = { backStack.removeLastOrNull() },
-            entryDecorators =
-                listOf(
-                    rememberSaveableStateHolderNavEntryDecorator(),
-                    rememberViewModelStoreNavEntryDecorator(),
-                ),
-            entryProvider =
-                entryProvider {
-                    entry<BrowseHome> { BrowseRoute() }
-                    entry<TransfersHome> { TransfersScreen() }
-                    entry<SettingsHome> { SettingsScreen() }
-                },
+            entries = entries,
+            modifier = Modifier.padding(padding).consumeWindowInsets(padding),
+            onBack = {
+                if (backStack.size > 1) backStack.removeLastOrNull() else place = Place.Browse
+            },
+            transitionSpec = { fade() },
+            popTransitionSpec = { fade() },
+            predictivePopTransitionSpec = { fade() },
         )
     }
 }
+
+/** Screens change with a short, calm crossfade. */
+private fun fade(): ContentTransform =
+    fadeIn(tween(SCREEN_MILLIS)) togetherWith fadeOut(tween(SCREEN_MILLIS))
+
+private const val SCREEN_MILLIS = 250
 
 @Composable
 private fun TansuNavigationBar(

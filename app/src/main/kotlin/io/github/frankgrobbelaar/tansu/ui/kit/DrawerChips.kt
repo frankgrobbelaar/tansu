@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.frankgrobbelaar.tansu.files.Drawer
+import io.github.frankgrobbelaar.tansu.ui.theme.KiriCorners
 
 /** The row of drawers under the top bar: the phone, then each server. */
 @Composable
@@ -71,7 +72,7 @@ private fun DrawerChip(
         leadingIcon = {
             Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
         },
-        shape = MaterialTheme.shapes.small,
+        shape = KiriCorners.Chip,
         colors =
             FilterChipDefaults.filterChipColors(
                 labelColor = colors.onSurfaceVariant,

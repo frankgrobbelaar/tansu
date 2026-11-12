@@ -28,6 +28,8 @@ private fun style(size: Int, line: Int, weight: Int, tracking: Double = 0.0) =
         lineHeight = line.sp,
         fontWeight = FontWeight(weight),
         letterSpacing = tracking.em,
+        // Tabular figures, so sizes, counts and progress don't jitter as their digits change.
+        fontFeatureSettings = "tnum",
     )
 
 /**
