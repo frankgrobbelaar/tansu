@@ -15,6 +15,9 @@ them on, and lets you move them between the two without fuss.
   drawer.
 - Shows every job as it runs: what it's doing, how far it got and how long is left. Jobs keep going
   when you leave the app.
+- Opens pictures, videos and PDFs itself, streaming them from servers; anything else opens in
+  another app.
+- Updates itself from GitHub, checking once a day unless you turn that off.
 
 ## What it doesn't do
 
