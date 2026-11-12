@@ -34,13 +34,14 @@ takes its real name once it's whole, never over anything the user didn't choose 
 ## Left for later
 
 - Jobs live in memory: a job queued or paused when Android ends tansu's process is lost. The
-  architecture plans for saving them.
-- Sharing files from a server out to other apps needs them fetched first, which comes with opening
-  server files (iteration 6).
-
-- From the same review, still to do: fetching a server file to open or share it runs in Browse
-  rather than as a job with a notification; one timed-out listing restarts a running transfer's
-  file; and the job detail doesn't list files one by one yet.
+  architecture plans for saving them. What a stopped job half wrote is only ever a hidden
+  `.name.<job>.tansu` file, so nothing broken shows under a real name.
+- Fetching a server file to open in another app, or to share, runs in Browse with its progress
+  and Cancel, but not as a job with a notification.
+- One timed-out listing drops the server's connection, so a transfer running on it starts its
+  current file again.
+- The job detail lists each pick and where it stands, but not each file inside a picked folder,
+  and pasted files don't appear in Browse until their job ends.
 - A missing SMB share should list the shares the server does have (spec, flow 8). Listing shares
   needs SMB's RPC calls, which smbj leaves to another library; until then the message offers Edit
   server.
