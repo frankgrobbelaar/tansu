@@ -55,7 +55,8 @@ class SmbFileSystemTest {
         smb().use { files ->
             val entries = runBlocking { files.list("/") }.associateBy { it.name }
 
-            assertEquals(setOf("hello.txt", "Films"), entries.keys)
+            // The image may keep files of its own in the share; ours must be there.
+            assertTrue(entries.keys.containsAll(setOf("hello.txt", "Films")))
             assertEquals(5L, entries.getValue("hello.txt").size)
             assertEquals("/Films", entries.getValue("Films").path)
             assertTrue(entries.getValue("Films").isFolder)
