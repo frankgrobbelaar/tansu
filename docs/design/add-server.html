@@ -1,0 +1,383 @@
+<!doctype html>
+<!-- Tansu design snapshot of "2 · Add a server" (https://claude.ai/artifact/HCxYiAaQqE7Qr8RqXmuDXB), taken 2026-11-12.
+     Change the canvas, then re-run scripts/design-snapshot.mjs; don't edit this file. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2 · Add a server · Tansu design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#6a5f55}a:hover{color:#2b2622}
+</style>
+</head>
+<body>
+<div style="width: 2152px; height: 1140px; box-sizing: border-box; padding: 56px 64px; background: #efe8de; color: #2b2622; font-family: Figtree, system-ui, sans-serif; display: flex; flex-direction: column; gap: 36px">
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 14px"><span style="width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: #8a5a2b; color: #ffffff; font-size: 20px; font-weight: 800">2</span><h1 style="margin: 0; font-size: 40px; font-weight: 800; letter-spacing: -0.02em">Add a server</h1></div>
+<p style="margin: 0; max-width: 980px; font-size: 16px; line-height: 1.55; color: #4f453c">SMB or SFTP, a few plain fields, and Connect. Tansu checks the details before saving anything, then the server opens as a new drawer.</p>
+</div>
+<a href="index.html" style="flex: none; font-size: 14px; font-weight: 600; text-decoration: none">← All workflows</a>
+</header>
+<div style="display: flex; gap: 56px; align-items: flex-start">
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Add a server</h2>
+
+</div>
+
+
+
+</div>
+
+<div style="flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 4px 20px 24px">
+<p style="margin: 0 4px 6px; font-size: 14px; line-height: 1.55; color: #4f453c">Pick how tansu talks to it. Both work at home and over Tailscale.</p>
+<button style="display: flex; align-items: center; gap: 16px; width: 100%; box-sizing: border-box; padding: 18px 14px 18px 18px; border-radius: 20px; border: 1px solid #e5dbcd; background: #fffdf9; color: #2b2622; font-family: Figtree, system-ui, sans-serif; text-align: left"><span style="width: 48px; height: 48px; flex: none; border-radius: 14px; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="6.5" rx="2"/><rect x="3.5" y="13" width="17" height="6.5" rx="2"/><path d="M7.5 7.75h.01M7.5 16.25h.01"/></svg></span><span style="flex: 1; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 17px; font-weight: 700">SMB</span><span style="font-size: 13px; line-height: 1.45; color: #6a5f55">Windows shares and most NAS boxes</span></span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6a5f55" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></button>
+<button style="display: flex; align-items: center; gap: 16px; width: 100%; box-sizing: border-box; padding: 18px 14px 18px 18px; border-radius: 20px; border: 1px solid #e5dbcd; background: #fffdf9; color: #2b2622; font-family: Figtree, system-ui, sans-serif; text-align: left"><span style="width: 48px; height: 48px; flex: none; border-radius: 14px; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7.5 9.5l2.5 2.5-2.5 2.5"/><path d="M12.5 15h4"/></svg></span><span style="flex: 1; display: flex; flex-direction: column; gap: 3px"><span style="font-size: 17px; font-weight: 700">SFTP</span><span style="font-size: 13px; line-height: 1.45; color: #6a5f55">Any server you can reach with SSH</span></span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#6a5f55" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg></button>
+<div style="margin-top: auto; display: flex; gap: 12px; padding: 14px 16px; border-radius: 16px; background: #f1e9de; font-size: 13px; line-height: 1.5; color: #4f453c"><span style="flex: none; color: #6a5f55"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.6h.01"/></svg></span><span>Away from home? Keep the Tailscale app connected and use the server's tailnet name, like <strong style="font-weight: 700; color: #2b2622">nas</strong>, or its 100.x address.</span></div>
+</div>
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">2.1  SMB or SFTP</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">Two kinds, each explained in one line. Add a server is in the drawers, the More menu and Settings.</span></figcaption>
+</figure>
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">SMB server</h2>
+
+</div>
+
+
+
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: 2px 20px 0">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Name<input value="NAS" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Host<input value="nas" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 2px solid #8a5a2b; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"><span style="font-weight: 500">A tailnet name, local name or IP</span></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Share<input value="Media" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Start in folder<input placeholder="Optional" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Username<input value="sam" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Password<span style="position: relative; display: block"><input type="password" value="oak-drawer-42" style="width: 100%; height: 48px; box-sizing: border-box; padding: 0 48px 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"><button aria-label="Show password" style="position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; border: 0; padding: 0; border-radius: 22px; background: none; color: #6a5f55; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+<button role="switch" aria-checked="false" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; border: 0; padding: 0 4px; background: none; color: #2b2622; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; text-align: left">Sign in as guest<span style="width: 52px; height: 32px; flex: none; box-sizing: border-box; border-radius: 16px; border: 2px solid #a89a8a; background: #f1e9de; display: flex; align-items: center; padding: 0 6px"><span style="width: 16px; height: 16px; border-radius: 8px; background: #8a7b6c"></span></span></button>
+</div>
+<div style="flex: none; padding: 14px 20px 20px; background: #fbf7f1; box-shadow: 0 -1px 0 #ece3d6"><button style="width: 100%; height: 52px; border: 0; border-radius: 26px; background: #8a5a2b; color: #ffffff; font-family: Figtree, system-ui, sans-serif; font-size: 16px; font-weight: 700">Connect</button></div>
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">2.2  SMB details</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">Plain fields with a hint where one helps. Connect checks everything before the server is saved.</span></figcaption>
+</figure>
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">SFTP server</h2>
+
+</div>
+
+
+
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 14px; padding: 2px 20px 0">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Name<input value="Home server" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<div style="display: flex; gap: 12px">
+<label style="flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Host<input value="home-server" style="width: 100%; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<label style="width: 84px; flex: none; display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Port<input value="22" style="width: 100%; height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+</div>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Start in folder<input value="/srv" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Username<input value="sam" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Sign in with
+<div role="group" aria-label="Sign in with" style="display: flex; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px #dccfbe; overflow: hidden">
+<button aria-pressed="false" style="flex: 1; border: 0; background: none; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 14px; font-weight: 600">Password</button>
+<button aria-pressed="true" style="flex: 1; border: 0; background: #f3dfc6; color: #4a2e12; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: Figtree, system-ui, sans-serif; font-size: 14px; font-weight: 700"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Private key</button>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 6px 10px 14px; border-radius: 12px; background: #fffdf9; box-shadow: inset 0 0 0 1px #dccfbe"><span style="color: #8a5a2b"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5L19 4"/><path d="M16 7l2.5 2.5"/><path d="M14 9l1.8 1.8"/></svg></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 600">id_ed25519</span><span style="font-size: 12px; color: #6a5f55">From Phone › Download</span></span><button style="height: 40px; border: 0; padding: 0 12px; border-radius: 20px; background: none; color: #8a5a2b; font-family: Figtree, system-ui, sans-serif; font-size: 14px; font-weight: 700">Change</button></div>
+</div>
+<div style="flex: none; display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 20px; background: #fbf7f1; box-shadow: 0 -1px 0 #ece3d6">
+<div role="status" style="display: flex; align-items: center; gap: 12px"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#e2d6c6" stroke-width="2.5"/><path d="M12 3a9 9 0 0 1 9 9" fill="none" stroke="#8a5a2b" stroke-width="2.5" stroke-linecap="round"/></svg><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">Connecting to home-server</span><span style="font-size: 12px; color: #6a5f55">Checking the key and the folder</span></span></div>
+<button style="width: 100%; height: 48px; border: 1px solid #dccfbe; border-radius: 24px; background: none; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 700">Cancel</button>
+</div>
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">2.3  SFTP, with a key</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">A password or a private key from the phone. While connecting, tansu says what it's checking, with Cancel.</span></figcaption>
+</figure>
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">SFTP server</h2>
+
+</div>
+
+
+
+</div>
+
+<div style="flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 2px 20px 0">
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Name<input value="Home server" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+<label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #6a5f55">Host<input value="home-server" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 12px; border: 1px solid #dccfbe; background: #fffdf9; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; color: #2b2622"></label>
+</div>
+<div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(43, 38, 34, 0.4)">
+<div role="dialog" aria-labelledby="trust-title" style="width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 24px; border-radius: 28px; background: #f6f0e7; box-shadow: 0 24px 48px rgba(43, 38, 34, 0.24)">
+<span style="width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: #e3e8d5; color: #2c3520"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5L19 4"/><path d="M16 7l2.5 2.5"/><path d="M14 9l1.8 1.8"/></svg></span>
+<h2 id="trust-title" style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.01em">Trust Home server?</h2>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #4f453c">This is the first time tansu connects to home-server. Check that its key matches the server's before you trust it.</p>
+<div style="padding: 12px 14px; border-radius: 12px; background: #fbf7f1; box-shadow: inset 0 0 0 1px #e5dbcd; font-family: ui-monospace, 'Roboto Mono', monospace; font-size: 13px; line-height: 1.55; color: #2b2622; word-break: break-all">ED25519<br>SHA256:k3Vq8pXr2bN0yQf7mWd4tHs9LcJe1aZu6oRi5gTvPnE</div>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: #6a5f55">If the key ever changes, tansu stops and tells you before connecting.</p>
+<div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 2px"><button style="height: 44px; border: 0; padding: 0 16px; border-radius: 22px; background: none; color: #8a5a2b; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 700">Cancel</button><button style="height: 44px; border: 0; padding: 0 22px; border-radius: 22px; background: #8a5a2b; color: #ffffff; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 700">Trust</button></div>
+</div>
+</div>
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">2.4  Trust the server, once</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">The first SFTP connection shows the server's key to check. A changed key later blocks the connection (9.5).</span></figcaption>
+</figure>
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+
+<span style="width: 14px; flex: none"></span>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Home server</h2>
+
+</div>
+
+<button aria-label="Search" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+<button aria-label="More options" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18.5" r="1.5"/></svg></button>
+</div>
+
+
+
+<div role="group" aria-label="Drawers" style="width: 360px; height: 52px; box-sizing: border-box; display: flex; gap: 8px; padding: 4px 16px 12px; overflow: hidden; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
+
+
+
+Phone
+
+</button>
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="6.5" rx="2"/><rect x="3.5" y="13" width="17" height="6.5" rx="2"/><path d="M7.5 7.75h.01M7.5 16.25h.01"/></svg>
+
+
+NAS
+
+</button>
+
+<button aria-pressed="true" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #f3dfc6; background: #f3dfc6; color: #4a2e12; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7.5 9.5l2.5 2.5-2.5 2.5"/><path d="M12.5 15h4"/></svg>
+
+Home server
+
+</button>
+
+</div>
+
+
+
+<div style="width: 360px; height: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px 6px; font-family: Figtree, system-ui, sans-serif; font-size: 13px; color: #6a5f55">
+<span style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Home server<span aria-hidden="true" style="padding: 0 5px">›</span><strong style="font-weight: 600; color: #2b2622">srv</strong></span>
+<span style="flex: none; font-variant-numeric: tabular-nums">5 items</span>
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 0 8px">
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">backups</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">12 items · Today</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">docker</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">8 items · 2 Nov</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">media</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">4 items · 30 Oct</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h6.5l4.5 4.5v10.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V8H18"/><path d="M8.5 12.5h7M8.5 16h5"/></svg>
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">notes.md</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">3 KB · Yesterday</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4.5" rx="1.5"/><path d="M4.5 8.5v9.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8.5"/><path d="M10 12.5h4"/></svg>
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">configs-2026.tar.gz</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">18 MB · 1 Nov</span>
+
+</span>
+
+
+
+</div>
+
+</div>
+<div role="status" style="position: absolute; left: 12px; right: 12px; bottom: 92px; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: #2b2622; color: #f6efe6; font-size: 14px; font-weight: 500; box-shadow: 0 12px 28px rgba(43, 38, 34, 0.24)"><span style="color: #c9d6b4"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Home server added to your drawers</div>
+
+
+<nav aria-label="Main" style="width: 360px; height: 80px; box-sizing: border-box; display: flex; justify-content: space-around; padding: 10px 8px 0; background: #f1e9de; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<a href="#browse" aria-current="page" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #2b2622; font-size: 12px; font-weight: 700">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: #e3e8d5; color: #2c3520">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+</span>
+Browse
+</a>
+
+<a href="#transfers" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 19V5"/><path d="M4.5 8.5L8 5l3.5 3.5"/><path d="M16 5v14"/><path d="M12.5 15.5L16 19l3.5-3.5"/></svg>
+
+
+
+</span>
+Transfers
+</a>
+
+<a href="#settings" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h8.5M16.5 7H20M4 17h3.5M11.5 17H20"/><circle cx="14.5" cy="7" r="2"/><circle cx="9.5" cy="17" r="2"/></svg>
+
+
+</span>
+Settings
+</a>
+
+</nav>
+
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">2.5  A new drawer</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">The server is saved and opens straight away. Its password or key is encrypted on the phone.</span></figcaption>
+</figure>
+
+</div>
+</div>
+</body>
+</html>

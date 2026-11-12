@@ -1,0 +1,996 @@
+<!doctype html>
+<!-- Tansu design snapshot of "3 · Browse" (https://claude.ai/artifact/HCxYiAaQqE7Qr8RqXmuDXB), taken 2026-11-12.
+     Change the canvas, then re-run scripts/design-snapshot.mjs; don't edit this file. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3 · Browse · Tansu design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#6a5f55}a:hover{color:#2b2622}
+</style>
+</head>
+<body>
+<div style="width: 1736px; height: 1140px; box-sizing: border-box; padding: 56px 64px; background: #efe8de; color: #2b2622; font-family: Figtree, system-ui, sans-serif; display: flex; flex-direction: column; gap: 36px">
+<header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; gap: 14px"><span style="width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: #8a5a2b; color: #ffffff; font-size: 20px; font-weight: 800">3</span><h1 style="margin: 0; font-size: 40px; font-weight: 800; letter-spacing: -0.02em">Browse</h1></div>
+<p style="margin: 0; max-width: 980px; font-size: 16px; line-height: 1.55; color: #4f453c">The same Browse for every drawer: folders first, list or grid, one sheet for sorting and view, and search that filters as you type.</p>
+</div>
+<a href="index.html" style="flex: none; font-size: 14px; font-weight: 600; text-decoration: none">← All workflows</a>
+</header>
+<div style="display: flex; gap: 56px; align-items: flex-start">
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Download</h2>
+
+</div>
+
+<button aria-label="Search" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+<button aria-label="More options" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18.5" r="1.5"/></svg></button>
+</div>
+
+
+
+<div role="group" aria-label="Drawers" style="width: 360px; height: 52px; box-sizing: border-box; display: flex; gap: 8px; padding: 4px 16px 12px; overflow: hidden; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<button aria-pressed="true" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #f3dfc6; background: #f3dfc6; color: #4a2e12; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
+
+
+
+Phone
+
+</button>
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="6.5" rx="2"/><rect x="3.5" y="13" width="17" height="6.5" rx="2"/><path d="M7.5 7.75h.01M7.5 16.25h.01"/></svg>
+
+
+NAS
+
+</button>
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7.5 9.5l2.5 2.5-2.5 2.5"/><path d="M12.5 15h4"/></svg>
+
+Home server
+
+</button>
+
+</div>
+
+
+
+<div style="width: 360px; height: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px 6px; font-family: Figtree, system-ui, sans-serif; font-size: 13px; color: #6a5f55">
+<span style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Phone<span aria-hidden="true" style="padding: 0 5px">›</span><strong style="font-weight: 600; color: #2b2622">Download</strong></span>
+<span style="flex: none; font-variant-numeric: tabular-nums">18 items</span>
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 0 8px">
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Receipts</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">14 items · 3 Nov</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h6.5l4.5 4.5v10.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V8H18"/><path d="M8.5 12.5h7M8.5 16h5"/></svg>
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Invoice 0423.pdf</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">212 KB · Today, 09:40</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 42 42" width="42" height="42" aria-hidden="true"><rect width="42" height="42" fill="#c9d8c5"/><circle cx="30" cy="13" r="5" fill="#f6f1e4"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#6f8f6a"/></svg>
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_1980.jpg</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">3.1 MB · Today, 08:15</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17.5V6.5l10-2v11"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></svg>
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Podcast episode 12.mp3</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">48 MB · Yesterday</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M10.5 9.6v4.8l4-2.4z" fill="currentColor"/></svg>
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Screen recording.mp4</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">96 MB · Yesterday</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4.5" rx="1.5"/><path d="M4.5 8.5v9.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8.5"/><path d="M10 12.5h4"/></svg>
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Setup files.zip</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">24 MB · 8 Nov</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h6.5l4.5 4.5v10.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V8H18"/><path d="M8.5 12.5h7M8.5 16h5"/></svg>
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Boarding pass.pdf</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">88 KB · 2 Nov</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h6.5l4.5 4.5v10.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V8H18"/><path d="M8.5 12.5h7M8.5 16h5"/></svg>
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Budget 2026.xlsx</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">4.8 MB · 1 Nov</span>
+
+</span>
+
+
+
+</div>
+
+</div>
+
+
+<nav aria-label="Main" style="width: 360px; height: 80px; box-sizing: border-box; display: flex; justify-content: space-around; padding: 10px 8px 0; background: #f1e9de; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<a href="#browse" aria-current="page" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #2b2622; font-size: 12px; font-weight: 700">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: #e3e8d5; color: #2c3520">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+</span>
+Browse
+</a>
+
+<a href="#transfers" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 19V5"/><path d="M4.5 8.5L8 5l3.5 3.5"/><path d="M16 5v14"/><path d="M12.5 15.5L16 19l3.5-3.5"/></svg>
+
+
+
+</span>
+Transfers
+</a>
+
+<a href="#settings" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h8.5M16.5 7H20M4 17h3.5M11.5 17H20"/><circle cx="14.5" cy="7" r="2"/><circle cx="9.5" cy="17" r="2"/></svg>
+
+
+</span>
+Settings
+</a>
+
+</nav>
+
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">3.1  A folder</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">Folders first, then files, each with its size and date. Back goes up a folder; the path jumps to any parent.</span></figcaption>
+</figure>
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Photos</h2>
+
+</div>
+
+<button aria-label="Search" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+<button aria-label="More options" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18.5" r="1.5"/></svg></button>
+</div>
+
+
+
+<div role="group" aria-label="Drawers" style="width: 360px; height: 52px; box-sizing: border-box; display: flex; gap: 8px; padding: 4px 16px 12px; overflow: hidden; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
+
+
+
+Phone
+
+</button>
+
+<button aria-pressed="true" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #f3dfc6; background: #f3dfc6; color: #4a2e12; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="6.5" rx="2"/><rect x="3.5" y="13" width="17" height="6.5" rx="2"/><path d="M7.5 7.75h.01M7.5 16.25h.01"/></svg>
+
+
+NAS
+
+</button>
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7.5 9.5l2.5 2.5-2.5 2.5"/><path d="M12.5 15h4"/></svg>
+
+Home server
+
+</button>
+
+</div>
+
+
+
+<div style="width: 360px; height: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px 6px; font-family: Figtree, system-ui, sans-serif; font-size: 13px; color: #6a5f55">
+<span style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">NAS<span aria-hidden="true" style="padding: 0 5px">›</span>Media<span aria-hidden="true" style="padding: 0 5px">›</span><strong style="font-weight: 600; color: #2b2622">Photos</strong></span>
+<span style="flex: none; font-variant-numeric: tabular-nums">24 items</span>
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 12px 8px; padding: 4px 16px">
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">2026</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">2025</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Screenshots</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #9fc4d3; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#9fc4d3"/><circle cx="30" cy="13" r="5" fill="#f3d48c"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#4e7a5b"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2041.jpg</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #e7b48c; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#e7b48c"/><circle cx="30" cy="13" r="5" fill="#fbe4bb"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#7b4c3b"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2040.jpg</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #b9c8e0; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#b9c8e0"/><circle cx="30" cy="13" r="5" fill="#f7e6b5"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#4f6185"/></svg>
+<span style="position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; gap: 4px; padding: 3px 8px 3px 6px; border-radius: 999px; background: rgba(27, 24, 21, 0.72); color: #fbf7f1; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>0:42</span>
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Beach walk.mp4</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #c9d8c5; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#c9d8c5"/><circle cx="30" cy="13" r="5" fill="#f6f1e4"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#6f8f6a"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2039.jpg</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #f0c9a5; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#f0c9a5"/><circle cx="30" cy="13" r="5" fill="#fff3dc"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#a2643f"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2038.jpg</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #d8cbbd; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#d8cbbd"/><circle cx="30" cy="13" r="5" fill="#fbf3e6"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#8a7462"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2037.jpg</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #9fc4d3; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#9fc4d3"/><circle cx="30" cy="13" r="5" fill="#fbe4bb"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#6f8f6a"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2036.jpg</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #e7b48c; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#e7b48c"/><circle cx="30" cy="13" r="5" fill="#f3d48c"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#4f6185"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2035.jpg</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0">
+<span style="position: relative; height: 104px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: #b9c8e0; color: #8a5a2b">
+
+<svg viewBox="0 0 42 42" width="104" height="104" aria-hidden="true"><rect width="42" height="42" fill="#b9c8e0"/><circle cx="30" cy="13" r="5" fill="#f6f1e4"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#7b4c3b"/></svg>
+
+</span>
+<span style="font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_2034.jpg</span>
+</div>
+
+</div>
+
+
+<nav aria-label="Main" style="width: 360px; height: 80px; box-sizing: border-box; display: flex; justify-content: space-around; padding: 10px 8px 0; background: #f1e9de; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<a href="#browse" aria-current="page" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #2b2622; font-size: 12px; font-weight: 700">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: #e3e8d5; color: #2c3520">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+</span>
+Browse
+</a>
+
+<a href="#transfers" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 19V5"/><path d="M4.5 8.5L8 5l3.5 3.5"/><path d="M16 5v14"/><path d="M12.5 15.5L16 19l3.5-3.5"/></svg>
+
+
+
+</span>
+Transfers
+</a>
+
+<a href="#settings" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h8.5M16.5 7H20M4 17h3.5M11.5 17H20"/><circle cx="14.5" cy="7" r="2"/><circle cx="9.5" cy="17" r="2"/></svg>
+
+
+</span>
+Settings
+</a>
+
+</nav>
+
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">3.2  Grid, where pictures matter</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">Server pictures show as thumbnails too. Each folder remembers whether it's a list or a grid.</span></figcaption>
+</figure>
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+
+
+<div style="width: 360px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 2px; padding: 0 6px; background: transparent; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Download</h2>
+
+</div>
+
+<button aria-label="Search" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+<button aria-label="More options" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5.5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18.5" r="1.5"/></svg></button>
+</div>
+
+
+
+<div role="group" aria-label="Drawers" style="width: 360px; height: 52px; box-sizing: border-box; display: flex; gap: 8px; padding: 4px 16px 12px; overflow: hidden; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<button aria-pressed="true" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #f3dfc6; background: #f3dfc6; color: #4a2e12; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
+
+
+
+Phone
+
+</button>
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="6.5" rx="2"/><rect x="3.5" y="13" width="17" height="6.5" rx="2"/><path d="M7.5 7.75h.01M7.5 16.25h.01"/></svg>
+
+
+NAS
+
+</button>
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7.5 9.5l2.5 2.5-2.5 2.5"/><path d="M12.5 15h4"/></svg>
+
+Home server
+
+</button>
+
+</div>
+
+
+
+<div style="width: 360px; height: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px 6px; font-family: Figtree, system-ui, sans-serif; font-size: 13px; color: #6a5f55">
+<span style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Phone<span aria-hidden="true" style="padding: 0 5px">›</span><strong style="font-weight: 600; color: #2b2622">Download</strong></span>
+<span style="flex: none; font-variant-numeric: tabular-nums">18 items</span>
+</div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding: 0 8px">
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Receipts</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">14 items · 3 Nov</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h6.5l4.5 4.5v10.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V8H18"/><path d="M8.5 12.5h7M8.5 16h5"/></svg>
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Invoice 0423.pdf</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">212 KB · Today, 09:40</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 42 42" width="42" height="42" aria-hidden="true"><rect width="42" height="42" fill="#c9d8c5"/><circle cx="30" cy="13" r="5" fill="#f6f1e4"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#6f8f6a"/></svg>
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_1980.jpg</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">3.1 MB · Today, 08:15</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 17.5V6.5l10-2v11"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/></svg>
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Podcast episode 12.mp3</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">48 MB · Yesterday</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M10.5 9.6v4.8l4-2.4z" fill="currentColor"/></svg>
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Screen recording.mp4</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">96 MB · Yesterday</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4.5" rx="1.5"/><path d="M4.5 8.5v9.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8.5"/><path d="M10 12.5h4"/></svg>
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Setup files.zip</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">24 MB · 8 Nov</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h6.5l4.5 4.5v10.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V8H18"/><path d="M8.5 12.5h7M8.5 16h5"/></svg>
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Boarding pass.pdf</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">88 KB · 2 Nov</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3.5h6.5l4.5 4.5v10.5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M13.5 3.5V8H18"/><path d="M8.5 12.5h7M8.5 16h5"/></svg>
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Budget 2026.xlsx</span>
+
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">4.8 MB · 1 Nov</span>
+
+</span>
+
+
+
+</div>
+
+</div>
+
+
+<nav aria-label="Main" style="width: 360px; height: 80px; box-sizing: border-box; display: flex; justify-content: space-around; padding: 10px 8px 0; background: #f1e9de; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<a href="#browse" aria-current="page" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #2b2622; font-size: 12px; font-weight: 700">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: #e3e8d5; color: #2c3520">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+</span>
+Browse
+</a>
+
+<a href="#transfers" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 19V5"/><path d="M4.5 8.5L8 5l3.5 3.5"/><path d="M16 5v14"/><path d="M12.5 15.5L16 19l3.5-3.5"/></svg>
+
+
+
+</span>
+Transfers
+</a>
+
+<a href="#settings" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h8.5M16.5 7H20M4 17h3.5M11.5 17H20"/><circle cx="14.5" cy="7" r="2"/><circle cx="9.5" cy="17" r="2"/></svg>
+
+
+</span>
+Settings
+</a>
+
+</nav>
+
+<div style="position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(43, 38, 34, 0.4)">
+<div role="dialog" aria-labelledby="sort-title" style="display: flex; flex-direction: column; gap: 16px; padding: 10px 20px 28px; border-radius: 28px 28px 0 0; background: #f6f0e7">
+<span style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: #c9bba9"></span>
+<h2 id="sort-title" style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.01em">Sort and view</h2>
+<div role="radiogroup" aria-label="Sort by" style="display: flex; flex-direction: column">
+<span style="font-size: 12px; font-weight: 600; color: #6a5f55; padding-bottom: 2px">Sort by</span>
+
+<button role="radio" aria-checked="true" style="display: flex; align-items: center; gap: 14px; height: 46px; border: 0; padding: 0; background: none; color: #2b2622; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 700; text-align: left"><span style="width: 20px; height: 20px; box-sizing: border-box; border-radius: 10px; border: 2px solid #8a5a2b; display: grid; place-items: center"><span style="width: 10px; height: 10px; border-radius: 5px; background: #8a5a2b"></span></span>Name</button>
+
+<button role="radio" aria-checked="false" style="display: flex; align-items: center; gap: 14px; height: 46px; border: 0; padding: 0; background: none; color: #2b2622; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; text-align: left"><span style="width: 20px; height: 20px; box-sizing: border-box; border-radius: 10px; border: 2px solid #a89a8a; display: grid; place-items: center"><span style="width: 10px; height: 10px; border-radius: 5px; background: transparent"></span></span>Date modified</button>
+
+<button role="radio" aria-checked="false" style="display: flex; align-items: center; gap: 14px; height: 46px; border: 0; padding: 0; background: none; color: #2b2622; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; text-align: left"><span style="width: 20px; height: 20px; box-sizing: border-box; border-radius: 10px; border: 2px solid #a89a8a; display: grid; place-items: center"><span style="width: 10px; height: 10px; border-radius: 5px; background: transparent"></span></span>Size</button>
+
+<button role="radio" aria-checked="false" style="display: flex; align-items: center; gap: 14px; height: 46px; border: 0; padding: 0; background: none; color: #2b2622; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; text-align: left"><span style="width: 20px; height: 20px; box-sizing: border-box; border-radius: 10px; border: 2px solid #a89a8a; display: grid; place-items: center"><span style="width: 10px; height: 10px; border-radius: 5px; background: transparent"></span></span>Type</button>
+
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: #6a5f55">Order</span>
+<div role="group" aria-label="Order" style="display: flex; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px #dccfbe; overflow: hidden">
+<button aria-pressed="true" style="flex: 1; border: 0; background: #f3dfc6; color: #4a2e12; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: Figtree, system-ui, sans-serif; font-size: 14px; font-weight: 700"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>A to Z</button>
+<button aria-pressed="false" style="flex: 1; border: 0; background: none; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 14px; font-weight: 600">Z to A</button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; font-weight: 600; color: #6a5f55">View</span>
+<div role="group" aria-label="View" style="display: flex; height: 40px; border-radius: 20px; box-shadow: inset 0 0 0 1px #dccfbe; overflow: hidden">
+<button aria-pressed="true" style="flex: 1; border: 0; background: #f3dfc6; color: #4a2e12; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: Figtree, system-ui, sans-serif; font-size: 14px; font-weight: 700"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6.5h12M8 12h12M8 17.5h12"/><path d="M4 6.5h.01M4 12h.01M4 17.5h.01"/></svg>List</button>
+<button aria-pressed="false" style="flex: 1; border: 0; background: none; color: #4f453c; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: Figtree, system-ui, sans-serif; font-size: 14px; font-weight: 600"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Grid</button>
+</div>
+</div>
+<button role="switch" aria-checked="false" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; border: 0; padding: 0; background: none; color: #2b2622; font-family: Figtree, system-ui, sans-serif; font-size: 15px; font-weight: 500; text-align: left">Show hidden files<span style="width: 52px; height: 32px; flex: none; box-sizing: border-box; border-radius: 16px; border: 2px solid #a89a8a; background: #f1e9de; display: flex; align-items: center; padding: 0 6px"><span style="width: 16px; height: 16px; border-radius: 8px; background: #8a7b6c"></span></span></button>
+</div>
+</div>
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">3.3  Sort and view</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">One sheet from the More menu. Every change applies the moment you tap it.</span></figcaption>
+</figure>
+
+<figure style="margin: 0; width: 360px; display: flex; flex-direction: column; gap: 16px">
+<div style="width: 360px; height: 780px; box-sizing: border-box; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; background: #fbf7f1; color: #2b2622; box-shadow: 0 30px 60px rgba(60, 40, 20, 0.16), 0 0 0 1px rgba(60, 40, 20, 0.08)">
+<div style="height: 28px; flex: none"></div>
+<div style="height: 64px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 10px 0 6px">
+<button aria-label="Back" style="width: 48px; height: 48px; flex: none; border: 0; padding: 0; border-radius: 24px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M11 18l-6-6 6-6"/></svg></button>
+<label style="flex: 1; min-width: 0; height: 48px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 4px 0 14px; border-radius: 24px; background: #f1e9de; color: #6a5f55"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input value="beach" aria-label="Search Photos" style="flex: 1; min-width: 0; border: 0; padding: 0; background: none; font-family: Figtree, system-ui, sans-serif; font-size: 16px; font-weight: 500; color: #2b2622"><button aria-label="Clear search" style="width: 40px; height: 40px; flex: none; border: 0; padding: 0; border-radius: 20px; background: none; color: inherit; display: grid; place-items: center"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></label>
+</div>
+
+
+<div role="group" aria-label="Drawers" style="width: 360px; height: 52px; box-sizing: border-box; display: flex; gap: 8px; padding: 4px 16px 12px; overflow: hidden; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></svg>
+
+
+
+Phone
+
+</button>
+
+<button aria-pressed="true" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #f3dfc6; background: #f3dfc6; color: #4a2e12; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="6.5" rx="2"/><rect x="3.5" y="13" width="17" height="6.5" rx="2"/><path d="M7.5 7.75h.01M7.5 16.25h.01"/></svg>
+
+
+NAS
+
+</button>
+
+<button aria-pressed="false" style="height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 10px; border-radius: 10px; border: 1px solid #dccfbe; background: transparent; color: #4f453c; font-family: Figtree, system-ui, sans-serif; font-size: 13px; font-weight: 600">
+
+
+<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M7.5 9.5l2.5 2.5-2.5 2.5"/><path d="M12.5 15h4"/></svg>
+
+Home server
+
+</button>
+
+</div>
+
+
+
+<div style="width: 360px; height: 30px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 20px 6px; font-family: Figtree, system-ui, sans-serif; font-size: 13px; color: #6a5f55">
+<span style="min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">NAS<span aria-hidden="true" style="padding: 0 5px">›</span>Media<span aria-hidden="true" style="padding: 0 5px">›</span><strong style="font-weight: 600; color: #2b2622">Photos</strong></span>
+<span style="flex: none; font-variant-numeric: tabular-nums">3 matches</span>
+</div>
+
+<div style="display: flex; flex-direction: column; padding: 0 8px">
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: #f3dfc6; color: #8a5a2b">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><mark style="padding: 0 1px; border-radius: 3px; background: #f3dfc6; color: #4a2e12">Beach</mark> 2025</span>
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">64 items · 3 Jan</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M10.5 9.6v4.8l4-2.4z" fill="currentColor"/></svg>
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><mark style="padding: 0 1px; border-radius: 3px; background: #f3dfc6; color: #4a2e12">Beach</mark> walk.mp4</span>
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">182 MB · Yesterday</span>
+
+</span>
+
+
+
+</div>
+
+
+<div style="width: 344px; height: 64px; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 0 12px; border-radius: 16px; background: transparent; opacity: 1; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+<span style="width: 42px; height: 42px; flex: none; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 42 42" width="42" height="42" aria-hidden="true"><rect width="42" height="42" fill="#b9c8e0"/><circle cx="30" cy="13" r="5" fill="#f7e6b5"/><path d="M0 33l12-12 9 9 7-6 14 12v6H0z" fill="#4f6185"/></svg>
+
+
+
+
+
+</span>
+<span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+
+<span style="font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><mark style="padding: 0 1px; border-radius: 3px; background: #f3dfc6; color: #4a2e12">beach</mark>-day.jpg</span>
+<span style="font-size: 13px; color: #6a5f55; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">5.6 MB · 12 Dec</span>
+
+</span>
+
+
+
+</div>
+
+</div>
+<p style="margin: 20px 32px 0; font-size: 13px; line-height: 1.5; color: #6a5f55; text-align: center">Searching this folder by name. Clear the search to see everything again.</p>
+<div style="flex: 1"></div>
+
+
+<nav aria-label="Main" style="width: 360px; height: 80px; box-sizing: border-box; display: flex; justify-content: space-around; padding: 10px 8px 0; background: #f1e9de; font-family: Figtree, system-ui, sans-serif; color: #2b2622">
+
+<a href="#browse" aria-current="page" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #2b2622; font-size: 12px; font-weight: 700">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: #e3e8d5; color: #2c3520">
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h3.6l2.2 2.4h7.2a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+
+
+
+
+</span>
+Browse
+</a>
+
+<a href="#transfers" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 19V5"/><path d="M4.5 8.5L8 5l3.5 3.5"/><path d="M16 5v14"/><path d="M12.5 15.5L16 19l3.5-3.5"/></svg>
+
+
+
+</span>
+Transfers
+</a>
+
+<a href="#settings" aria-current="false" style="width: 88px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #6a5f55; font-size: 12px; font-weight: 600">
+<span style="position: relative; width: 56px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: transparent; color: #6a5f55">
+
+
+<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h8.5M16.5 7H20M4 17h3.5M11.5 17H20"/><circle cx="14.5" cy="7" r="2"/><circle cx="9.5" cy="17" r="2"/></svg>
+
+
+</span>
+Settings
+</a>
+
+</nav>
+
+</div>
+<figcaption style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 12px; font-weight: 700; color: #8a5a2b">3.4  Search</span><span style="font-size: 14px; line-height: 1.5; color: #4f453c">Search filters the current folder as you type and marks what matched.</span></figcaption>
+</figure>
+
+</div>
+</div>
+</body>
+</html>
