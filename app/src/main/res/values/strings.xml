@@ -6,6 +6,37 @@
     <string name="nav_transfers">Transfers</string>
     <string name="nav_settings">Settings</string>
 
+    <string name="back">Back</string>
+    <string name="go_up">Go up</string>
+    <string name="grant_access">Grant access</string>
+    <string name="not_now">Not now</string>
+
+    <string name="drawer_phone">Phone</string>
+
+    <string name="welcome_title">Your phone and your servers, in one chest</string>
+    <string name="welcome_body">Browse, copy and move files between this phone and your own SMB and SFTP servers.</string>
+    <string name="welcome_no_sign_in">No sign-in or accounts</string>
+    <string name="welcome_no_ads">No ads and no tracking</string>
+    <string name="welcome_passwords">Server passwords stay on this phone, encrypted</string>
+    <string name="welcome_start">Get started</string>
+
+    <string name="access_title">Let tansu see your files</string>
+    <string name="access_body_before">"To browse, copy and move the files on this phone, Android needs to give tansu "</string>
+    <string name="access_body_name">All files access</string>
+    <string name="access_body_after">". You\'ll turn it on in the next screen."</string>
+    <string name="access_promise">Tansu only touches files when you ask it to, and sends them only where you choose.</string>
+    <string name="access_open_settings">Open settings</string>
+
+    <string name="browse_empty_title">This folder is empty</string>
+    <string name="browse_empty_body">Files you copy or move here show up straight away.</string>
+    <string name="browse_no_access_title">Tansu can\'t see your files yet</string>
+    <string name="browse_no_access_body">Android needs to give tansu All files access before it can show what\'s on this phone.</string>
+    <string name="browse_locked_title">This folder is closed to tansu</string>
+    <string name="browse_locked_body">Android keeps some folders, like Android/data, private to the apps that own them.</string>
+    <string name="browse_missing_title">This folder isn\'t here any more</string>
+    <string name="browse_missing_body">It may have been moved, renamed or deleted.</string>
+    <string name="browse_no_app">No app on this phone can open that file.</string>
+
     <string name="transfers_empty_title">Nothing moving</string>
     <string name="transfers_empty_body">Copies, moves and deletes show up here while they run, and stay for a day after.</string>
 </resources>

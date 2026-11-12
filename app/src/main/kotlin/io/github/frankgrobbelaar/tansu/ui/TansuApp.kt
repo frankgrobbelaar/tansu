@@ -26,7 +26,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import io.github.frankgrobbelaar.tansu.R
-import io.github.frankgrobbelaar.tansu.ui.browse.BrowseScreen
+import io.github.frankgrobbelaar.tansu.ui.browse.BrowseRoute
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.settings.SettingsScreen
 import io.github.frankgrobbelaar.tansu.ui.transfers.TransfersScreen
@@ -78,7 +78,7 @@ fun TansuApp(modifier: Modifier = Modifier) {
                 ),
             entryProvider =
                 entryProvider {
-                    entry<BrowseHome> { BrowseScreen() }
+                    entry<BrowseHome> { BrowseRoute() }
                     entry<TransfersHome> { TransfersScreen() }
                     entry<SettingsHome> { SettingsScreen() }
                 },
