@@ -5,6 +5,11 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- Pictures, videos and PDFs open in tansu. Swipe through a folder's pictures and pinch or
+  double-tap to zoom; videos play straight from the server as they stream; PDFs scroll with the
+  page you're on. Anything else still opens in another app.
+- A folder shown as a grid shows its pictures, from the phone and from servers.
+
 - Search a folder by name as you type, with what matched in bold.
 - Sort by name, date, size or type, either way round, from Sort and view in the menu or in
   Settings. Any folder can be a grid instead of a list, and remembers it.

@@ -95,9 +95,10 @@ data class BrowseUiState(
     val label: String
         get() = crumbs.joinToString(" › ") { it.name }
 
-    /** What [fetching] is for: opening one file, or sharing them. */
+    /** What [fetching] is for: opening one file, reading a PDF in tansu, or sharing them. */
     enum class Purpose {
         Open,
+        Read,
         Share,
     }
 
@@ -117,6 +118,10 @@ data class BrowseUiState(
 
     val title: String
         get() = crumbs.last().name
+
+    /** The folder on show, by its path. */
+    val folder: String
+        get() = crumbs.last().path
 
     val atRoot: Boolean
         get() = crumbs.size == 1

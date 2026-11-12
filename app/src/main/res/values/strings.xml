@@ -152,4 +152,11 @@
     <string name="view">View</string>
     <string name="view_list">List</string>
     <string name="view_grid">Grid</string>
+
+    <string name="viewer_place">%1$d of %2$d</string>
+    <string name="viewer_unreadable">These pictures can\'t be shown. The folder couldn\'t be read.</string>
+    <string name="video_unplayable">This video can\'t be played here. It may be in a format the phone doesn\'t know, or the server stopped answering.</string>
+    <string name="pdf_unreadable">This PDF can\'t be shown here. It may be locked with a password, or damaged.</string>
+    <string name="pdf_page">%1$d / %2$d</string>
+    <string name="pdf_page_label">Page %1$d</string>
 </resources>

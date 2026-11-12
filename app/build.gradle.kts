@@ -114,6 +114,9 @@ dependencies {
     implementation(libs.sshj)
     implementation(libs.bouncycastle.prov)
     implementation(libs.bouncycastle.pkix)
+    implementation(libs.coil.compose)
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
     debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(platform(libs.compose.bom))

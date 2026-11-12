@@ -56,30 +56,30 @@ import io.github.frankgrobbelaar.tansu.ui.kit.TansuTopBar
 import io.github.frankgrobbelaar.tansu.ui.rememberNotificationAsk
 import io.github.frankgrobbelaar.tansu.ui.servers.LocalNetworkAccess
 import io.github.frankgrobbelaar.tansu.ui.servers.rememberLocalNetworkAccess
+import io.github.frankgrobbelaar.tansu.ui.viewer.Viewer
+import io.github.frankgrobbelaar.tansu.ui.viewer.Viewing
+import io.github.frankgrobbelaar.tansu.ui.viewer.viewingOf
 import java.io.File
 import kotlinx.coroutines.launch
 
-/** Browse, wired to its ViewModel: folders open in place, files open in another app. */
+/**
+ * Browse, wired to its ViewModel: folders open in place; pictures, videos and PDFs in tansu's
+ * viewers; anything else in another app.
+ */
 @Composable
 fun BrowseRoute(
     onAddServer: () -> Unit,
     onEditServer: (DrawerTab) -> Unit,
     onOpenTransfers: () -> Unit,
+    onView: (Viewer) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: BrowseViewModel = viewModel(factory = BrowseViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
     var dialog by remember { mutableStateOf<BrowseDialog?>(null) }
-    val outside =
-        Outside(
-            context = context,
-            say = { text -> scope.launch { snackbar.showSnackbar(text) } },
-            noApp = stringResource(R.string.browse_no_app),
-            chooser = stringResource(R.string.share_chooser),
-        )
+    val outside = rememberOutside(snackbar)
     val localNetwork = rememberLocalNetworkAccess()
     val askNotifications = rememberNotificationAsk()
     BrowseEffects(
@@ -92,8 +92,13 @@ fun BrowseRoute(
         onAnnounce = viewModel::addedShown,
         onClearNotice = viewModel::noticeShown,
     )
-    val places = Places(onAddServer, { onEditServer(state.drawer) }, onOpenTransfers)
-    FetchedEffect(state.fetched, outside, onConsume = viewModel::fetchedHandled)
+    val places = Places(onAddServer, { onEditServer(state.drawer) }, onOpenTransfers, onView)
+    FetchedEffect(
+        fetched = state.fetched,
+        outside = outside,
+        onRead = { file -> onView(Viewer.Pdf(file.path, file.name, state.label)) },
+        onConsume = viewModel::fetchedHandled,
+    )
     Box(modifier = modifier.fillMaxSize()) {
         BrowseScreen(
             state = state,
@@ -142,14 +147,17 @@ internal class DialogDecisions(
 private fun FetchedEffect(
     fetched: BrowseUiState.Fetched?,
     outside: Outside,
+    onRead: (File) -> Unit,
     onConsume: () -> Unit,
 ) {
     val consume by rememberUpdatedState(onConsume)
+    val read by rememberUpdatedState(onRead)
     val hand by rememberUpdatedState(outside)
     LaunchedEffect(fetched) {
         if (fetched != null) {
             when (fetched.purpose) {
                 BrowseUiState.Purpose.Open -> hand.open(fetched.files.first())
+                BrowseUiState.Purpose.Read -> read(fetched.files.first())
                 BrowseUiState.Purpose.Share -> hand.share(fetched.files)
             }
             consume()
@@ -162,7 +170,20 @@ private class Places(
     val onAddServer: () -> Unit,
     val onEditServer: () -> Unit,
     val onOpenTransfers: () -> Unit,
+    val onView: (Viewer) -> Unit,
 )
+
+/** Handing files to other apps, saying so on [snackbar] when no app takes one. */
+@Composable
+private fun rememberOutside(snackbar: SnackbarHostState): Outside {
+    val scope = rememberCoroutineScope()
+    return Outside(
+        context = LocalContext.current,
+        say = { text -> scope.launch { snackbar.showSnackbar(text) } },
+        noApp = stringResource(R.string.browse_no_app),
+        chooser = stringResource(R.string.share_chooser),
+    )
+}
 
 /** Handing files to other apps, and what to say when that can't be done. */
 private class Outside(
@@ -201,9 +222,7 @@ private fun BrowseViewModel.actions(
             when {
                 state.selecting -> toggle(entry)
                 entry.isFolder -> open(entry)
-                // Another app can't read a server: the file comes to the phone first.
-                state.onServer -> fetch(listOf(entry), BrowseUiState.Purpose.Open)
-                else -> outside.open(File(entry.path))
+                else -> view(entry, state, places.onView, outside)
             }
         },
         onPick = ::toggle,
@@ -224,6 +243,28 @@ private fun BrowseViewModel.actions(
         onDropHeld = ::dropHeld,
         onOpenTransfers = places.onOpenTransfers,
     )
+
+/** Opens [entry]: pictures, videos and PDFs in tansu, anything else in another app. */
+private fun BrowseViewModel.view(
+    entry: Entry,
+    state: BrowseUiState,
+    onView: (Viewer) -> Unit,
+    outside: Outside,
+) {
+    val drawer = state.drawer.id
+    when (viewingOf(entry)) {
+        Viewing.Picture -> onView(Viewer.Picture(drawer, state.folder, entry.path))
+        Viewing.Video -> onView(Viewer.Video(drawer, entry.path, entry.name, state.label))
+        // Android draws PDFs from a file on the phone: a server's comes down first.
+        Viewing.Pdf ->
+            if (state.onServer) fetch(listOf(entry), BrowseUiState.Purpose.Read)
+            else onView(Viewer.Pdf(entry.path, entry.name, state.label))
+        // Another app can't read a server: the file comes to the phone first.
+        null ->
+            if (state.onServer) fetch(listOf(entry), BrowseUiState.Purpose.Open)
+            else outside.open(File(entry.path))
+    }
+}
 
 private fun BrowseViewModel.selectionActions(
     state: BrowseUiState,

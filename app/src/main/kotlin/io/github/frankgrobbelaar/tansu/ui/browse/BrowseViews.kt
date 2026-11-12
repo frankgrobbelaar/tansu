@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -47,11 +48,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileKind
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.kit.icon
+import io.github.frankgrobbelaar.tansu.ui.viewer.DrawerImage
 
 /** The top bar while searching: what to look for, Clear, and back to the folder. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,6 +147,7 @@ internal fun EntryGrid(
         items(state.entries, key = { it.path }) { entry ->
             EntryTile(
                 entry = entry,
+                drawerId = state.drawer.id,
                 name = marked(entry.name, state.search),
                 onClick = { actions.onOpen(entry) },
                 onLongClick = { actions.onPick(entry) },
@@ -160,6 +164,7 @@ internal fun EntryGrid(
 @Composable
 private fun EntryTile(
     entry: Entry,
+    drawerId: String,
     name: AnnotatedString,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -192,6 +197,15 @@ private fun EntryTile(
                 tint = if (kind == FileKind.Folder) colors.primary else colors.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
+            // Pictures show themselves, on the phone and on servers; the icon waits underneath.
+            if (kind == FileKind.Image) {
+                AsyncImage(
+                    model = DrawerImage(drawerId, entry),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             if (selected) {
                 Icon(
                     imageVector = TansuIcons.Check,

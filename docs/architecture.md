@@ -83,9 +83,13 @@ finishes when the job ends.
 ## Opening files
 
 Pictures go through Coil and videos through Media3, both reading straight from the `FileSystem`, so
-server files stream without downloading first. PDFs open with Android's `PdfRenderer`, from the
-cache for server files. Other files open in another app through a `FileProvider` URI, after server
-files are fetched to the cache.
+server files stream without downloading first: Coil through `DrawerImage` and its fetcher, Media3
+through `DrawerDataSource`, which opens each read at the position Media3 asks for, so seeking skips
+what it passes. PDFs open with Android's `PdfRenderer`, from the cache for server files. Other files
+open in another app through a `FileProvider` URI, after server files are fetched to the cache.
+
+The viewers are screens of their own (`ui/viewer`), pushed on the place's history like any task.
+Grid tiles show pictures' thumbnails through the same Coil loader.
 
 ## Updates
 

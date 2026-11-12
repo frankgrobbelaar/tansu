@@ -54,6 +54,10 @@ import io.github.frankgrobbelaar.tansu.ui.servers.ServerFormRoute
 import io.github.frankgrobbelaar.tansu.ui.settings.SettingsRoute
 import io.github.frankgrobbelaar.tansu.ui.transfers.JobRoute
 import io.github.frankgrobbelaar.tansu.ui.transfers.TransfersRoute
+import io.github.frankgrobbelaar.tansu.ui.viewer.PdfRoute
+import io.github.frankgrobbelaar.tansu.ui.viewer.PictureRoute
+import io.github.frankgrobbelaar.tansu.ui.viewer.VideoRoute
+import io.github.frankgrobbelaar.tansu.ui.viewer.Viewer
 import io.github.frankgrobbelaar.tansu.updates.Update
 import kotlinx.serialization.Serializable
 
@@ -200,8 +204,14 @@ private fun screensFor(
                 history.add(ServerForm(kind, drawer.id))
             },
             onOpenTransfers = onOpenTransfers,
+            onView = { history.add(it) },
         )
     }
+    entry<Viewer.Picture>(keyIn) { key ->
+        PictureRoute(key, onBack = { history.removeLastOrNull() })
+    }
+    entry<Viewer.Video>(keyIn) { key -> VideoRoute(key, onBack = { history.removeLastOrNull() }) }
+    entry<Viewer.Pdf>(keyIn) { key -> PdfRoute(key, onBack = { history.removeLastOrNull() }) }
     entry<AddServer>(keyIn) {
         AddServerScreen(
             onPick = { kind -> history.add(ServerForm(kind)) },
