@@ -91,7 +91,7 @@ Every copy, move, delete and share-in is a job.
 
 - A job shows what it's doing, how far it got (percent, items and size) and how long is left: in a
   card in Browse, on the Transfers tab and in a notification.
-- It keeps running when you leave tansu (Android 14's user-initiated data transfer jobs).
+- It keeps running when you leave tansu.
 - Transfers can be paused and resumed, and any job can be cancelled. Cancelling removes a
   half-copied file; finished files stay.
 - Jobs run one at a time, in order. Each ends with a summary ("Copied 128 files to NAS, 2

@@ -1,12 +1,35 @@
 package io.github.frankgrobbelaar.tansu.files
 
+import java.io.InputStream
+import java.io.OutputStream
+
 /**
  * One place files live: the phone, an SMB share or an SFTP server. Screens and jobs only ever see
  * this interface. Paths are absolute within the file system and use `/` between names.
+ *
+ * Every call fails with a [FileSystemException]. The streams it hands out block, so they're used
+ * off the main thread, and fail with [java.io.IOException] like any stream.
  */
 interface FileSystem {
     /** What's in the folder at [path], in no particular order. */
     suspend fun list(path: String): List<Entry>
+
+    /** The file or folder at [path], or null when there's nothing there. */
+    suspend fun stat(path: String): Entry?
+
+    /** Reads the file at [path], starting [offset] bytes in. The caller closes the stream. */
+    suspend fun read(path: String, offset: Long = 0): InputStream
+
+    /** Writes the file at [path] from its start, replacing what was there. */
+    suspend fun write(path: String): OutputStream
+
+    suspend fun createFolder(path: String)
+
+    /** Moves [from] to [to] within this file system. Fails with Exists if [to] is taken. */
+    suspend fun rename(from: String, to: String)
+
+    /** Deletes the file, or the empty folder, at [path]. */
+    suspend fun delete(path: String)
 }
 
 /** A file or folder as Browse shows it. */
@@ -40,6 +63,12 @@ sealed class FileSystemException(message: String, cause: Throwable? = null) :
     /** The folder or file isn't there (any more). */
     class NotFound(path: String) : FileSystemException("Nothing at $path")
 
+    /** Something with that name is already there. */
+    class Exists(path: String) : FileSystemException("Already at $path")
+
+    /** The phone or server is full. */
+    class NoSpace(path: String) : FileSystemException("No space for $path")
+
     /** The storage or server failed to read it, for a reason with no better name. */
     class Unreadable(path: String, cause: Throwable? = null) :
         FileSystemException("Can't read $path", cause)
@@ -67,8 +96,14 @@ sealed class FileSystemException(message: String, cause: Throwable? = null) :
 }
 
 /** [parent] and [name] joined with one `/`. */
-internal fun join(parent: String, name: String) =
+fun join(parent: String, name: String) =
     if (parent.endsWith('/')) parent + name else "$parent/$name"
+
+/** The folder holding [path]. */
+fun parentOf(path: String): String = path.substringBeforeLast('/').ifEmpty { "/" }
+
+/** The last name in [path]. */
+fun nameOf(path: String): String = path.substringAfterLast('/')
 
 /** Whether [this] path is [root] or somewhere inside it. */
 internal fun String.isWithin(root: String) =

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- How jobs speak, on screen and in notifications. -->
+<resources>
+    <plurals name="job_copying_files">
+        <item quantity="one">Copying %1$d file to %2$s</item>
+        <item quantity="other">Copying %1$d files to %2$s</item>
+    </plurals>
+    <plurals name="job_copying_items">
+        <item quantity="one">Copying %1$d item to %2$s</item>
+        <item quantity="other">Copying %1$d items to %2$s</item>
+    </plurals>
+    <plurals name="job_copied_files">
+        <item quantity="one">Copied %1$d file to %2$s</item>
+        <item quantity="other">Copied %1$d files to %2$s</item>
+    </plurals>
+    <plurals name="job_copied_items">
+        <item quantity="one">Copied %1$d item to %2$s</item>
+        <item quantity="other">Copied %1$d items to %2$s</item>
+    </plurals>
+    <plurals name="job_moving_files">
+        <item quantity="one">Moving %1$d file to %2$s</item>
+        <item quantity="other">Moving %1$d files to %2$s</item>
+    </plurals>
+    <plurals name="job_moving_items">
+        <item quantity="one">Moving %1$d item to %2$s</item>
+        <item quantity="other">Moving %1$d items to %2$s</item>
+    </plurals>
+    <plurals name="job_moved_files">
+        <item quantity="one">Moved %1$d file to %2$s</item>
+        <item quantity="other">Moved %1$d files to %2$s</item>
+    </plurals>
+    <plurals name="job_moved_items">
+        <item quantity="one">Moved %1$d item to %2$s</item>
+        <item quantity="other">Moved %1$d items to %2$s</item>
+    </plurals>
+    <plurals name="job_deleting_files">
+        <item quantity="one">Deleting %1$d file from %2$s</item>
+        <item quantity="other">Deleting %1$d files from %2$s</item>
+    </plurals>
+    <plurals name="job_deleting_items">
+        <item quantity="one">Deleting %1$d item from %2$s</item>
+        <item quantity="other">Deleting %1$d items from %2$s</item>
+    </plurals>
+    <plurals name="job_deleted_files">
+        <item quantity="one">Deleted %1$d file from %2$s</item>
+        <item quantity="other">Deleted %1$d files from %2$s</item>
+    </plurals>
+    <plurals name="job_deleted_items">
+        <item quantity="one">Deleted %1$d item from %2$s</item>
+        <item quantity="other">Deleted %1$d items from %2$s</item>
+    </plurals>
+    <plurals name="job_done_kept">
+        <item quantity="one">%1$s · %2$d kept as a copy</item>
+        <item quantity="other">%1$s · %2$d kept as copies</item>
+    </plurals>
+    <plurals name="time_minutes_left">
+        <item quantity="one">%1$d min left</item>
+        <item quantity="other">%1$d min left</item>
+    </plurals>
+    <plurals name="time_hours_left">
+        <item quantity="one">about %1$d hour left</item>
+        <item quantity="other">about %1$d hours left</item>
+    </plurals>
+
+    <string name="time_seconds_left">a few seconds left</string>
+    <string name="job_waiting">Waiting · %1$s</string>
+    <string name="job_paused">Paused</string>
+    <string name="job_paused_lost">Paused: lost the connection to %1$s</string>
+    <string name="job_getting_ready">Getting ready</string>
+    <string name="job_items_of">%1$d of %2$d</string>
+    <string name="job_size_of">%1$s of %2$s</string>
+    <string name="job_size_and_time">%1$s · %2$s</string>
+    <plurals name="job_some_failed">
+        <item quantity="one">%1$d done · %2$d couldn\'t be done</item>
+        <item quantity="other">%1$d done · %2$d couldn\'t be done</item>
+    </plurals>
+    <string name="job_freed">%1$s freed</string>
+    <string name="job_cancelled">Cancelled</string>
+
+    <string name="failure_not_found">It wasn\'t there any more.</string>
+    <string name="failure_access_denied">%1$s said no: this login can\'t write there.</string>
+    <string name="failure_no_space">%1$s ran out of space.</string>
+    <string name="failure_exists">Something with that name was already there.</string>
+    <string name="failure_unreadable">It couldn\'t be read or written.</string>
+    <string name="failure_unreachable">%1$s stopped answering.</string>
+    <string name="failure_into_itself">A folder can\'t go inside itself.</string>
+    <string name="failure_mismatch">The copy didn\'t match, so the original was kept.</string>
+
+    <string name="transfers_now">Now</string>
+    <string name="transfers_next">Up next</string>
+    <string name="transfers_needs_look">Needs a look</string>
+    <string name="transfers_earlier">Earlier</string>
+    <string name="job_from">From</string>
+    <string name="job_to">To</string>
+    <string name="job_speed">%1$s a second</string>
+    <string name="job_now_on">Now on %1$s</string>
+    <string name="job_not_done">Not done</string>
+    <string name="transfers_badge">%1$d to do</string>
+
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="cancel_job">Cancel job</string>
+    <string name="done">Done</string>
+    <plurals name="retry_files">
+        <item quantity="one">Retry %1$d file</item>
+        <item quantity="other">Retry %1$d files</item>
+    </plurals>
+
+    <string name="notification_channel_jobs">Copies, moves and deletes</string>
+    <string name="notification_channel_jobs_body">Progress while a job runs, and how it ended.</string>
+</resources>

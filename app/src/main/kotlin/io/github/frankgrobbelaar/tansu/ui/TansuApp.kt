@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -27,6 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntryDecorator
@@ -37,14 +42,17 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import io.github.frankgrobbelaar.tansu.R
+import io.github.frankgrobbelaar.tansu.appContainer
 import io.github.frankgrobbelaar.tansu.files.Drawer
+import io.github.frankgrobbelaar.tansu.jobs.Job
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.browse.BrowseRoute
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.servers.AddServerScreen
 import io.github.frankgrobbelaar.tansu.ui.servers.ServerFormRoute
 import io.github.frankgrobbelaar.tansu.ui.settings.SettingsScreen
-import io.github.frankgrobbelaar.tansu.ui.transfers.TransfersScreen
+import io.github.frankgrobbelaar.tansu.ui.transfers.JobRoute
+import io.github.frankgrobbelaar.tansu.ui.transfers.TransfersRoute
 import kotlinx.serialization.Serializable
 
 /** The three places in the navigation bar. Each keeps its own history. */
@@ -66,6 +74,9 @@ enum class Place(@param:StringRes val label: Int, val icon: ImageVector) {
 /** A server's details: a new one of [kind], or the saved one called [serverId]. */
 @Serializable data class ServerForm(val kind: Server.Kind, val serverId: String? = null) : NavKey
 
+/** One job, in detail. */
+@Serializable data class JobDetail(val id: Long) : NavKey
+
 /** Tansu's frame: the current place's screens above the navigation bar. */
 @Composable
 fun TansuApp(modifier: Modifier = Modifier) {
@@ -85,7 +96,7 @@ fun TansuApp(modifier: Modifier = Modifier) {
             rememberSaveableStateHolderNavEntryDecorator(),
             rememberViewModelStoreNavEntryDecorator(),
         )
-    val screens = screensFor(browse)
+    val screens = screensFor(browse, transfers, onOpenTransfers = { place = Place.Transfers })
     // Every history is decorated all the time, so a place out of sight keeps its screens' state.
     val browseEntries = rememberDecoratedNavEntries(browse, decorators, screens)
     val transfersEntries = rememberDecoratedNavEntries(transfers, decorators, screens)
@@ -98,13 +109,17 @@ fun TansuApp(modifier: Modifier = Modifier) {
             Place.Settings -> browseEntries + settingsEntries
         }
 
+    // Jobs still to finish, counted on the Transfers tab.
+    val jobs by appContainer().jobs.all.collectAsStateWithLifecycle()
+    val toDo = jobs.count { it.status == Job.Status.Running || it.status == Job.Status.Queued }
+
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
         // The bar is for moving between places; a task opened from one has the screen to itself.
         bottomBar = {
             if (backStack.size == 1) {
-                TansuNavigationBar(current = place, onSelect = { place = it })
+                TansuNavigationBar(current = place, toDo = toDo, onSelect = { place = it })
             }
         },
     ) { padding ->
@@ -122,7 +137,11 @@ fun TansuApp(modifier: Modifier = Modifier) {
 }
 
 /** What each key shows. Browse's tasks, like adding a server, go on top of [browse]. */
-private fun screensFor(browse: NavBackStack<NavKey>) = entryProvider {
+private fun screensFor(
+    browse: NavBackStack<NavKey>,
+    transfers: NavBackStack<NavKey>,
+    onOpenTransfers: () -> Unit,
+) = entryProvider {
     entry<BrowseHome> {
         BrowseRoute(
             onAddServer = { browse.add(AddServer) },
@@ -130,6 +149,7 @@ private fun screensFor(browse: NavBackStack<NavKey>) = entryProvider {
                 val kind = if (drawer.kind == Drawer.Kind.Smb) Server.Kind.Smb else Server.Kind.Sftp
                 browse.add(ServerForm(kind, drawer.id))
             },
+            onOpenTransfers = onOpenTransfers,
         )
     }
     entry<AddServer> {
@@ -147,7 +167,8 @@ private fun screensFor(browse: NavBackStack<NavKey>) = entryProvider {
             onBack = { browse.removeLastOrNull() },
         )
     }
-    entry<TransfersHome> { TransfersScreen() }
+    entry<TransfersHome> { TransfersRoute(onOpenJob = { id -> transfers.add(JobDetail(id)) }) }
+    entry<JobDetail> { key -> JobRoute(id = key.id, onBack = { transfers.removeLastOrNull() }) }
     entry<SettingsHome> { SettingsScreen() }
 }
 
@@ -160,6 +181,7 @@ private const val SCREEN_MILLIS = 250
 @Composable
 private fun TansuNavigationBar(
     current: Place,
+    toDo: Int,
     onSelect: (Place) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -176,7 +198,24 @@ private fun TansuNavigationBar(
             NavigationBarItem(
                 selected = place == current,
                 onClick = { onSelect(place) },
-                icon = { Icon(imageVector = place.icon, contentDescription = null) },
+                icon = {
+                    if (place == Place.Transfers && toDo > 0) {
+                        val badge = stringResource(R.string.transfers_badge, toDo)
+                        BadgedBox(
+                            badge = {
+                                Badge(
+                                    modifier = Modifier.semantics { contentDescription = badge }
+                                ) {
+                                    Text(toDo.toString())
+                                }
+                            }
+                        ) {
+                            Icon(imageVector = place.icon, contentDescription = null)
+                        }
+                    } else {
+                        Icon(imageVector = place.icon, contentDescription = null)
+                    }
+                },
                 label = { Text(text = stringResource(place.label)) },
                 colors = colors,
             )

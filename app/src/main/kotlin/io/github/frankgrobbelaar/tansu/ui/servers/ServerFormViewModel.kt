@@ -307,7 +307,9 @@ private fun ServerFormUiState.withRefusal(e: FileSystemException): ServerFormUiS
             filling.copy(failure = ServerFormUiState.Failure.Locked)
         is FileSystemException.NotFound ->
             filling.copy(failure = ServerFormUiState.Failure.FolderMissing)
-        is FileSystemException.Unreadable ->
+        is FileSystemException.Unreadable,
+        is FileSystemException.Exists,
+        is FileSystemException.NoSpace ->
             filling.copy(failure = ServerFormUiState.Failure.Unreadable)
     }
 }

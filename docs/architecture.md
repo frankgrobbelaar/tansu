@@ -41,12 +41,21 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
 
 ## Jobs
 
-- A job is an operation (copy, move or delete), its sources and its destination. Queued and paused
-  jobs are saved, so they survive the app being closed.
-- Jobs run one at a time as user-initiated data transfer jobs (Android 14+), each with its
-  notification.
-- A copy streams in chunks from one `FileSystem` to another, reporting progress as it goes. A move
-  within a drawer is a rename; across drawers it copies, checks the size, then deletes.
+- A job (`jobs/Job.kt`) is an operation (copy, move or delete), what was picked, where it came from
+  and where it goes. `Jobs` is the queue: one job at a time, in order, each able to pause, resume,
+  cancel and retry. `JobRun` carries one out.
+- While anything is queued or running, `TransferService` (a data sync foreground service) keeps
+  tansu alive and shows the running job in a notification, with Pause and Cancel. It stops when
+  the queue is empty. User-initiated data transfer jobs were the first plan, but Android makes them
+  wait for a network, which a copy on the phone alone doesn't need.
+- A copy streams 256 KB chunks from one `FileSystem` to another, reporting progress as it goes. A
+  move within a drawer is a rename; across drawers it copies, checks the size, then deletes the
+  original. Folders are walked first, so the job knows how much there is.
+- Name clashes are settled before the job starts (Keep both, Replace or Skip, per name). A job
+  remembers where each pick went and which files are done, so a paused, resumed or retried job
+  carries on without asking again or doing anything twice.
+- A server that stops answering is retried for 30 seconds, then the job pauses and says which
+  server it lost. Cancelling deletes the file half written; finished files stay.
 - Progress is a `StateFlow` read by the Browse card, the Transfers tab and the notification (which
   updates at most once a second).
 

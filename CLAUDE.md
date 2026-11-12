@@ -41,7 +41,7 @@ Decided with the owner on 2026-11-12:
 - Manual dependency injection to start; Hilt only if the app grows.
 - Storage backends, all behind one file-system interface: phone storage (`java.nio` with All files access, `MANAGE_EXTERNAL_STORAGE`), SMB (smbj) and SFTP (sshj). NFS is deliberately out of scope.
 - DataStore for settings and saved servers; SMB and SFTP passwords encrypted with an Android Keystore key.
-- Coil 3 for pictures and thumbnails, Media3 for video and Android's `PdfRenderer` for PDFs. Jobs (copy, move, delete) run as user-initiated data transfer jobs (Android 14+).
+- Coil 3 for pictures and thumbnails, Media3 for video and Android's `PdfRenderer` for PDFs. Jobs (copy, move, delete) run in a data sync foreground service. User-initiated data transfer jobs were the first plan, but Android makes them wait for a network, which a copy on the phone alone doesn't need (changed 2026-11-12, while building jobs).
 - One `:app` module, Gradle Kotlin DSL with a version catalog.
 - Gradle 9.8 with AGP 9.5 and Kotlin 2.4; compile and target SDK 37, minimum 34. Versions live in `gradle/libs.versions.toml`.
 

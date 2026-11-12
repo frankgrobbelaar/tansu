@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Selecting, cutting, copying, pasting, renaming and deleting. -->
+<resources>
+    <string name="row_selected">Selected</string>
+    <string name="row_not_selected">Not selected</string>
+    <plurals name="selection_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <string name="select_all">Select all</string>
+    <string name="stop_selecting">Stop selecting</string>
+
+    <string name="action_cut">Cut</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_share">Share</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_more">More</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_details">Details</string>
+    <string name="action_open_outside">Open in another app</string>
+    <string name="new_folder">New folder</string>
+
+    <plurals name="held_copy">
+        <item quantity="one">%1$d item to copy</item>
+        <item quantity="other">%1$d items to copy</item>
+    </plurals>
+    <plurals name="held_move">
+        <item quantity="one">%1$d item to move</item>
+        <item quantity="other">%1$d items to move</item>
+    </plurals>
+    <string name="held_from">%1$s from %2$s</string>
+    <string name="paste_here">Paste here</string>
+    <string name="drop_held">Let go of these</string>
+
+    <plurals name="delete_title">
+        <item quantity="one">Delete %1$d item from %2$s?</item>
+        <item quantity="other">Delete %1$d items from %2$s?</item>
+    </plurals>
+    <string name="delete_body">%1$s from %2$s. There\'s no trash, so this can\'t be undone.</string>
+    <string name="delete_body_folders">%1$s from %2$s, and everything in the folders. There\'s no trash, so this can\'t be undone.</string>
+    <string name="delete">Delete</string>
+
+    <string name="rename_title">Rename</string>
+    <string name="rename_name">Name</string>
+    <string name="rename_keeps_extension">The extension stays as it is.</string>
+    <string name="rename">Rename</string>
+    <string name="create">Create</string>
+    <string name="name_not_allowed">A name can\'t be empty or have a / in it.</string>
+
+    <string name="clash_title">%1$s is already here</string>
+    <string name="clash_here">Already in %1$s</string>
+    <string name="clash_incoming_copy">The one you\'re copying</string>
+    <string name="clash_incoming_move">The one you\'re moving</string>
+    <string name="keep_both">Keep both</string>
+    <string name="replace">Replace</string>
+    <string name="skip">Skip</string>
+    <plurals name="clash_rest">
+        <item quantity="one">Do this for the %1$d other clash</item>
+        <item quantity="other">Do this for the %1$d other clashes</item>
+    </plurals>
+
+    <string name="details_kind_folder">Folder</string>
+    <string name="details_size">Size</string>
+    <string name="details_where">Where</string>
+    <string name="details_changed">Changed</string>
+    <string name="details_path">Full path</string>
+
+    <string name="share_server_not_yet">Tansu can\'t share files from servers yet.</string>
+    <string name="share_chooser">Share with</string>
+</resources>

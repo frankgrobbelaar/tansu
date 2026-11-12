@@ -13,16 +13,25 @@ import io.github.frankgrobbelaar.tansu.TansuSettings
 import io.github.frankgrobbelaar.tansu.files.BrowseOrder
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
+import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
 import io.github.frankgrobbelaar.tansu.files.isWithin
 import io.github.frankgrobbelaar.tansu.files.join
+import io.github.frankgrobbelaar.tansu.jobs.Clash
+import io.github.frankgrobbelaar.tansu.jobs.Clipboard
+import io.github.frankgrobbelaar.tansu.jobs.Failure
+import io.github.frankgrobbelaar.tansu.jobs.Held
+import io.github.frankgrobbelaar.tansu.jobs.Job
+import io.github.frankgrobbelaar.tansu.jobs.Jobs
+import io.github.frankgrobbelaar.tansu.jobs.Where
+import io.github.frankgrobbelaar.tansu.jobs.reasonOf
 import io.github.frankgrobbelaar.tansu.servers.SavedServers
+import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.kit.Crumb
 import io.github.frankgrobbelaar.tansu.ui.kit.DrawerTab
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -43,7 +52,34 @@ data class BrowseUiState(
     val offerServers: Boolean = false,
     /** A server that was just added, to say so once. */
     val added: String? = null,
+    /** The paths picked in this folder; picking anything turns on selection. */
+    val selected: Set<String> = emptySet(),
+    /** What Cut or Copy picked up, waiting to be pasted. */
+    val held: Held? = null,
+    /** The job running now, or next. */
+    val job: Job? = null,
+    /** Something to say once, such as how a job ended. */
+    val notice: Notice? = null,
+    /** How the drawer's files are addressed outside tansu, such as smb://nas/Media. */
+    val address: String = "",
 ) {
+    val selecting: Boolean
+        get() = selected.isNotEmpty()
+
+    val picked: List<Entry>
+        get() = entries.filter { it.path in selected }
+
+    /** The folder as a person reads it, such as "NAS › Media › Photos". */
+    val label: String
+        get() = crumbs.joinToString(" › ") { it.name }
+
+    sealed interface Notice {
+        data class JobEnded(val job: Job) : Notice
+
+        /** A rename or new folder in [drawer] didn't happen, and why. */
+        data class Refused(val reason: Failure.Reason, val drawer: String) : Notice
+    }
+
     val title: String
         get() = crumbs.last().name
 
@@ -88,37 +124,51 @@ class BrowseViewModel(
     private val access: StorageAccess,
     private val servers: SavedServers,
     private val settings: TansuSettings,
+    private val jobs: Jobs,
+    private val clipboard: Clipboard,
     savedState: SavedStateHandle,
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
     private val phone = drawers.value.first()
-    private val selected = savedState.getMutableStateFlow(DRAWER, phone.id)
+    private val drawerId = savedState.getMutableStateFlow(DRAWER, phone.id)
     private val paths = savedState.getMutableStateFlow(PATHS, emptyMap<String, String>())
     private val troubled = MutableStateFlow(emptySet<String>())
     private val listing = MutableStateFlow(Listing(loading = true))
     private val added = MutableStateFlow<String?>(null)
-    private var loading: Job? = null
+    private val picked = MutableStateFlow(emptySet<String>())
+    private val notice = MutableStateFlow<BrowseUiState.Notice?>(null)
+    private var loading: kotlinx.coroutines.Job? = null
 
     /** The drawer and folder on show. A drawer that's gone falls back to the phone. */
     private val here: StateFlow<Here> =
-        combine(drawers, selected, paths, ::hereOf)
+        combine(drawers, drawerId, paths, ::hereOf)
             .stateIn(
                 viewModelScope,
                 SharingStarted.Eagerly,
-                hereOf(drawers.value, selected.value, paths.value),
+                hereOf(drawers.value, drawerId.value, paths.value),
             )
 
     /** Whether to offer a first server, and the name of one just added. */
     private val news =
-        combine(servers.all, settings.serverOfferDismissed, added) { saved, dismissed, added ->
-            News(offerServers = saved.isEmpty() && !dismissed, added = added)
+        combine(servers.all, settings.serverOfferDismissed, added, drawers) {
+            saved,
+            dismissed,
+            added,
+            drawers ->
+            News(offerServers = saved.isEmpty() && !dismissed, added = added, drawers = drawers)
+        }
+
+    /** Selection, the clipboard, the job under way, and anything to say. */
+    private val tools =
+        combine(picked, clipboard.contents, jobs.all, notice) { picked, held, all, notice ->
+            Tools(picked, held, all.firstOrNull { it.active }, notice)
         }
 
     val state: StateFlow<BrowseUiState> =
-        combine(drawers, here, listing, troubled, news) { drawers, here, listing, troubled, news ->
+        combine(here, listing, troubled, news, tools) { here, listing, troubled, news, tools ->
                 BrowseUiState(
-                    drawers = drawers.map { tabOf(it, troubled) },
+                    drawers = news.drawers.map { tabOf(it, troubled) },
                     drawer = tabOf(here.drawer, troubled),
                     crumbs = crumbsOf(here),
                     entries = listing.entries,
@@ -126,6 +176,11 @@ class BrowseViewModel(
                     problem = listing.problem,
                     offerServers = news.offerServers,
                     added = news.added,
+                    selected = tools.picked,
+                    held = tools.held,
+                    job = tools.job,
+                    notice = tools.notice,
+                    address = addressOf(here.drawer),
                 )
             }
             .stateIn(
@@ -139,17 +194,23 @@ class BrowseViewModel(
             )
 
     init {
-        viewModelScope.launch { here.collect { load(it, fresh = true) } }
+        viewModelScope.launch {
+            here.collect {
+                picked.value = emptySet()
+                load(it, fresh = true)
+            }
+        }
         viewModelScope.launch {
             servers.added.collect { server ->
-                selected.value = server.id
+                drawerId.value = server.id
                 added.value = server.name
             }
         }
+        viewModelScope.launch { watchJobs() }
     }
 
     fun select(drawerId: String) {
-        selected.value = drawerId
+        this.drawerId.value = drawerId
     }
 
     fun open(entry: Entry) {
@@ -182,14 +243,107 @@ class BrowseViewModel(
 
     /** Leaves a server whose key changed blocked, and goes back to the phone. */
     fun keepBlocked() {
-        selected.value = phone.id
+        drawerId.value = phone.id
     }
 
     fun removeServer() {
         val serverId = here.value.drawer.id
         if (serverId == phone.id) return
-        selected.value = phone.id
+        drawerId.value = phone.id
         viewModelScope.launch { servers.remove(serverId) }
+    }
+
+    // Selecting and managing files
+
+    fun toggle(entry: Entry) {
+        picked.update { if (entry.path in it) it - entry.path else it + entry.path }
+    }
+
+    fun selectAll() {
+        picked.value = listing.value.entries.map { it.path }.toSet()
+    }
+
+    fun clearSelection() {
+        picked.value = emptySet()
+    }
+
+    fun cut() = hold(cut = true)
+
+    fun copy() = hold(cut = false)
+
+    fun dropHeld() {
+        clipboard.clear()
+    }
+
+    /** What's held whose name is already in this folder: the user settles each before pasting. */
+    fun clashes(): List<Clashing> {
+        val held = clipboard.contents.value ?: return emptyList()
+        val here = listing.value.entries.associateBy { it.name }
+        return held.picks.mapNotNull { pick -> here[pick.name]?.let { Clashing(it, pick) } }
+    }
+
+    /** Starts copying or moving what's held into this folder, settling clashes as [choices] say. */
+    fun paste(choices: Map<String, Clash>) {
+        val held = clipboard.contents.value ?: return
+        val to = whereHere()
+        if (held.cut) jobs.move(held.picks, held.from, to, choices)
+        else jobs.copy(held.picks, held.from, to, choices)
+        clipboard.clear()
+    }
+
+    fun delete() {
+        jobs.delete(state.value.picked, whereHere())
+        clearSelection()
+    }
+
+    /** Renames [entry] to [name] in its folder. The extension is the caller's to keep. */
+    fun rename(entry: Entry, name: String) {
+        clearSelection()
+        change { files -> files.rename(entry.path, join(here.value.path, name)) }
+    }
+
+    fun createFolder(name: String) {
+        change { files -> files.createFolder(join(here.value.path, name)) }
+    }
+
+    fun noticeShown() {
+        notice.value = null
+    }
+
+    private fun hold(cut: Boolean) {
+        clipboard.hold(state.value.picked, whereHere(), cut)
+        clearSelection()
+    }
+
+    /** A quick change to this folder, then a fresh listing; a refusal is said once. */
+    private fun change(block: suspend (FileSystem) -> Unit) {
+        viewModelScope.launch {
+            try {
+                block(here.value.drawer.fileSystem)
+            } catch (e: FileSystemException) {
+                notice.value = BrowseUiState.Notice.Refused(reasonOf(e), here.value.drawer.name)
+            }
+            load(here.value, fresh = false)
+        }
+    }
+
+    private fun whereHere(): Where {
+        val here = here.value
+        return Where(here.drawer.id, here.path, here.drawer.name, state.value.label)
+    }
+
+    /** Lists the folder again when a job that touched this drawer ends, and says how it went. */
+    private suspend fun watchJobs() {
+        var ended = jobs.all.value.filterNot { it.active }.map { it.id }.toSet()
+        jobs.all.collect { all ->
+            val newlyEnded = all.filter { !it.active && it.id !in ended }
+            ended = ended + newlyEnded.map { it.id }
+            newlyEnded.lastOrNull()?.let { job ->
+                if (job.status == Job.Status.Done) notice.value = BrowseUiState.Notice.JobEnded(job)
+                val drawer = here.value.drawer.id
+                if (job.from.drawerId == drawer || job.to?.drawerId == drawer) refresh()
+            }
+        }
     }
 
     fun dismissServerOffer() {
@@ -240,7 +394,18 @@ class BrowseViewModel(
         return listOf(Crumb(here.drawer.name, root)) + names.zip(paths, ::Crumb)
     }
 
-    private data class News(val offerServers: Boolean, val added: String?)
+    private data class News(
+        val offerServers: Boolean,
+        val added: String?,
+        val drawers: List<Drawer>,
+    )
+
+    private data class Tools(
+        val picked: Set<String>,
+        val held: Held?,
+        val job: Job?,
+        val notice: BrowseUiState.Notice?,
+    )
 
     private data class Listing(
         val entries: List<Entry> = emptyList(),
@@ -261,6 +426,8 @@ class BrowseViewModel(
                     access = container.storageAccess,
                     servers = container.servers,
                     settings = container.settings,
+                    jobs = container.jobs,
+                    clipboard = container.clipboard,
                     savedState = createSavedStateHandle(),
                 )
             }
@@ -277,6 +444,19 @@ private fun hereOf(drawers: List<Drawer>, selected: String, paths: Map<String, S
     return Here(drawer, path)
 }
 
+/** A name already in the folder, [here], and the picked one that would land on it. */
+data class Clashing(val here: Entry, val incoming: Entry)
+
+/** How a drawer's files are addressed outside tansu: smb://host/share, sftp://host, or nothing. */
+private fun addressOf(drawer: Drawer): String {
+    val server = drawer.server ?: return ""
+    val port = if (server.port != server.kind.defaultPort) ":${server.port}" else ""
+    return when (server.kind) {
+        Server.Kind.Smb -> "smb://${server.host}$port/${server.share}"
+        Server.Kind.Sftp -> "sftp://${server.host}$port"
+    }
+}
+
 private fun tabOf(drawer: Drawer, troubled: Set<String>) =
     DrawerTab(drawer.id, drawer.name, drawer.kind, troubled = drawer.id in troubled)
 
@@ -285,7 +465,9 @@ private fun problemOf(e: FileSystemException): BrowseUiState.Problem =
     when (e) {
         is FileSystemException.AccessDenied -> BrowseUiState.Problem.Locked
         is FileSystemException.NotFound -> BrowseUiState.Problem.Missing
-        is FileSystemException.Unreadable -> BrowseUiState.Problem.Unreadable
+        is FileSystemException.Unreadable,
+        is FileSystemException.Exists,
+        is FileSystemException.NoSpace -> BrowseUiState.Problem.Unreadable
         is FileSystemException.Unreachable -> BrowseUiState.Problem.Unreachable(e.host)
         is FileSystemException.AuthFailed,
         is FileSystemException.BadKey -> BrowseUiState.Problem.LoginRefused

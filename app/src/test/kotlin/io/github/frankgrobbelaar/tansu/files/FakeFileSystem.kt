@@ -6,7 +6,8 @@ import kotlinx.coroutines.CompletableDeferred
  * A file system made of a map from folder paths to what they hold, or to what goes wrong. A gate
  * holds a folder's listing back until the test opens it.
  */
-class FakeFileSystem(private val folders: Map<String, List<Entry>> = emptyMap()) : FileSystem {
+class FakeFileSystem(private val folders: Map<String, List<Entry>> = emptyMap()) :
+    FileSystem by MemoryFileSystem() {
     val failures = mutableMapOf<String, FileSystemException>()
     val gates = mutableMapOf<String, CompletableDeferred<Unit>>()
     var listings = 0

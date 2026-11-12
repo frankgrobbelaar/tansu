@@ -51,6 +51,8 @@ fun TansuField(
     placeholder: String? = null,
     secret: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    /** Text after what's typed that can't be changed, such as a file's extension. */
+    suffix: String = "",
 ) {
     var shown by rememberSaveable { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
@@ -91,6 +93,13 @@ fun TansuField(
                         )
                     }
                     field()
+                }
+                if (suffix.isNotEmpty()) {
+                    Text(
+                        text = suffix,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.onSurfaceVariant,
+                    )
                 }
                 if (secret) ShowButton(shown = shown, onClick = { shown = !shown })
             }

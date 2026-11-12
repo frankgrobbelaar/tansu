@@ -13,6 +13,9 @@ import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.LocalFileSystem
 import io.github.frankgrobbelaar.tansu.files.SftpFileSystem
 import io.github.frankgrobbelaar.tansu.files.SmbFileSystem
+import io.github.frankgrobbelaar.tansu.jobs.Clipboard
+import io.github.frankgrobbelaar.tansu.jobs.Jobs
+import io.github.frankgrobbelaar.tansu.jobs.TransferService
 import io.github.frankgrobbelaar.tansu.servers.LiveServerCheck
 import io.github.frankgrobbelaar.tansu.servers.Secrets
 import io.github.frankgrobbelaar.tansu.servers.Server
@@ -58,6 +61,10 @@ class AppContainer(
     val drawers = Drawers(phone, servers.all, { fileSystemFor(it, secrets) }, scope)
 
     val serverCheck: ServerCheck = LiveServerCheck(::fileSystemFor)
+
+    val jobs = Jobs(drawers.all, scope, onBusy = { TransferService.start(context) })
+
+    val clipboard = Clipboard()
 
     companion object {
         const val PHONE = "phone"

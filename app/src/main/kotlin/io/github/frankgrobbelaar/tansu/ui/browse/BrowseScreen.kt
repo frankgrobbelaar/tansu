@@ -1,5 +1,6 @@
 package io.github.frankgrobbelaar.tansu.ui.browse
 
+import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
@@ -24,11 +25,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -36,7 +38,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.files.Entry
+import io.github.frankgrobbelaar.tansu.jobs.Clash
 import io.github.frankgrobbelaar.tansu.ui.format.Human
+import io.github.frankgrobbelaar.tansu.ui.format.JobWords
 import io.github.frankgrobbelaar.tansu.ui.kit.Crumb
 import io.github.frankgrobbelaar.tansu.ui.kit.DrawerChips
 import io.github.frankgrobbelaar.tansu.ui.kit.DrawerTab
@@ -45,6 +49,8 @@ import io.github.frankgrobbelaar.tansu.ui.kit.FileRow
 import io.github.frankgrobbelaar.tansu.ui.kit.PathBar
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuTopBar
+import io.github.frankgrobbelaar.tansu.ui.rememberNotificationAsk
+import io.github.frankgrobbelaar.tansu.ui.servers.LocalNetworkAccess
 import io.github.frankgrobbelaar.tansu.ui.servers.rememberLocalNetworkAccess
 import kotlinx.coroutines.launch
 
@@ -53,6 +59,7 @@ import kotlinx.coroutines.launch
 fun BrowseRoute(
     onAddServer: () -> Unit,
     onEditServer: (DrawerTab) -> Unit,
+    onOpenTransfers: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: BrowseViewModel = viewModel(factory = BrowseViewModel.Factory),
 ) {
@@ -60,62 +67,172 @@ fun BrowseRoute(
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val noApp = stringResource(R.string.browse_no_app)
-    val notYet = stringResource(R.string.browse_server_files_not_yet)
-    var removing by rememberSaveable { mutableStateOf(false) }
+    var dialog by remember { mutableStateOf<BrowseDialog?>(null) }
+    val outside =
+        Outside(
+            context = context,
+            say = { text -> scope.launch { snackbar.showSnackbar(text) } },
+            noApp = stringResource(R.string.browse_no_app),
+            notYet = stringResource(R.string.browse_server_files_not_yet),
+            shareNotYet = stringResource(R.string.share_server_not_yet),
+            chooser = stringResource(R.string.share_chooser),
+        )
     val localNetwork = rememberLocalNetworkAccess()
+    val askNotifications = rememberNotificationAsk()
     BrowseEffects(
         state = state,
         snackbar = snackbar,
         onResume = viewModel::refresh,
         onUp = { viewModel.up() },
+        onClearSelection = viewModel::clearSelection,
         onAnnounce = viewModel::addedShown,
+        onClearNotice = viewModel::noticeShown,
     )
-
+    val places = Places(onAddServer, { onEditServer(state.drawer) }, onOpenTransfers)
     Box(modifier = modifier.fillMaxSize()) {
         BrowseScreen(
             state = state,
             actions =
-                BrowseActions(
-                    onSelectDrawer = viewModel::select,
-                    onAddServer = onAddServer,
-                    onEditServer = { onEditServer(state.drawer) },
-                    onRemoveServer = { removing = true },
-                    onDismissOffer = viewModel::dismissServerOffer,
-                    onOpen = { entry ->
-                        when {
-                            entry.isFolder -> viewModel.open(entry)
-                            state.onServer -> scope.launch { snackbar.showSnackbar(notYet) }
-                            !openOutside(context, entry) ->
-                                scope.launch { snackbar.showSnackbar(noApp) }
-                        }
-                    },
-                    onCrumb = viewModel::jumpTo,
-                    onUp = { viewModel.up() },
-                    onRetry = viewModel::refresh,
-                    onGrantAccess = { openAllFilesAccess(context) },
-                    onTrustKey = viewModel::trustNewKey,
-                    onKeepBlocked = viewModel::keepBlocked,
-                    onAllowLocalNetwork = { localNetwork.ask(viewModel::refresh) },
-                ),
+                viewModel.actions(state, places, outside, localNetwork, askNotifications) {
+                    dialog = it
+                },
+            selectionActions = viewModel.selectionActions(state, outside) { dialog = it },
             localNetworkBlocked = !localNetwork.allowed,
         )
         SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter))
     }
-    if (removing) {
-        RemoveServerDialog(
-            name = state.drawer.name,
-            onRemove = {
-                removing = false
-                viewModel.removeServer()
-            },
-            onCancel = { removing = false },
-        )
+    BrowseDialogHost(
+        dialog = dialog,
+        state = state,
+        decisions =
+            DialogDecisions(
+                onRemoveServer = viewModel::removeServer,
+                onCreateFolder = viewModel::createFolder,
+                onDelete = { askNotifications(viewModel::delete) },
+                onRename = viewModel::rename,
+                onPaste = { choices -> askNotifications { viewModel.paste(choices) } },
+            ),
+        onDialog = { dialog = it },
+    )
+}
+
+/** What Browse's dialogs can decide. */
+internal class DialogDecisions(
+    val onRemoveServer: () -> Unit,
+    val onCreateFolder: (String) -> Unit,
+    val onDelete: () -> Unit,
+    val onRename: (Entry, String) -> Unit,
+    val onPaste: (Map<String, Clash>) -> Unit,
+)
+
+/** Where Browse's tasks lead: other screens and places. */
+private class Places(
+    val onAddServer: () -> Unit,
+    val onEditServer: () -> Unit,
+    val onOpenTransfers: () -> Unit,
+)
+
+/** Handing files to other apps, and what to say when that can't be done. */
+private class Outside(
+    val context: android.content.Context,
+    val say: (String) -> Unit,
+    val noApp: String,
+    val notYet: String,
+    val shareNotYet: String,
+    val chooser: String,
+) {
+    fun open(entry: Entry, onServer: Boolean) {
+        when {
+            onServer -> say(notYet)
+            !openOutside(context, entry) -> say(noApp)
+        }
+    }
+
+    fun share(entries: List<Entry>, onServer: Boolean) {
+        if (onServer) say(shareNotYet) else shareOutside(context, entries, chooser)
     }
 }
 
+private fun BrowseViewModel.actions(
+    state: BrowseUiState,
+    places: Places,
+    outside: Outside,
+    localNetwork: LocalNetworkAccess,
+    askNotifications: (then: () -> Unit) -> Unit,
+    onDialog: (BrowseDialog) -> Unit,
+) =
+    BrowseActions(
+        onSelectDrawer = ::select,
+        onAddServer = places.onAddServer,
+        onEditServer = places.onEditServer,
+        onRemoveServer = { onDialog(BrowseDialog.RemoveServer) },
+        onNewFolder = { onDialog(BrowseDialog.NewFolder) },
+        onDismissOffer = ::dismissServerOffer,
+        onOpen = { entry ->
+            when {
+                state.selecting -> toggle(entry)
+                entry.isFolder -> open(entry)
+                else -> outside.open(entry, state.onServer)
+            }
+        },
+        onPick = ::toggle,
+        onCrumb = ::jumpTo,
+        onUp = { up() },
+        onRetry = ::refresh,
+        onGrantAccess = { openAllFilesAccess(outside.context) },
+        onTrustKey = ::trustNewKey,
+        onKeepBlocked = ::keepBlocked,
+        onAllowLocalNetwork = { localNetwork.ask(::refresh) },
+        onClearSelection = ::clearSelection,
+        onSelectAll = ::selectAll,
+        onPaste = {
+            val clashes = clashes()
+            if (clashes.isEmpty()) askNotifications { paste(emptyMap()) }
+            else onDialog(BrowseDialog.Clashes(clashes))
+        },
+        onDropHeld = ::dropHeld,
+        onOpenTransfers = places.onOpenTransfers,
+    )
+
+private fun BrowseViewModel.selectionActions(
+    state: BrowseUiState,
+    outside: Outside,
+    onDialog: (BrowseDialog) -> Unit,
+) =
+    SelectionActions(
+        onCut = ::cut,
+        onCopy = ::copy,
+        onShare = { outside.share(state.picked.filterNot { it.isFolder }, state.onServer) },
+        onDelete = { onDialog(BrowseDialog.Delete) },
+        onRename = { state.picked.singleOrNull()?.let { onDialog(BrowseDialog.Rename(it)) } },
+        onDetails = { state.picked.singleOrNull()?.let { onDialog(BrowseDialog.Details(it)) } },
+        onOpenOutside = {
+            state.picked.firstOrNull { !it.isFolder }?.let { outside.open(it, state.onServer) }
+        },
+    )
+
+/** The dialog Browse has open, if any. */
+internal sealed interface BrowseDialog {
+    data object RemoveServer : BrowseDialog
+
+    data object NewFolder : BrowseDialog
+
+    data object Delete : BrowseDialog
+
+    data class Rename(val entry: Entry) : BrowseDialog
+
+    data class Details(val entry: Entry) : BrowseDialog
+
+    /** Clashes still to settle before pasting, and the choices made so far. */
+    data class Clashes(
+        val left: List<Clashing>,
+        val choices: Map<String, Clash> = emptyMap(),
+    ) : BrowseDialog
+}
+
 /**
- * What Browse does around the screen: refreshing, going up on back, and saying a server was added.
+ * What Browse does around the screen: refreshing, going up or leaving selection on back, and saying
+ * what happened once.
  */
 @Composable
 private fun BrowseEffects(
@@ -123,24 +240,45 @@ private fun BrowseEffects(
     snackbar: SnackbarHostState,
     onResume: () -> Unit,
     onUp: () -> Unit,
+    onClearSelection: () -> Unit,
     onAnnounce: () -> Unit,
+    onClearNotice: () -> Unit,
 ) {
+    val resources = LocalResources.current
     val added = state.added?.let { stringResource(R.string.server_added, it) }
+    val notice = state.notice?.let { noticeText(it, resources) }
     val resume by rememberUpdatedState(onResume)
     val announce by rememberUpdatedState(onAnnounce)
+    val clearNotice by rememberUpdatedState(onClearNotice)
     // Coming back to tansu lists the folder again: access may have changed, or the files.
     LifecycleResumeEffect(Unit) {
         resume()
         onPauseOrDispose {}
     }
     BackHandler(enabled = !state.atRoot, onBack = onUp)
+    // Registered after going up, so it wins: back first leaves selection.
+    BackHandler(enabled = state.selecting, onBack = onClearSelection)
+    // Shown first and cleared after: clearing changes the key, which would end the snackbar early.
     LaunchedEffect(added) {
         if (added != null) {
-            announce()
             snackbar.showSnackbar(added)
+            announce()
+        }
+    }
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            snackbar.showSnackbar(notice)
+            clearNotice()
         }
     }
 }
+
+private fun noticeText(notice: BrowseUiState.Notice, resources: Resources) =
+    when (notice) {
+        is BrowseUiState.Notice.JobEnded ->
+            JobWords.title(notice.job, resources) + " · " + JobWords.detail(notice.job, resources)
+        is BrowseUiState.Notice.Refused -> JobWords.reason(notice.reason, notice.drawer, resources)
+    }
 
 /** Everything Browse lets you do, in one place so the screen's signature stays readable. */
 class BrowseActions(
@@ -148,8 +286,10 @@ class BrowseActions(
     val onAddServer: () -> Unit,
     val onEditServer: () -> Unit,
     val onRemoveServer: () -> Unit,
+    val onNewFolder: () -> Unit,
     val onDismissOffer: () -> Unit,
     val onOpen: (Entry) -> Unit,
+    val onPick: (Entry) -> Unit,
     val onCrumb: (Crumb) -> Unit,
     val onUp: () -> Unit,
     val onRetry: () -> Unit,
@@ -157,35 +297,40 @@ class BrowseActions(
     val onTrustKey: () -> Unit,
     val onKeepBlocked: () -> Unit,
     val onAllowLocalNetwork: () -> Unit,
+    val onClearSelection: () -> Unit,
+    val onSelectAll: () -> Unit,
+    val onPaste: () -> Unit,
+    val onDropHeld: () -> Unit,
+    val onOpenTransfers: () -> Unit,
 )
 
 /** A drawer's folder: the top bar, the drawers, the path, then the files or why there are none. */
 @Composable
-fun BrowseScreen(
+internal fun BrowseScreen(
     state: BrowseUiState,
     actions: BrowseActions,
+    selectionActions: SelectionActions,
     modifier: Modifier = Modifier,
     localNetworkBlocked: Boolean = false,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
-        TansuTopBar(
-            title = state.title,
-            navigationIcon = {
-                if (!state.atRoot) {
-                    IconButton(onClick = actions.onUp) {
-                        Icon(TansuIcons.Back, contentDescription = stringResource(R.string.back))
-                    }
-                }
-            },
-            actions = { MoreMenu(onServer = state.onServer, actions = actions) },
-        )
-        DrawerChips(
-            drawers = state.drawers,
-            selected = state.drawer.id,
-            onSelect = actions.onSelectDrawer,
-            onAdd = actions.onAddServer,
-        )
-        AnimatedVisibility(visible = state.offerServers) {
+        if (state.selecting) {
+            SelectionTopBar(
+                count = state.selected.size,
+                bytes = state.picked.sumOf { it.size },
+                onClose = actions.onClearSelection,
+                onSelectAll = actions.onSelectAll,
+            )
+        } else {
+            BrowseTopBar(state, actions)
+            DrawerChips(
+                drawers = state.drawers,
+                selected = state.drawer.id,
+                onSelect = actions.onSelectDrawer,
+                onAdd = actions.onAddServer,
+            )
+        }
+        AnimatedVisibility(visible = state.offerServers && !state.selecting) {
             ServerOffer(onAdd = actions.onAddServer, onDismiss = actions.onDismissOffer)
         }
         if (state.problem == null) {
@@ -206,7 +351,7 @@ fun BrowseScreen(
                         title = stringResource(R.string.browse_empty_title),
                         body = stringResource(R.string.browse_empty_body),
                     )
-                else -> Entries(state.entries, actions.onOpen)
+                else -> Entries(state, actions)
             }
             if (state.loading) {
                 LinearProgressIndicator(
@@ -214,58 +359,89 @@ fun BrowseScreen(
                 )
             }
         }
+        BrowseFoot(state, actions, selectionActions)
     }
+}
+
+/** The job under way, then the selection's actions or the paste bar. */
+@Composable
+private fun BrowseFoot(
+    state: BrowseUiState,
+    actions: BrowseActions,
+    selectionActions: SelectionActions,
+) {
+    state.job?.let { JobCard(job = it, onClick = actions.onOpenTransfers) }
+    val held = state.held
+    when {
+        state.selecting ->
+            SelectionBar(single = state.selected.size == 1, actions = selectionActions)
+        held != null && state.problem == null ->
+            PasteBar(held = held, onPaste = actions.onPaste, onDrop = actions.onDropHeld)
+    }
+}
+
+@Composable
+private fun BrowseTopBar(state: BrowseUiState, actions: BrowseActions) {
+    TansuTopBar(
+        title = state.title,
+        navigationIcon = {
+            if (!state.atRoot) {
+                IconButton(onClick = actions.onUp) {
+                    Icon(TansuIcons.Back, contentDescription = stringResource(R.string.back))
+                }
+            }
+        },
+        actions = { MoreMenu(onServer = state.onServer, actions = actions) },
+    )
 }
 
 @Composable
 private fun MoreMenu(onServer: Boolean, actions: BrowseActions, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
+    val choose: (() -> Unit) -> () -> Unit = { action ->
+        {
+            open = false
+            action()
+        }
+    }
     Box(modifier = modifier) {
         IconButton(onClick = { open = true }) {
             Icon(TansuIcons.More, contentDescription = stringResource(R.string.more_options))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.add_server)) },
-                onClick = {
-                    open = false
-                    actions.onAddServer()
-                },
-                leadingIcon = { Icon(TansuIcons.Plus, contentDescription = null) },
-            )
+            MenuItem(TansuIcons.NewFolder, R.string.new_folder, choose(actions.onNewFolder))
+            MenuItem(TansuIcons.Plus, R.string.add_server, choose(actions.onAddServer))
             if (onServer) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.edit_server)) },
-                    onClick = {
-                        open = false
-                        actions.onEditServer()
-                    },
-                    leadingIcon = { Icon(TansuIcons.Rename, contentDescription = null) },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.remove_server)) },
-                    onClick = {
-                        open = false
-                        actions.onRemoveServer()
-                    },
-                    leadingIcon = { Icon(TansuIcons.Delete, contentDescription = null) },
-                )
+                MenuItem(TansuIcons.Rename, R.string.edit_server, choose(actions.onEditServer))
+                MenuItem(TansuIcons.Delete, R.string.remove_server, choose(actions.onRemoveServer))
             }
         }
     }
 }
 
 @Composable
-private fun Entries(entries: List<Entry>, onOpen: (Entry) -> Unit, modifier: Modifier = Modifier) {
+private fun MenuItem(icon: ImageVector, label: Int, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(stringResource(label)) },
+        onClick = onClick,
+        leadingIcon = { Icon(icon, contentDescription = null) },
+    )
+}
+
+@Composable
+private fun Entries(state: BrowseUiState, actions: BrowseActions, modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 16.dp),
     ) {
-        items(entries, key = { it.path }) { entry ->
+        items(state.entries, key = { it.path }) { entry ->
             FileRow(
                 entry = entry,
                 meta = remember(entry) { Human.meta(entry) },
-                onClick = { onOpen(entry) },
+                onClick = { actions.onOpen(entry) },
+                onLongClick = { actions.onPick(entry) },
+                selecting = state.selecting,
+                selected = entry.path in state.selected,
                 modifier = Modifier.animateItem(),
             )
         }

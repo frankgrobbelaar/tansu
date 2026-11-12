@@ -14,8 +14,8 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 | 0 | Foundation | The Gradle project, linting and formatting, CI, the Kiri theme, and the app shell with Browse, Transfers and Settings | Done |
 | 1 | Browse the phone | All files access, the file-system interface, the phone drawer, folders and files, the path and back | Done |
 | 2 | Servers | Adding SMB and SFTP servers, encrypted credentials, host keys, server drawers, and the problem states | Done |
-| 3 | Jobs | Copy, move and delete with progress, notifications, the Transfers tab, pause, resume, cancel and retry | |
-| 4 | Select and paste | Selection, cut, copy and paste across drawers, clashes, rename, new folder, details, delete, share out | |
+| 3 | Jobs | Copy, move and delete with progress, notifications, the Transfers tab, pause, resume, cancel and retry | Done |
+| 4 | Select and paste | Selection, cut, copy and paste across drawers, clashes, rename, new folder, details, delete, share out | Done, apart from sharing files from servers |
 | 5 | Share in | Tansu in the share sheet, and the Save to picker | |
 | 6 | Open files | Pictures, videos and PDFs in tansu; other files in another app | |
 | 7 | Browse extras and Settings | Search, sort and view, grid, hidden files, and Settings | |
@@ -26,6 +26,11 @@ Two things wait for the owner: making the release signing key (and its GitHub se
 first push to `release`.
 
 ## Left for later
+
+- Jobs live in memory: a job queued or paused when Android ends tansu's process is lost. The
+  architecture plans for saving them.
+- Sharing files from a server out to other apps needs them fetched first, which comes with opening
+  server files (iteration 6).
 
 - A missing SMB share should list the shares the server does have (spec, flow 8). Listing shares
   needs SMB's RPC calls, which smbj leaves to another library; until then the message offers Edit

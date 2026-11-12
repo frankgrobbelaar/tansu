@@ -4,10 +4,15 @@ import io.github.frankgrobbelaar.tansu.servers.Secret
 import io.github.frankgrobbelaar.tansu.servers.Secrets
 import io.github.frankgrobbelaar.tansu.servers.Server
 import java.io.Closeable
+import java.io.FilterInputStream
+import java.io.FilterOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.security.MessageDigest
 import java.security.PublicKey
 import java.util.Base64
+import java.util.EnumSet
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -18,6 +23,8 @@ import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.common.Buffer
 import net.schmizz.sshj.common.KeyType
 import net.schmizz.sshj.common.SSHRuntimeException
+import net.schmizz.sshj.sftp.FileMode
+import net.schmizz.sshj.sftp.OpenMode
 import net.schmizz.sshj.sftp.RemoteResourceInfo
 import net.schmizz.sshj.sftp.Response
 import net.schmizz.sshj.sftp.SFTPClient
@@ -43,10 +50,75 @@ class SftpFileSystem(
     private var sftp: SFTPClient? = null
 
     override suspend fun list(path: String): List<Entry> =
-        withContext(io) {
-            val sftp = sftp()
-            mapErrors(path) { sftp.ls(path).map(::entryOf) }
+        onServer(path) { sftp ->
+            sftp.ls(path).map(::entryOf)
         }
+
+    override suspend fun stat(path: String): Entry? =
+        onServer(path) { sftp ->
+            sftp.statExistence(path)?.let { attributes ->
+                val isFolder = attributes.type == FileMode.Type.DIRECTORY
+                Entry(
+                    name = nameOf(path),
+                    path = path,
+                    isFolder = isFolder,
+                    size = if (isFolder) 0 else attributes.size,
+                    modified = attributes.mtime * MILLIS_PER_SECOND,
+                )
+            }
+        }
+
+    override suspend fun read(path: String, offset: Long): InputStream =
+        onServer(path) { sftp ->
+            val file = sftp.open(path, EnumSet.of(OpenMode.READ))
+            val stream = file.ReadAheadRemoteFileInputStream(READ_AHEAD, offset)
+            object : FilterInputStream(stream) {
+                override fun close() {
+                    try {
+                        super.close()
+                    } finally {
+                        file.close()
+                    }
+                }
+            }
+        }
+
+    override suspend fun write(path: String): OutputStream =
+        onServer(path) { sftp ->
+            val file = sftp.open(path, EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC))
+            val stream = file.RemoteFileOutputStream(0, UNCONFIRMED_WRITES)
+            object : FilterOutputStream(stream) {
+                // FilterOutputStream writes byte by byte; hand whole buffers on.
+                override fun write(buffer: ByteArray, offset: Int, length: Int) =
+                    stream.write(buffer, offset, length)
+
+                override fun close() {
+                    try {
+                        super.close()
+                    } finally {
+                        file.close()
+                    }
+                }
+            }
+        }
+
+    override suspend fun createFolder(path: String) {
+        onServer(path) { sftp -> sftp.mkdir(path) }
+    }
+
+    override suspend fun rename(from: String, to: String) {
+        onServer(to) { sftp ->
+            // SFTP's rename quietly replaces on some servers: refuse if the name is taken.
+            if (sftp.statExistence(to) != null) throw FileSystemException.Exists(to)
+            sftp.rename(from, to)
+        }
+    }
+
+    override suspend fun delete(path: String) {
+        onServer(path) { sftp ->
+            if (sftp.stat(path).type == FileMode.Type.DIRECTORY) sftp.rmdir(path) else sftp.rm(path)
+        }
+    }
 
     override fun close() {
         try {
@@ -58,6 +130,13 @@ class SftpFileSystem(
         sftp = null
         ssh = null
     }
+
+    /** Runs [block] on the server, off the main thread, connecting first if need be. */
+    private suspend fun <T> onServer(path: String, block: (SFTPClient) -> T): T =
+        withContext(io) {
+            val sftp = sftp()
+            mapErrors(path) { block(sftp) }
+        }
 
     private suspend fun sftp(): SFTPClient = lock.withLock {
         sftp?.takeIf { ssh?.isConnected == true }
@@ -127,6 +206,9 @@ class SftpFileSystem(
                 Response.StatusCode.PERMISSION_DENIED -> FileSystemException.AccessDenied(path)
                 Response.StatusCode.NO_SUCH_FILE,
                 Response.StatusCode.NO_SUCH_PATH -> FileSystemException.NotFound(path)
+                Response.StatusCode.FILE_ALREADY_EXISTS -> FileSystemException.Exists(path)
+                Response.StatusCode.NO_SPACE_ON_FILESYSTEM,
+                Response.StatusCode.QUOTA_EXCEEDED -> FileSystemException.NoSpace(path)
                 else -> FileSystemException.Unreadable(path, e)
             }
         } catch (e: IOException) {
@@ -150,6 +232,9 @@ class SftpFileSystem(
     private companion object {
         const val TIMEOUT_MILLIS = 15_000
         const val MILLIS_PER_SECOND = 1000L
+        /** Requests kept in flight, so a transfer isn't one round trip per chunk. */
+        const val READ_AHEAD = 16
+        const val UNCONFIRMED_WRITES = 16
     }
 }
 

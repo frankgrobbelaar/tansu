@@ -1,7 +1,8 @@
 package io.github.frankgrobbelaar.tansu.ui.kit
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,22 +22,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileKind
 import io.github.frankgrobbelaar.tansu.ui.theme.KiriCorners
 
-/** One file or folder in a list: its tile, its name, and the line under it. */
+/**
+ * One file or folder in a list: its tile, its name, and the line under it. While selecting, a
+ * [selected] row is shaded and every row shows whether it's in.
+ */
 @Composable
-fun FileRow(entry: Entry, meta: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun FileRow(
+    entry: Entry,
+    meta: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    selecting: Boolean = false,
+    selected: Boolean = false,
+) {
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
                 .height(64.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .clickable(onClick = onClick)
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = SHADE)
+                    else Color.Transparent
+                )
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
                 .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -56,8 +77,39 @@ fun FileRow(entry: Entry, meta: String, onClick: () -> Unit, modifier: Modifier 
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (selecting) SelectMark(selected)
     }
 }
+
+/** A filled circle with a tick when selected; an empty ring when not. */
+@Composable
+private fun SelectMark(selected: Boolean, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val description =
+        stringResource(if (selected) R.string.row_selected else R.string.row_not_selected)
+    Box(
+        modifier =
+            modifier
+                .size(22.dp)
+                .semantics { contentDescription = description }
+                .then(
+                    if (selected) Modifier.background(colors.primary, CircleShape)
+                    else Modifier.border(1.6.dp, colors.outline, CircleShape)
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                imageVector = TansuIcons.Check,
+                contentDescription = null,
+                tint = colors.onPrimary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+private const val SHADE = 0.6f
 
 /** A folder sits on a wood tile; every other kind is a plain line icon. */
 @Composable

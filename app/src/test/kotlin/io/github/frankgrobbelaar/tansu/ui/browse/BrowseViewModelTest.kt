@@ -11,9 +11,14 @@ import io.github.frankgrobbelaar.tansu.files.FakeFileSystem.Companion.file
 import io.github.frankgrobbelaar.tansu.files.FakeFileSystem.Companion.folder
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
+import io.github.frankgrobbelaar.tansu.jobs.Clipboard
+import io.github.frankgrobbelaar.tansu.jobs.Job
+import io.github.frankgrobbelaar.tansu.jobs.Jobs
 import io.github.frankgrobbelaar.tansu.servers.SavedServers
 import io.github.frankgrobbelaar.tansu.servers.Server
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -69,10 +74,22 @@ class BrowseViewModelTest {
     private val drawers = MutableStateFlow(listOf(phone))
     private val servers = FakeServers()
     private val settings = TansuSettings(MemoryStore())
+    private val jobs =
+        Jobs(drawers, CoroutineScope(SupervisorJob() + main.dispatcher), io = main.dispatcher)
+    private val clipboard = Clipboard()
     private var granted = true
 
     private fun viewModel(saved: SavedStateHandle = SavedStateHandle()) =
-        BrowseViewModel(drawers, { granted }, servers, settings, saved, main.dispatcher)
+        BrowseViewModel(
+            drawers = drawers,
+            access = { granted },
+            servers = servers,
+            settings = settings,
+            jobs = jobs,
+            clipboard = clipboard,
+            savedState = saved,
+            compute = main.dispatcher,
+        )
 
     @Test
     fun `opens on the phone's top folder, folders first and hidden files left out`() = runTest {
@@ -281,6 +298,56 @@ class BrowseViewModelTest {
 
             browse.dismissServerOffer()
             assertFalse(expectMostRecentItem().offerServers)
+        }
+    }
+
+    @Test
+    fun `picking files selects them, and moving to another folder lets go`() = runTest {
+        val browse = viewModel()
+        browse.state.test {
+            browse.toggle(folder(root, "Download"))
+            browse.toggle(file(root, "notes.txt"))
+            val picking = expectMostRecentItem()
+            assertTrue(picking.selecting)
+            assertEquals(listOf("Download", "notes.txt"), picking.picked.map { it.name })
+
+            browse.open(folder(root, "Download"))
+            assertFalse(expectMostRecentItem().selecting)
+        }
+    }
+
+    @Test
+    fun `copy holds the picks, and a clash in the new folder is found before pasting`() = runTest {
+        val browse = viewModel()
+        browse.state.test {
+            browse.toggle(file(root, "notes.txt"))
+            browse.copy()
+            val holding = expectMostRecentItem()
+            assertFalse(holding.selecting)
+            assertEquals(listOf("notes.txt"), holding.held?.picks?.map { it.name })
+
+            browse.open(folder(root, "Download"))
+            val inDownload = expectMostRecentItem()
+            assertTrue(browse.clashes().isEmpty())
+            browse.jumpTo(inDownload.crumbs.first())
+            expectMostRecentItem()
+            assertEquals(listOf("notes.txt"), browse.clashes().map { it.here.name })
+        }
+    }
+
+    @Test
+    fun `pasting starts a job into this folder and lets go of what was held`() = runTest {
+        val browse = viewModel()
+        browse.state.test {
+            browse.toggle(file(root, "notes.txt"))
+            browse.cut()
+            browse.open(folder(root, "Download"))
+            browse.paste(emptyMap())
+
+            val job = jobs.all.value.single()
+            assertEquals(Job.Kind.Move, job.kind)
+            assertEquals(download, job.to?.folder)
+            assertNull(expectMostRecentItem().held)
         }
     }
 }

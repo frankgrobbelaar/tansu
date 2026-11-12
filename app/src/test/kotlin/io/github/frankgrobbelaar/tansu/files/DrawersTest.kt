@@ -14,10 +14,8 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DrawersTest {
-    private class Connection(val server: Server) : FileSystem, Closeable {
+    private class Connection(val server: Server) : FileSystem by MemoryFileSystem(), Closeable {
         var closed = false
-
-        override suspend fun list(path: String) = emptyList<Entry>()
 
         override fun close() {
             closed = true
