@@ -530,6 +530,9 @@ class BrowseViewModel(
             troubled.update {
                 if (result.problem.isServerWide()) it + drawerId else it - drawerId
             }
+            // What's gone since can't stay picked.
+            val there = result.entries.mapTo(HashSet()) { it.path }
+            picked.update { it.intersect(there) }
             listing.value = result
         }
     }

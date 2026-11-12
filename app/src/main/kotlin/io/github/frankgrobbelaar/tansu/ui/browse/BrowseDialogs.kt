@@ -42,15 +42,21 @@ internal fun DeleteDialog(
     onDelete: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    val size = Human.size(picked.sumOf { it.size })
+    val bytes = picked.sumOf { it.size }
+    val size = Human.size(bytes)
+    // A folder's size isn't known without going through it: say what's known, honestly.
     val body =
-        if (picked.any { it.isFolder }) R.string.delete_body_folders else R.string.delete_body
+        when {
+            picked.none { it.isFolder } -> stringResource(R.string.delete_body, size, folder)
+            bytes > 0 -> stringResource(R.string.delete_body_folders, size, folder)
+            else -> stringResource(R.string.delete_body_only_folders, folder)
+        }
     AlertDialog(
         onDismissRequest = onCancel,
         title = {
             Text(pluralStringResource(R.plurals.delete_title, picked.size, picked.size, drawer))
         },
-        text = { Text(stringResource(body, size, folder)) },
+        text = { Text(body) },
         confirmButton = {
             TextButton(onClick = onDelete) {
                 Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)

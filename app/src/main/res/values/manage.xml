@@ -39,6 +39,7 @@
     </plurals>
     <string name="delete_body">%1$s from %2$s. There\'s no trash, so this can\'t be undone.</string>
     <string name="delete_body_folders">%1$s from %2$s, and everything in the folders. There\'s no trash, so this can\'t be undone.</string>
+    <string name="delete_body_only_folders">Everything in them, from %1$s. There\'s no trash, so this can\'t be undone.</string>
     <string name="delete">Delete</string>
 
     <string name="rename_title">Rename</string>
