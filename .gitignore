@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Machine-specific config (SDK path, local secrets)
+local.properties
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Android build artifacts
+captures/
+.externalNativeBuild/
+.cxx/
+/app/release/
+*.apk
+*.aab
+
+# Signing keys
+*.jks
+*.keystore
+keystore.properties
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code personal settings
+.claude/settings.local.json
+CLAUDE.local.md
