@@ -30,6 +30,9 @@ uploads over 256 KiB failing against OpenSSH, and three ways to lose a file (nam
 in case, Cancel after a refused Replace, and deleting a link on SFTP). They're fixed and tested. A second review of those fixes found more ways a paused, resumed or
 case-blind job could write over a file; every file is now written under a hidden name and only
 takes its real name once it's whole, never over anything the user didn't choose to replace.
+A third review, of those and the viewers, found a few more corners (a retried merge into a
+case-blind folder, a move onto the very file it moves, lost answers from a server, very tall PDF
+pages, streams left open by a cancelled thumbnail); each is fixed and tested where it can be.
 
 ## Left for later
 
