@@ -67,5 +67,17 @@
     <string name="details_path">Full path</string>
 
     <string name="fetching_title">Getting %1$s</string>
+
+    <plurals name="save_to_title">
+        <item quantity="one">Save %1$d item</item>
+        <item quantity="other">Save %1$d items</item>
+    </plurals>
+    <string name="save_to_another_app">another app</string>
+    <string name="save_to_pick">Pick a folder</string>
+    <string name="save_here">Save here</string>
+    <string name="save_into">Into %1$s on %2$s</string>
+    <string name="save_into_drawer">Into %1$s</string>
+    <string name="save_to_unreachable_title">Tansu can\'t open %1$s right now</string>
+    <string name="save_to_unreachable_body">Pick another drawer, or open tansu to see why.</string>
     <string name="share_chooser">Share with</string>
 </resources>

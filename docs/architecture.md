@@ -61,9 +61,14 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
 
 ## Sharing in
 
-An activity takes `ACTION_SEND` and `ACTION_SEND_MULTIPLE` for any type. It shows the destination
-picker, hands the shared URIs and their read grants to a copy job, and finishes, which returns the
-user to the app they came from.
+`ShareActivity` takes `ACTION_SEND` and `ACTION_SEND_MULTIPLE` for any type and shows Save to: a
+drawer and folder picker that starts where the last share was saved. Save here starts a copy job
+whose source is `SharedFiles`, a read-only `FileSystem` over the shared content URIs.
+
+Android lets an app read shared URIs only while the activity they were shared with is alive. So
+the activity runs in a task of its own (a document, out of Recents), steps back with
+`moveTaskToBack` once the job starts, which returns the user to the app they shared from, and
+finishes when the job ends.
 
 ## Opening files
 

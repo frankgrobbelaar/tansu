@@ -43,8 +43,9 @@ fun DrawerChips(
     drawers: List<DrawerTab>,
     selected: String,
     onSelect: (String) -> Unit,
-    onAdd: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Add a server, at the end of the row; none where adding one doesn't belong. */
+    onAdd: (() -> Unit)? = null,
 ) {
     Row(
         modifier =
@@ -61,7 +62,7 @@ fun DrawerChips(
                 onClick = { onSelect(drawer.id) },
             )
         }
-        AddChip(onClick = onAdd)
+        if (onAdd != null) AddChip(onClick = onAdd)
     }
 }
 

@@ -2,6 +2,7 @@ package io.github.frankgrobbelaar.tansu.jobs
 
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
+import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -38,6 +39,7 @@ class Jobs(
     private val ids = AtomicLong()
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private val stops = ConcurrentHashMap<Long, Stop>()
+    private val outside = ConcurrentHashMap<String, Side>()
 
     @Volatile private var running: Running? = null
 
@@ -55,6 +57,15 @@ class Jobs(
 
     fun move(picks: List<Entry>, from: Where, to: Where, clashes: Map<String, Clash>): Long =
         add(Job(ids.incrementAndGet(), Job.Kind.Move, picks, from, to, clashes))
+
+    /**
+     * Copies files from outside the drawers, such as files shared with tansu, read from [files].
+     * [from]'s drawer id names them for this job alone.
+     */
+    fun copyIn(files: FileSystem, picks: List<Entry>, from: Where, to: Where): Long {
+        outside[from.drawerId] = Side(files, remote = false, name = from.drawerName)
+        return copy(picks, from, to, emptyMap())
+    }
 
     fun delete(picks: List<Entry>, from: Where): Long =
         add(Job(ids.incrementAndGet(), Job.Kind.Delete, picks, from, to = null))
@@ -171,9 +182,10 @@ class Jobs(
     }
 
     private fun sideOf(where: Where): Side? =
-        drawers.value
-            .find { it.id == where.drawerId }
-            ?.let { Side(it.fileSystem, remote = it.kind != Drawer.Kind.Phone, name = it.name) }
+        outside[where.drawerId]
+            ?: drawers.value
+                .find { it.id == where.drawerId }
+                ?.let { Side(it.fileSystem, remote = it.kind != Drawer.Kind.Phone, name = it.name) }
 
     private enum class Stop {
         Pause,

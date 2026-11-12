@@ -16,8 +16,8 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 | 2 | Servers | Adding SMB and SFTP servers, encrypted credentials, host keys, server drawers, and the problem states | Done |
 | 3 | Jobs | Copy, move and delete with progress, notifications, the Transfers tab, pause, resume, cancel and retry | Done |
 | 4 | Select and paste | Selection, cut, copy and paste across drawers, clashes, rename, new folder, details, delete, share out | Done, apart from sharing files from servers |
-| 5 | Share in | Tansu in the share sheet, and the Save to picker | |
-| 6 | Open files | Pictures, videos and PDFs in tansu; other files in another app | |
+| 5 | Share in | Tansu in the share sheet, and the Save to picker | Done |
+| 6 | Open files | Pictures, videos and PDFs in tansu; other files in another app | Every file opens in another app, server files fetched first; viewers in tansu still to come |
 | 7 | Browse extras and Settings | Search, sort and view, grid, hidden files, and Settings | |
 | 8 | Releases and updates | The `release` branch and its workflow, signing, the downloads page, and the in-app update | Releases and the downloads page done; the in-app update next |
 | 9 | Polish | Accessibility, performance, dark theme and the small things | |
