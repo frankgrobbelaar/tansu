@@ -5,6 +5,10 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-13
+
+Settings, updates that arrive in the app, and safer copying.
+
 - Tansu is in the share sheet: share any number of files from Gallery, My Files or any app, pick
   a drawer and folder (it starts where you saved last time), and tap Save here. The save runs in
   the background and you're back where you were.
