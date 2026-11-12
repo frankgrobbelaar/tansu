@@ -27,7 +27,8 @@ import kotlinx.coroutines.launch
  */
 class TransferService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val jobs: Jobs by lazy { (application as TansuApplication).container.jobs }
+    private val container by lazy { (application as TansuApplication).container }
+    private val jobs: Jobs by lazy { container.jobs }
     private val notifications by lazy { getSystemService(NotificationManager::class.java) }
     private var watching = false
 
@@ -77,11 +78,11 @@ class TransferService : Service() {
     private fun show(all: List<Job>) {
         val running = all.firstOrNull { it.busy }
         if (running == null) {
-            // Done: the last job's ending stays in the shade; the service's own notification goes.
+            // Done: the last job's ending stays in the shade, unless tansu is in front saying so
+            // itself; the service's own notification goes.
             all.lastOrNull { !it.busy }
-                ?.let { ending ->
-                    notifications.notify(ENDING_ID, endingNotification(ending))
-                }
+                ?.takeUnless { container.front.shown }
+                ?.let { ending -> notifications.notify(ENDING_ID, endingNotification(ending)) }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             watching = false

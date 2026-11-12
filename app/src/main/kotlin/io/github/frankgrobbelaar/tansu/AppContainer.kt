@@ -7,6 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Drawers
 import io.github.frankgrobbelaar.tansu.files.Fetcher
@@ -32,6 +34,22 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /** A folder to show, asked for from outside Browse, such as by a job's finished notification. */
 data class FolderRequest(val id: Long, val drawerId: String, val folder: String)
+
+/** Counts tansu's screens that are started, on the main thread. */
+class Front : DefaultLifecycleObserver {
+    private var started = 0
+
+    val shown: Boolean
+        get() = started > 0
+
+    override fun onStart(owner: LifecycleOwner) {
+        started++
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        started--
+    }
+}
 
 /** Whether Android has given tansu All files access. */
 fun interface StorageAccess {
@@ -71,6 +89,12 @@ class AppContainer(
     val jobs = Jobs(drawers.all, scope, onBusy = { TransferService.start(context) })
 
     val clipboard = Clipboard()
+
+    /**
+     * Whether a tansu screen is in front, where a job's ending shows in the app: a notification
+     * then would only repeat it. Screens watch themselves with it.
+     */
+    val front = Front()
 
     /** The last folder asked for from outside Browse; each is shown once. */
     val folderRequests = MutableStateFlow<FolderRequest?>(null)

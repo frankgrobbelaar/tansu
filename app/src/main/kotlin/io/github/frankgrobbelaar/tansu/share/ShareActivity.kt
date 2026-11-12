@@ -46,6 +46,7 @@ class ShareActivity : ComponentActivity() {
             finish()
             return
         }
+        lifecycle.addObserver((application as TansuApplication).container.front)
         setContent {
             ChosenTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()

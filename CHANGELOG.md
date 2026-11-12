@@ -5,7 +5,8 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
-- Tapping a finished job's notification opens the folder its files went to.
+- Tapping a finished job's notification opens the folder its files went to. While tansu is in
+  front it says how a job ended itself, without a notification too.
 
 - A job's detail lists what was picked, each with where it stands: waiting, on it now, done,
   skipped or not done. A refusal names the drawer that said no.

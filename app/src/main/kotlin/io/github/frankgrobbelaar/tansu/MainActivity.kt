@@ -17,7 +17,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        val updates = (application as TansuApplication).container.updates
+        val container = (application as TansuApplication).container
+        lifecycle.addObserver(container.front)
+        val updates = container.updates
         // Each time tansu comes up, it asks GitHub for a new version if a day has gone by.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) { updates.checkIfDue() }
