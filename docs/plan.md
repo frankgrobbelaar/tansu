@@ -11,9 +11,9 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 
 | # | Iteration | What it delivers | Status |
 | --- | --- | --- | --- |
-| 0 | Foundation | The Gradle project, linting and formatting, CI, the Kiri theme, and the app shell with Browse, Transfers and Settings | |
-| 1 | Browse the phone | All files access, the file-system interface, the phone drawer, folders and files, the path and back | |
-| 2 | Servers | Adding SMB and SFTP servers, encrypted credentials, host keys, server drawers, and the problem states | |
+| 0 | Foundation | The Gradle project, linting and formatting, CI, the Kiri theme, and the app shell with Browse, Transfers and Settings | Done |
+| 1 | Browse the phone | All files access, the file-system interface, the phone drawer, folders and files, the path and back | Done |
+| 2 | Servers | Adding SMB and SFTP servers, encrypted credentials, host keys, server drawers, and the problem states | Done |
 | 3 | Jobs | Copy, move and delete with progress, notifications, the Transfers tab, pause, resume, cancel and retry | |
 | 4 | Select and paste | Selection, cut, copy and paste across drawers, clashes, rename, new folder, details, delete, share out | |
 | 5 | Share in | Tansu in the share sheet, and the Save to picker | |
@@ -24,3 +24,9 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 
 Two things wait for the owner: making the release signing key (and its GitHub secrets), and the
 first push to `release`.
+
+## Left for later
+
+- A missing SMB share should list the shares the server does have (spec, flow 8). Listing shares
+  needs SMB's RPC calls, which smbj leaves to another library; until then the message offers Edit
+  server.

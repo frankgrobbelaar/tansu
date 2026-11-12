@@ -25,10 +25,13 @@
 | detekt | Code smells and complexity, plus compose-rules for Compose. Any issue fails the build | `config/detekt/detekt.yml` |
 | Android Lint | Warnings are errors. Checks for newer library versions are off: Dependabot handles those | `app/build.gradle.kts` |
 | Kotlin | Compiler warnings are errors | `app/build.gradle.kts` |
-| Unit tests | JUnit 4, Robolectric (Android 16, the newest it runs) and Compose UI tests | `app/src/test` |
+| Unit tests | JUnit 4, Robolectric (Android 16, the newest it runs) and Compose UI tests; SFTP against Apache MINA's SSH server in the test, SMB against Samba in Docker | `app/src/test` |
 
 detekt is on a 2.0 alpha because compose-rules needs it and the 1.x line predates Kotlin 2.4. Move
 to 2.0 stable when it ships.
+
+The Samba tests start a container with Testcontainers. CI always has Docker; on a PC without it,
+those tests are skipped and the rest still run.
 
 ## The emulator
 
@@ -40,6 +43,9 @@ the checks on the design boards do:
 ```
 
 `adb exec-out screencap -p > screen.png` takes a screenshot to compare with the boards.
+
+To try a server on the emulator, run one on the PC and use `10.0.2.2` as its host. The emulator
+counts that as the local network, so on Android 17 tansu asks for local network access first.
 
 ## Versions
 

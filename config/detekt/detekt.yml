@@ -2,6 +2,9 @@
 # Any issue fails the build: there is no baseline.
 
 complexity:
+  TooManyFunctions:
+    # A ViewModel's actions are what it offers; private helpers don't add to that.
+    ignorePrivate: true
   LongParameterList:
     # Composables take a modifier and optional parameters by design.
     ignoreDefaultParameters: true
@@ -15,6 +18,8 @@ style:
   MagicNumber:
     # Sizes and colours in UI code are the design's values, named by where they're used.
     ignoreAnnotated: ['Composable', 'Preview']
+    # An enum entry names its values, as in Smb(445).
+    ignoreEnums: true
     excludes:
       - '**/test/**'
       - '**/*.kts'

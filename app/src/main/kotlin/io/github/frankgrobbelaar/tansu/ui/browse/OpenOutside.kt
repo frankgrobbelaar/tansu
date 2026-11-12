@@ -28,9 +28,19 @@ fun openOutside(context: Context, entry: Entry): Boolean {
     }
 }
 
-/** Android's own screen for giving tansu All files access. */
-fun allFilesAccessIntent(context: Context): Intent =
-    Intent(
-        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-        "package:${context.packageName}".toUri(),
-    )
+/**
+ * Opens Android's screen for giving tansu All files access: tansu's own page, or the list of apps
+ * on phones that don't have one.
+ */
+fun openAllFilesAccess(context: Context) {
+    val ownPage =
+        Intent(
+            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+            "package:${context.packageName}".toUri(),
+        )
+    try {
+        context.startActivity(ownPage)
+    } catch (_: ActivityNotFoundException) {
+        context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+    }
+}

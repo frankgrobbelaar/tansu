@@ -1,6 +1,7 @@
 package io.github.frankgrobbelaar.tansu.files
 
 import java.io.File
+import kotlin.io.invariantSeparatorsPath
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -28,7 +29,7 @@ class LocalFileSystemTest {
         val listedPhotos = entries.getValue("Photos")
         assertTrue(listedPhotos.isFolder)
         assertEquals(2, listedPhotos.childCount)
-        assertEquals(photos.path, listedPhotos.path)
+        assertEquals(photos.invariantSeparatorsPath, listedPhotos.path)
         val listedNotes = entries.getValue("notes.txt")
         assertEquals(5L, listedNotes.size)
         assertEquals(1_700_000_000_000, listedNotes.modified)

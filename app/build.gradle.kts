@@ -39,6 +39,14 @@ android {
 
     buildFeatures { compose = true }
 
+    packaging {
+        resources {
+            // BouncyCastle's jars each carry the same licence files; one copy is enough.
+            pickFirsts += setOf("META-INF/LICENSE.md", "META-INF/NOTICE.md")
+            excludes += setOf("META-INF/versions/9/OSGI-INF/MANIFEST.MF")
+        }
+    }
+
     lint {
         warningsAsErrors = true
         abortOnError = true
@@ -87,6 +95,10 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.smbj)
+    implementation(libs.sshj)
+    implementation(libs.bouncycastle.prov)
+    implementation(libs.bouncycastle.pkix)
     debugImplementation(libs.compose.ui.test.manifest)
 
     testImplementation(platform(libs.compose.bom))
@@ -95,6 +107,9 @@ dependencies {
     testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.sshd.core)
+    testImplementation(libs.sshd.sftp)
+    testImplementation(libs.testcontainers)
 
     detektPlugins(libs.compose.rules.detekt)
 }

@@ -114,7 +114,8 @@ Every copy, move, delete and share-in is a job.
   Keystore key, never logged, and left out of backups.
 - SFTP host keys are pinned on first connect; a changed key blocks the connection with a warning.
 - SMB 2 and 3 only, signed or encrypted when the server offers it.
-- Tansu asks for All files access and notifications, each when first needed and with a reason.
+- Tansu asks for All files access, notifications and (on Android 17) the local network, each when
+  first needed and with a reason.
 
 ## Quality bar
 

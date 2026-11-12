@@ -32,4 +32,14 @@ class BrowseOrderTest {
         assertEquals(-1, Integer.signum(naturalCompare("track 007", "track 10")))
         assertEquals(1, Integer.signum(naturalCompare("track 12", "track 007")))
     }
+
+    @Test
+    fun `digits from other scripts sort as letters, so the order stays consistent`() {
+        val fullwidthOne = "\uFF11"
+
+        val sorted = listOf(fullwidthOne, "a", "10").sortedWith(::naturalCompare)
+
+        assertEquals(listOf("10", "a", fullwidthOne), sorted)
+        assertEquals(1, Integer.signum(naturalCompare(fullwidthOne, "10")))
+    }
 }

@@ -17,7 +17,7 @@ UI (Compose screens) → ViewModels (one StateFlow<UiState> each) → repositori
 | `servers/` | Saved servers (DataStore) and the credential vault (Android Keystore) |
 | `jobs/` | The job queue, the transfer engine and its notification |
 | `updates/` | The daily check of GitHub's latest release and the hand-off to Android's installer |
-| `App.kt` | The application and its dependency container, wired by hand |
+| `TansuApplication.kt`, `AppContainer.kt` | The application and its dependency container, wired by hand |
 
 ## Drawers
 
@@ -31,8 +31,13 @@ delete. Screens and jobs only ever see this interface.
 | SFTP | sshj | One SSH connection per server, reused; host key checked against the pinned one |
 
 A connection opens on first use, is shared by browsing and jobs, and reconnects after a drop.
-Library errors become a few typed errors (`Unreachable`, `AuthFailed`, `NotFound`, `AccessDenied`,
-`NoSpace`, `Exists`, `Cancelled`), which the UI puts into words.
+`Drawers` keeps one `FileSystem` per server, and so one connection, until the server is edited or
+removed. Library errors become a few typed errors (`FileSystemException`: `Unreachable`,
+`AuthFailed`, `BadKey`, `ShareMissing`, `HostKeyUnknown`, `HostKeyChanged`, `NotFound`,
+`AccessDenied`, `Unreadable`), which the UI puts into words; nothing else escapes a `FileSystem`.
+
+Every call has a 15-second timeout. BouncyCastle is registered in full at start-up, in place of
+Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for NTLM.
 
 ## Jobs
 
@@ -72,3 +77,12 @@ Server details (name, kind, host, port, share or folder, username) are kept in D
 Passwords and private keys are encrypted with AES-GCM under a non-exportable Android Keystore key,
 decrypted only to connect, never logged, and excluded from backups and device transfer. SFTP host
 keys are pinned per server.
+
+Adding a server checks it first: a throwaway connection lists the starting folder with the details
+as typed, and only then is anything saved. An SFTP server seen for the first time is refused with
+its key, which the user checks and trusts; the check then runs again with the key pinned. Editing
+keeps the pinned key unless the host or port changes.
+
+Android 17 keeps apps off the local network until the user allows it (`ACCESS_LOCAL_NETWORK`, a
+runtime permission). Tansu asks when a server is first connected, and Browse explains it if a
+server can't be reached without it. Servers reached through Tailscale don't need it.

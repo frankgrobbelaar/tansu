@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -36,8 +37,12 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import io.github.frankgrobbelaar.tansu.R
+import io.github.frankgrobbelaar.tansu.files.Drawer
+import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.browse.BrowseRoute
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
+import io.github.frankgrobbelaar.tansu.ui.servers.AddServerScreen
+import io.github.frankgrobbelaar.tansu.ui.servers.ServerFormRoute
 import io.github.frankgrobbelaar.tansu.ui.settings.SettingsScreen
 import io.github.frankgrobbelaar.tansu.ui.transfers.TransfersScreen
 import kotlinx.serialization.Serializable
@@ -54,6 +59,12 @@ enum class Place(@param:StringRes val label: Int, val icon: ImageVector) {
 @Serializable data object TransfersHome : NavKey
 
 @Serializable data object SettingsHome : NavKey
+
+/** Add a server: SMB or SFTP. */
+@Serializable data object AddServer : NavKey
+
+/** A server's details: a new one of [kind], or the saved one called [serverId]. */
+@Serializable data class ServerForm(val kind: Server.Kind, val serverId: String? = null) : NavKey
 
 /** Tansu's frame: the current place's screens above the navigation bar. */
 @Composable
@@ -74,11 +85,7 @@ fun TansuApp(modifier: Modifier = Modifier) {
             rememberSaveableStateHolderNavEntryDecorator(),
             rememberViewModelStoreNavEntryDecorator(),
         )
-    val screens = entryProvider {
-        entry<BrowseHome> { BrowseRoute() }
-        entry<TransfersHome> { TransfersScreen() }
-        entry<SettingsHome> { SettingsScreen() }
-    }
+    val screens = screensFor(browse)
     // Every history is decorated all the time, so a place out of sight keeps its screens' state.
     val browseEntries = rememberDecoratedNavEntries(browse, decorators, screens)
     val transfersEntries = rememberDecoratedNavEntries(transfers, decorators, screens)
@@ -94,7 +101,12 @@ fun TansuApp(modifier: Modifier = Modifier) {
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
-        bottomBar = { TansuNavigationBar(current = place, onSelect = { place = it }) },
+        // The bar is for moving between places; a task opened from one has the screen to itself.
+        bottomBar = {
+            if (backStack.size == 1) {
+                TansuNavigationBar(current = place, onSelect = { place = it })
+            }
+        },
     ) { padding ->
         NavDisplay(
             entries = entries,
@@ -107,6 +119,36 @@ fun TansuApp(modifier: Modifier = Modifier) {
             predictivePopTransitionSpec = { fade() },
         )
     }
+}
+
+/** What each key shows. Browse's tasks, like adding a server, go on top of [browse]. */
+private fun screensFor(browse: NavBackStack<NavKey>) = entryProvider {
+    entry<BrowseHome> {
+        BrowseRoute(
+            onAddServer = { browse.add(AddServer) },
+            onEditServer = { drawer ->
+                val kind = if (drawer.kind == Drawer.Kind.Smb) Server.Kind.Smb else Server.Kind.Sftp
+                browse.add(ServerForm(kind, drawer.id))
+            },
+        )
+    }
+    entry<AddServer> {
+        AddServerScreen(
+            onPick = { kind -> browse.add(ServerForm(kind)) },
+            onBack = { browse.removeLastOrNull() },
+        )
+    }
+    entry<ServerForm> { key ->
+        ServerFormRoute(
+            kind = key.kind,
+            serverId = key.serverId,
+            // Saved: back to Browse, where a new server's drawer opens.
+            onDone = { browse.retainAll(listOf(BrowseHome)) },
+            onBack = { browse.removeLastOrNull() },
+        )
+    }
+    entry<TransfersHome> { TransfersScreen() }
+    entry<SettingsHome> { SettingsScreen() }
 }
 
 /** Screens change with a short, calm crossfade. */

@@ -2,6 +2,7 @@ package io.github.frankgrobbelaar.tansu.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -42,6 +43,10 @@ class TansuAppTest {
         val app = ApplicationProvider.getApplicationContext<TestTansuApplication>()
         File(app.container.phone.root, "Music").mkdir()
         compose.setContent { TansuTheme { TansuApp() } }
+        // The phone is listed off the main thread: wait for the folder to show up.
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithText("Music").fetchSemanticsNodes().isNotEmpty()
+        }
 
         compose.onNodeWithText("Music").performClick()
         compose.onNodeWithText("Transfers").performClick()

@@ -3,6 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- A file manager is the use Android made All files access for. -->
+    <!-- Servers, and GitHub for updates. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 17 and later: servers on the home network, asked for when one is added. -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />

@@ -8,26 +8,48 @@ val BrowseOrder: Comparator<Entry> =
     compareByDescending<Entry> { it.isFolder }
         .thenComparator { a, b -> naturalCompare(a.name, b.name) }
 
-/** Compares names piece by piece, reading runs of digits as numbers. */
+/**
+ * Compares names character by character, ignoring case, but reads each run of the digits 0 to 9 as
+ * one number. It walks the names in place, since a big folder makes many comparisons.
+ */
 fun naturalCompare(a: String, b: String): Int {
-    val left = pieces(a)
-    val right = pieces(b)
-    for (index in 0 until minOf(left.size, right.size)) {
-        val difference = comparePieces(left[index], right[index])
-        if (difference != 0) return difference
+    var i = 0
+    var j = 0
+    var difference = 0
+    while (difference == 0 && i < a.length && j < b.length) {
+        if (a[i].isAsciiDigit() && b[j].isAsciiDigit()) {
+            val aEnd = digitsEnd(a, i)
+            val bEnd = digitsEnd(b, j)
+            difference = compareNumbers(a.substring(i, aEnd), b.substring(j, bEnd))
+            i = aEnd
+            j = bEnd
+        } else {
+            difference = a[i].folded().compareTo(b[j].folded())
+            i++
+            j++
+        }
     }
-    return left.size.compareTo(right.size).takeIf { it != 0 } ?: a.compareTo(b)
+    return when {
+        difference != 0 -> difference
+        a.length - i != b.length - j -> (a.length - i).compareTo(b.length - j)
+        else -> a.compareTo(b)
+    }
 }
 
-private val piece = Regex("""\d+|\D+""")
+/** Only 0 to 9: other scripts' digits sort as letters, which keeps the order consistent. */
+private fun Char.isAsciiDigit() = this in '0'..'9'
 
-private fun pieces(name: String): List<String> = piece.findAll(name).map { it.value }.toList()
+/** Case folded the way `String.compareTo(ignoreCase = true)` does it. */
+private fun Char.folded() = uppercaseChar().lowercaseChar()
 
-private fun comparePieces(a: String, b: String): Int =
-    if (a.first().isDigit() && b.first().isDigit()) {
-        val numbers = a.trimStart('0').padStart(1, '0') to b.trimStart('0').padStart(1, '0')
-        numbers.first.length.compareTo(numbers.second.length).takeIf { it != 0 }
-            ?: numbers.first.compareTo(numbers.second)
-    } else {
-        a.compareTo(b, ignoreCase = true)
-    }
+private fun digitsEnd(name: String, start: Int): Int {
+    var end = start
+    while (end < name.length && name[end].isAsciiDigit()) end++
+    return end
+}
+
+private fun compareNumbers(a: String, b: String): Int {
+    val left = a.trimStart('0')
+    val right = b.trimStart('0')
+    return left.length.compareTo(right.length).takeIf { it != 0 } ?: left.compareTo(right)
+}

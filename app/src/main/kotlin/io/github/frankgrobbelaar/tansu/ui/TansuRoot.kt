@@ -12,7 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.frankgrobbelaar.tansu.appContainer
-import io.github.frankgrobbelaar.tansu.ui.browse.allFilesAccessIntent
+import io.github.frankgrobbelaar.tansu.ui.browse.openAllFilesAccess
 import io.github.frankgrobbelaar.tansu.ui.firstrun.FirstRunScreen
 import kotlinx.coroutines.launch
 
@@ -42,7 +42,7 @@ fun TansuRoot(modifier: Modifier = Modifier) {
         welcomeDone == null -> Unit
         welcomeDone == false && !hasAccess ->
             FirstRunScreen(
-                onOpenSettings = { context.startActivity(allFilesAccessIntent(context)) },
+                onOpenSettings = { openAllFilesAccess(context) },
                 onNotNow = { scope.launch { container.settings.finishWelcome() } },
                 modifier = modifier,
             )
