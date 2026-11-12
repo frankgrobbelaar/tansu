@@ -25,6 +25,10 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 The release signing key and its GitHub secrets were made on 12 Nov 2026 (see
 [releasing.md](releasing.md)); the owner keeps the backup.
 
+A review of iterations 3 to 5 found a crash when a folder couldn't be listed or made, SFTP
+uploads over 256 KiB failing against OpenSSH, and three ways to lose a file (names differing only
+in case, Cancel after a refused Replace, and deleting a link on SFTP). They're fixed and tested.
+
 ## Left for later
 
 - Jobs live in memory: a job queued or paused when Android ends tansu's process is lost. The
@@ -34,6 +38,9 @@ The release signing key and its GitHub secrets were made on 12 Nov 2026 (see
 
 - Settings › About should list the open-source licences (spec). It lists the version and updates
   for now.
+- From the same review, still to do: fetching a server file to open or share it runs in Browse
+  rather than as a job with a notification; one timed-out listing restarts a running transfer's
+  file; and the job detail doesn't list files one by one yet.
 - A missing SMB share should list the shares the server does have (spec, flow 8). Listing shares
   needs SMB's RPC calls, which smbj leaves to another library; until then the message offers Edit
   server.

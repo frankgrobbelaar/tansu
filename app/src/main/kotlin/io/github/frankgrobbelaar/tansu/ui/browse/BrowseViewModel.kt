@@ -329,8 +329,11 @@ class BrowseViewModel(
     /** What's held whose name is already in this folder: the user settles each before pasting. */
     fun clashes(): List<Clashing> {
         val held = clipboard.contents.value ?: return emptyList()
-        val here = listing.value.entries.associateBy { it.name }
-        return held.picks.mapNotNull { pick -> here[pick.name]?.let { Clashing(it, pick) } }
+        // The phone and SMB don't tell names apart by case, so neither does a clash.
+        val here = listing.value.entries.associateBy { it.name.lowercase() }
+        return held.picks.mapNotNull { pick ->
+            here[pick.name.lowercase()]?.let { Clashing(it, pick) }
+        }
     }
 
     /** Starts copying or moving what's held into this folder, settling clashes as [choices] say. */

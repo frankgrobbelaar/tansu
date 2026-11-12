@@ -13,6 +13,7 @@ import org.apache.sshd.common.keyprovider.KeyPairProvider
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.auth.password.PasswordAuthenticator
 import org.apache.sshd.server.auth.pubkey.PublickeyAuthenticator
+import org.apache.sshd.sftp.SftpModuleProperties
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -55,6 +56,8 @@ class SftpFileSystemTest {
                     user == "sam" && hostKeyOf(key).fingerprint == CLIENT_FINGERPRINT
                 }
                 subsystemFactories = listOf(SftpSubsystemFactory())
+                // OpenSSH refuses an SFTP message over 256 KiB; MINA takes bigger unless told.
+                SftpModuleProperties.MAX_WRITEDATA_PACKET_LENGTH.set(this, OPENSSH_MAX_WRITE)
                 fileSystemFactory = VirtualFileSystemFactory(folder.root.toPath())
                 start()
             }
@@ -146,6 +149,35 @@ class SftpFileSystemTest {
     }
 
     @Test
+    fun `big writes reach a server that takes at most 256 KiB at a time`() {
+        val bytes = ByteArray(1_000_000) { it.toByte() }
+        sftp().use { files ->
+            runBlocking {
+                files.write("/photos/big.bin").use { out ->
+                    // The size jobs write in.
+                    bytes.asList().chunked(256 * 1024).forEach { out.write(it.toByteArray()) }
+                }
+            }
+        }
+        assertTrue(File(folder.root, "photos/big.bin").readBytes().contentEquals(bytes))
+    }
+
+    @Test
+    fun `a new file never writes over one that's there, unless told to replace it`() {
+        sftp().use { files ->
+            assertThrows(FileSystemException.Exists::class.java) {
+                runBlocking { files.write("/notes.txt").close() }
+            }
+            assertEquals("hello", File(folder.root, "notes.txt").readText())
+
+            runBlocking {
+                files.write("/notes.txt", replace = true).use { it.write("bye".toByteArray()) }
+            }
+            assertEquals("bye", File(folder.root, "notes.txt").readText())
+        }
+    }
+
+    @Test
     fun `fingerprints read the way ssh-keygen prints them`() {
         val blob = Base64.getDecoder().decode(CLIENT_PUBLIC_KEY)
         val key = Buffer.PlainBuffer(blob).readPublicKey()
@@ -154,6 +186,9 @@ class SftpFileSystemTest {
     }
 
     private companion object {
+        /** The most data OpenSSH's sftp-server takes in one write, near enough. */
+        const val OPENSSH_MAX_WRITE = 256 * 1024 - 1024
+
         // A throwaway key made for this test with `ssh-keygen -t ed25519`; it guards nothing.
         val CLIENT_KEY =
             listOf(

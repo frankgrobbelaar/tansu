@@ -118,6 +118,7 @@ object JobWords {
             Failure.Reason.Unreachable -> res.getString(R.string.failure_unreachable, drawer)
             Failure.Reason.IntoItself -> res.getString(R.string.failure_into_itself)
             Failure.Reason.Mismatch -> res.getString(R.string.failure_mismatch)
+            Failure.Reason.Link -> res.getString(R.string.failure_link)
         }
 
     private const val MINUTE = 60L

@@ -64,7 +64,7 @@ class Jobs(
      */
     fun copyIn(files: FileSystem, picks: List<Entry>, from: Where, to: Where): Long {
         outside[from.drawerId] = Side(files, remote = false, name = from.drawerName)
-        return copy(picks, from, to, emptyMap())
+        return add(Job(ids.incrementAndGet(), Job.Kind.Copy, picks, from, to, outside = true))
     }
 
     fun delete(picks: List<Entry>, from: Where): Long =
@@ -84,19 +84,24 @@ class Jobs(
     }
 
     fun cancel(id: Long) {
+        // A job paused part-way through a file leaves it half written: that goes too.
+        val paused = jobs.value.find { it.id == id && it.status is Job.Status.Paused }
         stop(id, Stop.Cancel) {
-            if (it.active) it.copy(status = Job.Status.Cancelled, finishedAt = clock()) else it
+            if (it.active) {
+                it.copy(status = Job.Status.Cancelled, finishedAt = clock(), partial = null)
+            } else {
+                it
+            }
         }
+        val partial = paused?.partial ?: return
+        val target = paused.to?.let(::sideOf) ?: return
+        scope.launch(io) { removeHalfWritten(target, partial) }
     }
 
     /** Runs a finished job again for what didn't make it; what arrived is left alone. */
     fun retry(id: Long) {
         change(id) {
-            if (it.status == Job.Status.Done && it.failures.isNotEmpty()) {
-                it.copy(status = Job.Status.Queued, finishedAt = null)
-            } else {
-                it
-            }
+            if (it.canRetry) it.copy(status = Job.Status.Queued, finishedAt = null) else it
         }
         nudge()
     }
@@ -156,28 +161,39 @@ class Jobs(
             work.await()
         } catch (e: ConnectionLost) {
             put(run.job.copy(status = Job.Status.Paused(lost = e.name)))
+        } catch (e: FileSystemException) {
+            // The run puts what goes wrong against each file; anything else ends the job, saying
+            // so.
+            put(run.job.ended(clock(), reasonOf(e)))
         } catch (_: CancellationException) {
             settle(run, target, stops.remove(job.id))
             // The engine itself is shutting down: let it.
             currentCoroutineContext().ensureActive()
         } finally {
             running = null
+            // Another app's files are only lent while it shares them: done is done.
+            if (job.outside && jobs.value.none { it.id == job.id && it.active }) {
+                outside.remove(job.from.drawerId)
+            }
         }
     }
 
     /** Leaves a stopped job paused, or cancelled without the file it was half way through. */
     private suspend fun settle(run: JobRun, target: Side?, stop: Stop?) {
         if (stop == Stop.Cancel) {
-            run.inFlight?.let { path ->
-                try {
-                    target?.files?.delete(path)
-                } catch (_: FileSystemException) {
-                    // It may never have been created.
-                }
-            }
-            put(run.job.copy(status = Job.Status.Cancelled, finishedAt = clock()))
+            val partial = run.job.partial
+            if (partial != null && target != null) removeHalfWritten(target, partial)
+            put(run.job.copy(status = Job.Status.Cancelled, finishedAt = clock(), partial = null))
         } else {
             put(run.job.copy(status = Job.Status.Paused()))
+        }
+    }
+
+    private suspend fun removeHalfWritten(target: Side, path: String) {
+        try {
+            target.files.delete(path)
+        } catch (_: FileSystemException) {
+            // Best effort: a server that's gone keeps it until the user deletes it.
         }
     }
 

@@ -49,7 +49,7 @@ data class SaveToUiState(
         get() = crumbs.last().name
 
     val ready: Boolean
-        get() = picks.isNotEmpty() && !loading && !unreachable
+        get() = picks.isNotEmpty() && !loading && !unreachable && savedAs == null
 }
 
 /** What Save to lets you do. */
@@ -134,7 +134,8 @@ class SaveToViewModel(
     /** Starts copying the shared files into the folder on show, and remembers it for next time. */
     fun save() {
         val picks = _state.value.picks
-        if (picks.isEmpty()) return
+        // Once is enough: a second tap would save them all again.
+        if (picks.isEmpty() || _state.value.savedAs != null) return
         val crumbs = crumbsOf(drawer, path)
         val from = Where(SHARED + System.nanoTime(), "", _state.value.from, _state.value.from)
         val to = Where(drawer.id, path, drawer.name, crumbs.joinToString(" › ") { it.name })

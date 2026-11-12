@@ -10,6 +10,13 @@ What changed in each version of tansu, newest first, in plain words. A release m
   the background and you're back where you were.
 - Settings: light, dark or as the phone is; your wallpaper's colours if you like; hidden files in
   Browse; and your servers, to edit or add.
+- Copying and moving are safer. Names that differ only in case count as a clash, a Replace keeps
+  the original until the new copy is whole, Cancel never removes anything but the file it was
+  writing, and deleting a link on an SFTP server leaves what it points to.
+- A folder that can't be read or made no longer stops the app: it's listed with the files that
+  didn't make it, and the next job goes on. A full disk says so at once.
+- Uploads to SFTP servers that run OpenSSH, as most NAS boxes do, no longer stall on files over
+  256 KB.
 - Tansu updates itself. Once a day it asks GitHub for a new version (you can turn that off in
   Settings), shows what's new, and Download and install hands it to Android to confirm. Nothing
   about you is sent.

@@ -36,6 +36,11 @@ class SharedFiles(
             } catch (_: SecurityException) {
                 // The app that shared it took its permission back.
                 throw FileSystemException.AccessDenied(path)
+            } catch (e: IllegalArgumentException) {
+                // Another app's provider answers in its own ways.
+                throw FileSystemException.Unreadable(path, e)
+            } catch (e: IllegalStateException) {
+                throw FileSystemException.Unreadable(path, e)
             }
         }
 
@@ -43,7 +48,7 @@ class SharedFiles(
 
     override suspend fun list(path: String): List<Entry> = throw readOnly(path)
 
-    override suspend fun write(path: String): OutputStream = throw readOnly(path)
+    override suspend fun write(path: String, replace: Boolean): OutputStream = throw readOnly(path)
 
     override suspend fun createFolder(path: String) = throw readOnly(path)
 

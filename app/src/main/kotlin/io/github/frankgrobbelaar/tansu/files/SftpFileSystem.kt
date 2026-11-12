@@ -87,23 +87,22 @@ class SftpFileSystem(
             }
         }
 
-    override suspend fun write(path: String): OutputStream =
+    override suspend fun write(path: String, replace: Boolean): OutputStream =
         onServer(path) { sftp ->
-            val file = sftp.open(path, EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC))
-            val stream = file.RemoteFileOutputStream(0, UNCONFIRMED_WRITES)
-            object : FilterOutputStream(stream) {
-                // FilterOutputStream writes byte by byte; hand whole buffers on.
-                override fun write(buffer: ByteArray, offset: Int, length: Int) =
-                    stream.write(buffer, offset, length)
-
-                override fun close() {
-                    try {
-                        super.close()
-                    } finally {
-                        file.close()
+            val mode =
+                if (replace) EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC)
+                else EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.EXCL)
+            val file =
+                try {
+                    sftp.open(path, mode)
+                } catch (e: SFTPException) {
+                    // SFTP 3 has no word for "already there": OpenSSH says only that it failed.
+                    if (!replace && sftp.statExistence(path) != null) {
+                        throw FileSystemException.Exists(path)
                     }
+                    throw e
                 }
-            }
+            SftpOutput(file.RemoteFileOutputStream(0, UNCONFIRMED_WRITES), file, path)
         }
 
     override suspend fun createFolder(path: String) {
@@ -120,7 +119,9 @@ class SftpFileSystem(
 
     override suspend fun delete(path: String) {
         onServer(path) { sftp ->
-            if (sftp.stat(path).type == FileMode.Type.DIRECTORY) sftp.rmdir(path) else sftp.rm(path)
+            // Not through a link: a link goes on its own, and what it points to stays.
+            if (sftp.lstat(path).type == FileMode.Type.DIRECTORY) sftp.rmdir(path)
+            else sftp.rm(path)
         }
     }
 
@@ -234,6 +235,7 @@ class SftpFileSystem(
             isFolder = isFolder,
             size = if (isFolder) 0 else info.attributes.size,
             modified = info.attributes.mtime * MILLIS_PER_SECOND,
+            isLink = info.attributes.type == FileMode.Type.SYMLINK,
         )
     }
 
@@ -243,6 +245,56 @@ class SftpFileSystem(
         /** Requests kept in flight, so a transfer isn't one round trip per chunk. */
         const val READ_AHEAD = 16
         const val UNCONFIRMED_WRITES = 16
+    }
+}
+
+/**
+ * A file on the server being written. sshj sends each write as one SFTP message and OpenSSH refuses
+ * any over 256 KiB, so writes go in small pieces. A full disk or a refusal is said as one, so it
+ * isn't waited out like a dropped connection.
+ */
+private class SftpOutput(
+    private val stream: OutputStream,
+    private val file: Closeable,
+    private val path: String,
+) : FilterOutputStream(stream) {
+    override fun write(buffer: ByteArray, offset: Int, length: Int) {
+        var at = offset
+        while (at < offset + length) {
+            val piece = minOf(MAX_WRITE, offset + length - at)
+            refusals { stream.write(buffer, at, piece) }
+            at += piece
+        }
+    }
+
+    override fun flush() = refusals { stream.flush() }
+
+    override fun close() {
+        try {
+            refusals { super.close() }
+        } finally {
+            file.close()
+        }
+    }
+
+    private inline fun refusals(block: () -> Unit) {
+        try {
+            block()
+        } catch (e: SFTPException) {
+            throw when (e.statusCode) {
+                Response.StatusCode.NO_SPACE_ON_FILESYSTEM,
+                Response.StatusCode.QUOTA_EXCEEDED ->
+                    StreamRefused(FileSystemException.NoSpace(path))
+                Response.StatusCode.PERMISSION_DENIED ->
+                    StreamRefused(FileSystemException.AccessDenied(path))
+                else -> e
+            }
+        }
+    }
+
+    private companion object {
+        /** What sshj's own uploads send at a time. */
+        const val MAX_WRITE = 32 * 1024
     }
 }
 

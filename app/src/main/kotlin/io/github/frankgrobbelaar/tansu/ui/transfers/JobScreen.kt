@@ -201,7 +201,7 @@ private fun Controls(job: Job, actions: JobActions, modifier: Modifier = Modifie
                 WideButton(stringResource(R.string.resume), actions.onResume, main = true)
             status == Job.Status.Running && job.kind != Job.Kind.Delete ->
                 WideButton(stringResource(R.string.pause), actions.onPause, main = true)
-            status == Job.Status.Done && job.failures.isNotEmpty() ->
+            job.canRetry ->
                 WideButton(
                     pluralStringResource(
                         R.plurals.retry_files,

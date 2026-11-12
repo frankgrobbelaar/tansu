@@ -1,5 +1,6 @@
 package io.github.frankgrobbelaar.tansu.files
 
+import java.io.FilterOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -8,10 +9,12 @@ import java.nio.file.DirectoryIteratorException
 import java.nio.file.DirectoryNotEmptyException
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.NoSuchFileException
 import java.nio.file.NotDirectoryException
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.BasicFileAttributes
 import kotlin.io.path.invariantSeparatorsPathString
 import kotlin.io.path.name
@@ -46,8 +49,16 @@ class LocalFileSystem(private val io: CoroutineDispatcher = Dispatchers.IO) : Fi
             }
         }
 
-    override suspend fun write(path: String): OutputStream =
-        withContext(io) { mapErrors(path) { Files.newOutputStream(Paths.get(path)) } }
+    override suspend fun write(path: String, replace: Boolean): OutputStream =
+        withContext(io) {
+            mapErrors(path) {
+                val options =
+                    if (replace)
+                        arrayOf(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+                    else arrayOf(StandardOpenOption.CREATE_NEW)
+                LocalOutput(Files.newOutputStream(Paths.get(path), *options), path)
+            }
+        }
 
     override suspend fun createFolder(path: String) {
         withContext(io) { mapErrors(path) { Files.createDirectory(Paths.get(path)) } }
@@ -64,14 +75,26 @@ class LocalFileSystem(private val io: CoroutineDispatcher = Dispatchers.IO) : Fi
     /** An entry for [file], or nothing when it vanished or can't be read since it was listed. */
     private fun entryOf(file: Path, counted: Boolean = true): Entry? =
         try {
-            val attributes = Files.readAttributes(file, BasicFileAttributes::class.java)
+            val own =
+                Files.readAttributes(
+                    file,
+                    BasicFileAttributes::class.java,
+                    LinkOption.NOFOLLOW_LINKS,
+                )
+            // A link shows as what it points to.
+            val attributes =
+                if (own.isSymbolicLink) Files.readAttributes(file, BasicFileAttributes::class.java)
+                else own
             Entry(
                 name = file.name,
                 path = file.invariantSeparatorsPathString,
                 isFolder = attributes.isDirectory,
                 size = if (attributes.isDirectory) 0 else attributes.size(),
                 modified = attributes.lastModifiedTime().toMillis(),
-                childCount = if (attributes.isDirectory && counted) childCount(file) else null,
+                childCount =
+                    if (attributes.isDirectory && counted && !own.isSymbolicLink) childCount(file)
+                    else null,
+                isLink = own.isSymbolicLink,
             )
         } catch (_: IOException) {
             null
@@ -109,6 +132,30 @@ class LocalFileSystem(private val io: CoroutineDispatcher = Dispatchers.IO) : Fi
         } catch (e: DirectoryIteratorException) {
             throw FileSystemException.Unreadable(path, e)
         }
+
+    /** A file being written, with a full phone said as one rather than as a broken stream. */
+    private class LocalOutput(out: OutputStream, private val path: String) :
+        FilterOutputStream(out) {
+        override fun write(b: Int) = refusals { out.write(b) }
+
+        override fun write(b: ByteArray, off: Int, len: Int) = refusals { out.write(b, off, len) }
+
+        override fun flush() = refusals { out.flush() }
+
+        override fun close() = refusals { super.close() }
+
+        private inline fun refusals(block: () -> Unit) {
+            try {
+                block()
+            } catch (e: IOException) {
+                throw if (e.message?.contains(NO_SPACE) == true) {
+                    StreamRefused(FileSystemException.NoSpace(path))
+                } else {
+                    e
+                }
+            }
+        }
+    }
 
     private companion object {
         /** How Linux words ENOSPC. */

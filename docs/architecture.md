@@ -51,11 +51,21 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
 - A copy streams 256 KB chunks from one `FileSystem` to another, reporting progress as it goes. A
   move within a drawer is a rename; across drawers it copies, checks the size, then deletes the
   original. Folders are walked first, so the job knows how much there is.
-- Name clashes are settled before the job starts (Keep both, Replace or Skip, per name). A job
-  remembers where each pick went and which files are done, so a paused, resumed or retried job
-  carries on without asking again or doing anything twice.
-- A server that stops answering is retried for 30 seconds, then the job pauses and says which
-  server it lost. Cancelling deletes the file half written; finished files stay.
+- Name clashes are settled before the job starts (Keep both, Replace or Skip, per name), telling
+  names apart without case, as the phone and SMB do. A job remembers where each pick went and
+  which files are done, so a paused, resumed or retried job carries on without asking again or
+  doing anything twice.
+- Nothing is written over by accident: `FileSystem.write` makes a new file and fails if the name
+  is taken, so a clash the listing missed keeps both. Replace writes the new copy beside the
+  original under a hidden name and swaps it in only once it's whole.
+- Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.
+  A full disk or a refusal fails the file at once; a server that stops answering is retried for
+  30 seconds, then the job pauses and says which server it lost. Cancelling, even a paused job,
+  deletes the file half written; finished files stay.
+- Links on SFTP are never gone through to delete or move what they point to. A picked link is
+  followed for what's in it, and a move removes only the link; links inside a folder are left.
+- Writes to SFTP go in 32 KiB pieces: OpenSSH refuses any message over 256 KiB.
+- Saving shared files can't be retried: the other app only lends them while it shares them.
 - Progress is a `StateFlow` read by the Browse card, the Transfers tab and the notification (which
   updates at most once a second).
 

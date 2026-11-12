@@ -94,7 +94,7 @@ class SmbFileSystem(
             SmbInput(file, offset)
         }
 
-    override suspend fun write(path: String): OutputStream =
+    override suspend fun write(path: String, replace: Boolean): OutputStream =
         onShare(path) { share ->
             val file =
                 share.openFile(
@@ -102,10 +102,12 @@ class SmbFileSystem(
                     EnumSet.of(AccessMask.GENERIC_WRITE),
                     EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
                     SMB2ShareAccess.ALL,
-                    SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                    // A new file fails if the name is taken, in any case, rather than overwriting.
+                    if (replace) SMB2CreateDisposition.FILE_OVERWRITE_IF
+                    else SMB2CreateDisposition.FILE_CREATE,
                     null,
                 )
-            SmbOutput(file)
+            SmbOutput(file, path)
         }
 
     override suspend fun createFolder(path: String) {
@@ -256,17 +258,34 @@ private class SmbInput(private val file: File, private var position: Long) : Inp
     override fun close() = smbIo { file.close() }
 }
 
-/** A file on the share written from its start, as a stream; smbj's failures become I/O ones. */
-private class SmbOutput(private val file: File) : OutputStream() {
+/**
+ * A file on the share written from its start, as a stream. smbj's failures become I/O ones; a full
+ * share or a refusal is said as one, so it isn't waited out like a dropped connection.
+ */
+private class SmbOutput(private val file: File, private val path: String) : OutputStream() {
     private var position = 0L
 
     override fun write(byte: Int) = write(byteArrayOf(byte.toByte()), 0, 1)
 
-    override fun write(buffer: ByteArray, offset: Int, length: Int) = smbIo {
+    override fun write(buffer: ByteArray, offset: Int, length: Int) = refusals {
         position += file.write(buffer, position, offset, length)
     }
 
-    override fun close() = smbIo { file.close() }
+    override fun close() = refusals { file.close() }
+
+    private inline fun refusals(block: () -> Unit) {
+        try {
+            block()
+        } catch (e: SMBApiException) {
+            throw when (e.status.name) {
+                "STATUS_DISK_FULL" -> StreamRefused(FileSystemException.NoSpace(path))
+                "STATUS_ACCESS_DENIED" -> StreamRefused(FileSystemException.AccessDenied(path))
+                else -> IOException(e)
+            }
+        } catch (e: SMBRuntimeException) {
+            throw IOException(e)
+        }
+    }
 }
 
 private const val BYTE = 0xFF

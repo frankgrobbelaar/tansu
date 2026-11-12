@@ -25,15 +25,18 @@ import org.junit.Test
 class JobsTest {
     private val phone = MemoryFileSystem()
     private val nas = MemoryFileSystem()
+    private val share = MemoryFileSystem(ignoreCase = true)
     private val drawers =
         MutableStateFlow(
             listOf(
                 Drawer("phone", "Phone", Drawer.Kind.Phone, "/", phone),
-                Drawer("nas", "NAS", Drawer.Kind.Smb, "/", nas),
+                Drawer("nas", "NAS", Drawer.Kind.Sftp, "/", nas),
+                Drawer("share", "Share", Drawer.Kind.Smb, "/", share),
             )
         )
     private val camera = Where("phone", "/DCIM/Camera", "Phone", "Phone › DCIM › Camera")
     private val photos = Where("nas", "/Photos", "NAS", "NAS › Photos")
+    private val media = Where("share", "/Media", "Share", "Share › Media")
 
     private fun TestScope.jobs() =
         Jobs(
@@ -54,6 +57,7 @@ class JobsTest {
         phone.file("/DCIM/Camera/IMG_1.jpg", "one").file("/DCIM/Camera/IMG_2.jpg", "two!")
         phone.file("/DCIM/Camera/Trip/IMG_3.jpg", "three")
         nas.folderAt("/Photos")
+        share.folderAt("/Media")
     }
 
     @Test
@@ -270,8 +274,217 @@ class JobsTest {
         assertEquals("IMG (1).jpg", freeName("IMG.jpg", isFolder = false, taken = setOf("IMG.jpg")))
         assertEquals(
             "IMG (2).jpg",
-            freeName("IMG.jpg", isFolder = false, taken = setOf("IMG.jpg", "IMG (1).jpg")),
+            freeName("IMG.jpg", isFolder = false, taken = setOf("img.jpg", "img (1).jpg")),
         )
         assertEquals("Trip.2025 (1)", freeName("Trip.2025", isFolder = true, taken = emptySet()))
+    }
+
+    // What the review of iterations 3 to 5 found
+
+    @Test
+    fun `a retried delete passes over a folder that's gone, and the queue goes on`() = runTest {
+        val jobs = jobs()
+        val picks = listOf("Trip", "IMG_2.jpg").map { entry(phone, "/DCIM/Camera/$it") }
+        phone.failures["/DCIM/Camera/IMG_2.jpg"] = FileSystemException.AccessDenied("IMG_2.jpg")
+        val id = jobs.delete(picks, camera)
+        advanceUntilIdle()
+        assertFalse(phone.exists("/DCIM/Camera/Trip"))
+
+        phone.failures.clear()
+        jobs.retry(id)
+        val next =
+            jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertFalse(phone.exists("/DCIM/Camera/IMG_2.jpg"))
+        assertEquals(Job.Status.Done, jobs.job(next).status)
+    }
+
+    @Test
+    fun `a folder that can't be read or made fails on its own, and the queue goes on`() = runTest {
+        phone.file("/DCIM/Camera/Locked/secret.jpg", "no")
+        val jobs = jobs()
+        val picks = listOf("IMG_1.jpg", "Locked", "Trip").map { entry(phone, "/DCIM/Camera/$it") }
+        phone.failures["/DCIM/Camera/Locked"] = FileSystemException.AccessDenied("Locked")
+        nas.failures["/Photos/Trip"] = FileSystemException.AccessDenied("Trip")
+
+        val id = jobs.copy(picks, camera, photos, emptyMap())
+        val next =
+            jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_2.jpg")), camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        val job = jobs.job(id)
+        assertEquals(Job.Status.Done, job.status)
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+        assertEquals(setOf("Locked", "Trip", "IMG_3.jpg"), job.failures.map { it.name }.toSet())
+        assertTrue(job.failures.all { it.reason == Failure.Reason.AccessDenied })
+        assertEquals(Job.Status.Done, jobs.job(next).status)
+        assertEquals("two!", nas.text("/Photos/IMG_2.jpg"))
+    }
+
+    @Test
+    fun `a folder to paste into that's gone fails every pick`() = runTest {
+        val jobs = jobs()
+        val gone = Where("nas", "/Gone", "NAS", "NAS › Gone")
+
+        val id = jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, gone, emptyMap())
+        advanceUntilIdle()
+
+        assertEquals(Job.Status.Done, jobs.job(id).status)
+        assertEquals(Failure.Reason.NotFound, jobs.job(id).failures.single().reason)
+    }
+
+    @Test
+    fun `names that differ only in case clash where case is ignored`() = runTest {
+        share.file("/Media/img_1.JPG", "theirs")
+        nas.file("/Photos/Pair/a.jpg", "lower").file("/Photos/Pair/A.jpg", "upper")
+        val jobs = jobs()
+
+        jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, media, emptyMap())
+        jobs.copy(listOf(entry(nas, "/Photos/Pair")), photos, media, emptyMap())
+        advanceUntilIdle()
+
+        assertEquals("theirs", share.text("/Media/img_1.JPG"))
+        assertEquals("one", share.text("/Media/IMG_1 (1).jpg"))
+        // Two names that only SFTP tells apart both arrive, one kept under a new name.
+        val pair = share.paths().filter { it.startsWith("/Media/Pair/") }
+        assertEquals(setOf("lower", "upper"), pair.map { share.text(it) }.toSet())
+    }
+
+    @Test
+    fun `a refused write leaves the file that was there, even after a cancel`() = runTest {
+        nas.file("/Photos/IMG_1.jpg", "theirs")
+        nas.refusedWrites += "/Photos/.IMG_1.jpg.tansu"
+        val held = CompletableDeferred<Unit>()
+        phone.gates["/DCIM/Camera/IMG_2.jpg"] = held
+        val jobs = jobs()
+        val picks = listOf("IMG_1.jpg", "IMG_2.jpg").map { entry(phone, "/DCIM/Camera/$it") }
+
+        val id = jobs.copy(picks, camera, photos, mapOf("IMG_1.jpg" to Clash.Replace))
+        runCurrent()
+        jobs.cancel(id)
+        advanceUntilIdle()
+
+        assertEquals(Job.Status.Cancelled, jobs.job(id).status)
+        assertEquals("theirs", nas.text("/Photos/IMG_1.jpg"))
+        assertEquals(setOf("/Photos", "/Photos/IMG_1.jpg"), nas.paths())
+    }
+
+    @Test
+    fun `a replace keeps the original until the new copy is whole`() = runTest {
+        nas.file("/Photos/IMG_1.jpg", "theirs")
+        val jobs = jobs()
+        val pick = entry(phone, "/DCIM/Camera/IMG_1.jpg")
+        phone.broken = true
+
+        val id = jobs.copy(listOf(pick), camera, photos, mapOf("IMG_1.jpg" to Clash.Replace))
+        advanceUntilIdle()
+        assertEquals(Job.Status.Paused(lost = "NAS"), jobs.job(id).status)
+        assertEquals("theirs", nas.text("/Photos/IMG_1.jpg"))
+
+        phone.broken = false
+        jobs.resume(id)
+        advanceUntilIdle()
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+        assertEquals(setOf("/Photos", "/Photos/IMG_1.jpg"), nas.paths())
+    }
+
+    @Test
+    fun `cancelling a paused job removes what it half wrote, and only that`() = runTest {
+        nas.file("/Photos/IMG_2.jpg", "theirs")
+        val jobs = jobs()
+        val picks = listOf("IMG_1.jpg", "IMG_2.jpg").map { entry(phone, "/DCIM/Camera/$it") }
+        phone.broken = true
+
+        val id = jobs.copy(picks, camera, photos, mapOf("IMG_2.jpg" to Clash.Replace))
+        advanceUntilIdle()
+        assertEquals(Job.Status.Paused(lost = "NAS"), jobs.job(id).status)
+        assertTrue(nas.exists("/Photos/IMG_1.jpg"))
+
+        jobs.cancel(id)
+        advanceUntilIdle()
+        assertEquals(setOf("/Photos", "/Photos/IMG_2.jpg"), nas.paths())
+        assertEquals("theirs", nas.text("/Photos/IMG_2.jpg"))
+    }
+
+    @Test
+    fun `a move within a drawer is still a rename after a pause`() = runTest {
+        phone.folderAt("/Pictures")
+        val pictures = Where("phone", "/Pictures", "Phone", "Phone › Pictures")
+        val jobs = jobs()
+        val pick = entry(phone, "/DCIM/Camera/Trip")
+        phone.failures["/DCIM/Camera/Trip"] = FileSystemException.Unreachable("phone")
+
+        val id = jobs.move(listOf(pick), camera, pictures, emptyMap())
+        advanceUntilIdle()
+        assertEquals(Job.Status.Paused(lost = "Phone"), jobs.job(id).status)
+
+        phone.failures.clear()
+        jobs.resume(id)
+        advanceUntilIdle()
+        assertEquals("three", phone.text("/Pictures/Trip/IMG_3.jpg"))
+        assertFalse(phone.exists("/DCIM/Camera/Trip"))
+        assertTrue(phone.writes.isEmpty())
+    }
+
+    @Test
+    fun `deleting a link leaves what it points to`() = runTest {
+        nas.file("/Library/film.mkv", "film").file("/Photos/Old/a.jpg", "a")
+        nas.link("/Photos/media", "/Library").link("/Photos/Old/also", "/Library")
+        val jobs = jobs()
+        val picks = listOf("media", "Old").map { entry(nas, "/Photos/$it") }
+
+        val id = jobs.delete(picks, photos)
+        advanceUntilIdle()
+
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertEquals(setOf("/Library", "/Library/film.mkv", "/Photos"), nas.paths())
+    }
+
+    @Test
+    fun `moving a link to another drawer copies what's in it and keeps the originals`() = runTest {
+        nas.file("/Library/film.mkv", "film").link("/Photos/media", "/Library")
+        phone.folderAt("/Movies")
+        val movies = Where("phone", "/Movies", "Phone", "Phone › Movies")
+        val jobs = jobs()
+
+        jobs.move(listOf(entry(nas, "/Photos/media")), photos, movies, emptyMap())
+        advanceUntilIdle()
+
+        assertEquals("film", phone.text("/Movies/media/film.mkv"))
+        assertEquals("film", nas.text("/Library/film.mkv"))
+        assertFalse(nas.exists("/Photos/media"))
+    }
+
+    @Test
+    fun `a full disk fails the file at once, without waiting it out`() = runTest {
+        nas.full = true
+        val jobs = jobs()
+
+        val id =
+            jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        val job = jobs.job(id)
+        assertEquals(Job.Status.Done, job.status)
+        assertEquals(Failure.Reason.NoSpace, job.failures.single().reason)
+        assertTrue(testScheduler.currentTime < JobRun.RETRY_FOR_MILLIS)
+        assertFalse(nas.exists("/Photos/IMG_1.jpg"))
+    }
+
+    @Test
+    fun `saving shared files can't be retried once the app that shared them is gone`() = runTest {
+        val jobs = jobs()
+        val lent = MemoryFileSystem().file("/IMG_9.jpg", "nine")
+        lent.failures["/IMG_9.jpg"] = FileSystemException.AccessDenied("IMG_9.jpg")
+        val from = Where("shared-1", "", "Gallery", "Gallery")
+        val pick = Entry("IMG_9.jpg", "/IMG_9.jpg", isFolder = false, size = 4, modified = 0)
+
+        val id = jobs.copyIn(lent, listOf(pick), from, photos)
+        advanceUntilIdle()
+
+        assertEquals(Failure.Reason.AccessDenied, jobs.job(id).failures.single().reason)
+        assertFalse(jobs.job(id).canRetry)
     }
 }

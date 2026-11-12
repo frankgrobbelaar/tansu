@@ -85,6 +85,7 @@
     <string name="failure_unreachable">%1$s stopped answering.</string>
     <string name="failure_into_itself">A folder can\'t go inside itself.</string>
     <string name="failure_mismatch">The copy didn\'t match, so the original was kept.</string>
+    <string name="failure_link">It\'s a link to somewhere else, so tansu left it where it is.</string>
 
     <string name="transfers_now">Now</string>
     <string name="transfers_next">Up next</string>

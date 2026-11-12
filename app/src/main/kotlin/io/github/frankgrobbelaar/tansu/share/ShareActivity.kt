@@ -32,7 +32,8 @@ import kotlinx.coroutines.launch
  */
 class ShareActivity : ComponentActivity() {
 
-    private val shared by lazy { SharedFiles(contentResolver) }
+    // The app's own resolver: the job outlives this screen, and mustn't hold on to it.
+    private val shared by lazy { SharedFiles(applicationContext.contentResolver) }
     private val uris by lazy { sharedUris(intent) }
     private val viewModel: SaveToViewModel by viewModels {
         SaveToViewModel.factory(shared, read = { shared.entries(uris) }, from = sourceApp())

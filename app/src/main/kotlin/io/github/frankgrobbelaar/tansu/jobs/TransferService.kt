@@ -62,7 +62,10 @@ class TransferService : Service() {
 
     /** Android 15 caps a day's data sync: pause what's running and let the user resume it. */
     override fun onTimeout(startId: Int, fgsType: Int) {
-        jobs.all.value.filter { it.status == Job.Status.Running }.forEach { jobs.pause(it.id) }
+        // Everything waits: a queued job mustn't start without the service to keep it alive.
+        jobs.all.value
+            .filter { it.status == Job.Status.Running || it.status == Job.Status.Queued }
+            .forEach { jobs.pause(it.id) }
         stopSelf()
     }
 

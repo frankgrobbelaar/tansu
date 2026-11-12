@@ -4,6 +4,7 @@ import io.github.frankgrobbelaar.tansu.servers.Secret
 import io.github.frankgrobbelaar.tansu.servers.SecretLost
 import io.github.frankgrobbelaar.tansu.servers.Secrets
 import io.github.frankgrobbelaar.tansu.servers.Server
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -24,15 +25,18 @@ interface FileSystem {
     /** Reads the file at [path], starting [offset] bytes in. The caller closes the stream. */
     suspend fun read(path: String, offset: Long = 0): InputStream
 
-    /** Writes the file at [path] from its start, replacing what was there. */
-    suspend fun write(path: String): OutputStream
+    /**
+     * Writes a new file at [path]. Fails with Exists if something already has that name, which on
+     * the phone and SMB ignores case, unless told to [replace] it.
+     */
+    suspend fun write(path: String, replace: Boolean = false): OutputStream
 
     suspend fun createFolder(path: String)
 
     /** Moves [from] to [to] within this file system. Fails with Exists if [to] is taken. */
     suspend fun rename(from: String, to: String)
 
-    /** Deletes the file, or the empty folder, at [path]. */
+    /** Deletes the file, the empty folder or the link at [path]; a link's target stays. */
     suspend fun delete(path: String)
 }
 
@@ -47,6 +51,8 @@ data class Entry(
     val modified: Long,
     /** How many things a folder holds, when that's cheap to know. */
     val childCount: Int? = null,
+    /** A link to somewhere else; [isFolder] and [size] are what it points to. */
+    val isLink: Boolean = false,
 ) {
     val isHidden: Boolean
         get() = isHiddenName(name)
@@ -54,6 +60,12 @@ data class Entry(
 
 /** Names starting with a dot are hidden, as on Linux and Android. */
 internal fun isHiddenName(name: String) = name.startsWith(".")
+
+/**
+ * A stream's failure that waiting won't fix, such as a full disk, as opposed to a dropped
+ * connection. It carries the [refusal] to report.
+ */
+class StreamRefused(val refusal: FileSystemException) : IOException(refusal.message, refusal)
 
 /** A server's identity key, as its fingerprint is shown and pinned. */
 data class HostKey(val type: String, val fingerprint: String)

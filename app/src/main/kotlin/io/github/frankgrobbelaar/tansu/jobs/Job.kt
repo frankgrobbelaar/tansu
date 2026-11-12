@@ -22,10 +22,14 @@ data class Job(
     /** Source paths already done, so a resumed job carries on where it was. */
     val done: Set<String> = emptySet(),
     /**
-     * Where each pick went, by its path, once its clash was settled. A resumed or retried job
-     * carries on there instead of asking again.
+     * Where each pick went, by its path, once its clash was settled, and any file that had to go
+     * under a new name. A resumed or retried job carries on there instead of asking again.
      */
-    val placed: Map<String, String> = emptyMap(),
+    val placed: Map<String, Placement> = emptyMap(),
+    /** A file this job was half way through writing when it stopped: cancelling removes it. */
+    val partial: String? = null,
+    /** Read from another app, which only lends its files while it shares them: no retrying. */
+    val outside: Boolean = false,
     /** Picks kept under a new name because the name was taken. */
     val keptBoth: Int = 0,
     val skipped: Int = 0,
@@ -54,10 +58,24 @@ data class Job(
     val active: Boolean
         get() = status !is Status.Done && status !is Status.Cancelled
 
+    /** Finished with failures that running it again could fix. */
+    val canRetry: Boolean
+        get() = status == Status.Done && failures.isNotEmpty() && !outside
+
+    /** Ended early for [reason]: every pick still to go fails with it. */
+    internal fun ended(at: Long, reason: Failure.Reason): Job {
+        val settled = done + failures.map { it.path }
+        val left = picks.filter { it.path !in settled }.map { Failure(it.name, it.path, reason) }
+        return copy(status = Status.Done, finishedAt = at, failures = failures + left)
+    }
+
     /** Every pick's bytes, as far as the picks say; folders count once they're walked. */
     val pickedBytes: Long
         get() = picks.sumOf { it.size }
 }
+
+/** Where something went: its [path], and whether it was to [replace] what was there. */
+data class Placement(val path: String, val replace: Boolean)
 
 /** A folder in a drawer, with the names the UI shows for it. */
 data class Where(
@@ -92,7 +110,7 @@ data class Progress(
         get() =
             when {
                 bytesTotal > 0 -> (bytesDone.toFloat() / bytesTotal).coerceIn(0f, 1f)
-                itemsTotal > 0 -> itemsDone.toFloat() / itemsTotal
+                itemsTotal > 0 -> (itemsDone.toFloat() / itemsTotal).coerceIn(0f, 1f)
                 else -> 0f
             }
 
@@ -116,5 +134,7 @@ data class Failure(val name: String, val path: String, val reason: Reason) {
         IntoItself,
         /** The copy's size didn't match, so the original was kept. */
         Mismatch,
+        /** A link inside a folder points somewhere else entirely, so it's left where it is. */
+        Link,
     }
 }
