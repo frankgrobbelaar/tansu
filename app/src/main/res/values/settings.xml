@@ -37,4 +37,8 @@
     <string name="update_failed">Tansu %1$s didn\'t download</string>
     <string name="update_failed_detail">The connection dropped, or the file wasn\'t the one the release lists. Nothing was installed.</string>
     <string name="update_try_again">Try again</string>
+
+    <string name="licences">Open-source licences</string>
+    <string name="licences_detail">The work tansu is built with</string>
+    <string name="licences_intro">Tansu is open source, and built with the open-source work below. Tap one to read its licence.</string>
 </resources>

@@ -46,6 +46,7 @@ class SettingsActions(
     val onInstall: () -> Unit,
     val onAddServer: () -> Unit,
     val onEditServer: (Server) -> Unit,
+    val onLicences: () -> Unit,
 )
 
 /** Settings: how tansu looks and behaves, your servers, and the version you're on. */

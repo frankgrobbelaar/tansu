@@ -68,6 +68,7 @@ import io.github.frankgrobbelaar.tansu.updates.Update
 fun SettingsRoute(
     onAddServer: () -> Unit,
     onEditServer: (Server) -> Unit,
+    onLicences: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory),
 ) {
@@ -94,6 +95,7 @@ fun SettingsRoute(
                 onInstall = viewModel::install,
                 onAddServer = onAddServer,
                 onEditServer = onEditServer,
+                onLicences = onLicences,
             ),
         modifier = modifier,
     )
@@ -246,6 +248,13 @@ private fun About(state: SettingsUiState, actions: SettingsActions, modifier: Mo
             detail = stringResource(R.string.settings_check_daily_detail),
             checked = state.choices.checkUpdates,
             onChange = actions.onCheckUpdates,
+        )
+        RowDivider()
+        Setting(
+            title = stringResource(R.string.licences),
+            detail = stringResource(R.string.licences_detail),
+            modifier = Modifier.clickable(role = Role.Button, onClick = actions.onLicences),
+            trailing = { Chevron() },
         )
     }
 }

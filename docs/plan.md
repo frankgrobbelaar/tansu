@@ -38,8 +38,6 @@ takes its real name once it's whole, never over anything the user didn't choose 
 - Sharing files from a server out to other apps needs them fetched first, which comes with opening
   server files (iteration 6).
 
-- Settings › About should list the open-source licences (spec). It lists the version and updates
-  for now.
 - From the same review, still to do: fetching a server file to open or share it runs in Browse
   rather than as a job with a notification; one timed-out listing restarts a running transfer's
   file; and the job detail doesn't list files one by one yet.

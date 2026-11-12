@@ -51,6 +51,7 @@ import io.github.frankgrobbelaar.tansu.ui.browse.BrowseRoute
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.servers.AddServerScreen
 import io.github.frankgrobbelaar.tansu.ui.servers.ServerFormRoute
+import io.github.frankgrobbelaar.tansu.ui.settings.LicencesScreen
 import io.github.frankgrobbelaar.tansu.ui.settings.SettingsRoute
 import io.github.frankgrobbelaar.tansu.ui.transfers.JobRoute
 import io.github.frankgrobbelaar.tansu.ui.transfers.TransfersRoute
@@ -82,6 +83,9 @@ enum class Place(@param:StringRes val label: Int, val icon: ImageVector) {
 
 /** One job, in detail. */
 @Serializable data class JobDetail(val id: Long) : NavKey
+
+/** The open-source work tansu is built with. */
+@Serializable data object Licences : NavKey
 
 /** Tansu's frame: the current place's screens above the navigation bar. */
 @Composable
@@ -235,8 +239,10 @@ private fun screensFor(
         SettingsRoute(
             onAddServer = { history.add(AddServer) },
             onEditServer = { server -> history.add(ServerForm(server.kind, server.id)) },
+            onLicences = { history.add(Licences) },
         )
     }
+    entry<Licences>(keyIn) { LicencesScreen(onBack = { history.removeLastOrNull() }) }
 }
 
 /** Screens change with a short, calm crossfade. */
