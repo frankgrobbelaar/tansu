@@ -1,0 +1,25 @@
+# Changes on top of detekt's defaults and compose-rules' defaults (buildUponDefaultConfig).
+# Any issue fails the build: there is no baseline.
+
+complexity:
+  LongParameterList:
+    # Composables take a modifier and optional parameters by design.
+    ignoreDefaultParameters: true
+    ignoreAnnotated: ['Composable']
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+
+style:
+  MagicNumber:
+    # Sizes and colours in UI code are the design's values, named by where they're used.
+    ignoreAnnotated: ['Composable', 'Preview']
+    excludes:
+      - '**/test/**'
+      - '**/*.kts'
+      - '**/ui/theme/**'
+  UnusedPrivateFunction:
+    ignoreAnnotated: ['Preview']
+  ReturnCount:
+    excludeGuardClauses: true

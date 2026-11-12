@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">tansu</string>
+
+    <string name="nav_browse">Browse</string>
+    <string name="nav_transfers">Transfers</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="transfers_empty_title">Nothing moving</string>
+    <string name="transfers_empty_body">Copies, moves and deletes show up here while they run, and stay for a day after.</string>
+</resources>

@@ -43,7 +43,15 @@ Decided with the owner on 2026-11-12:
 - DataStore for settings and saved servers; SMB and SFTP passwords encrypted with an Android Keystore key.
 - Coil 3 for pictures and thumbnails, Media3 for video and Android's `PdfRenderer` for PDFs. Jobs (copy, move, delete) run as user-initiated data transfer jobs (Android 14+).
 - One `:app` module, Gradle Kotlin DSL with a version catalog.
-- Build, test and lint commands go here once the project is scaffolded.
+- Gradle 9.8 with AGP 9.5 and Kotlin 2.4; compile and target SDK 37, minimum 34. Versions live in `gradle/libs.versions.toml`.
+
+## Commands
+
+Run from the repo root (details in [docs/development.md](docs/development.md)):
+
+- `./gradlew check assembleDebug`: every check CI runs (Spotless, detekt, Android Lint, unit tests) and a debug build. It must pass before every push.
+- `./gradlew spotlessApply`: fix formatting.
+- `./gradlew installDebug`: install on the emulator or a phone.
 
 ## Design
 

@@ -8,4 +8,10 @@ updates:
       github-actions:
         patterns: ["*"]
 
-  # Gradle gets added here once the Android project exists.
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      gradle:
+        patterns: ["*"]

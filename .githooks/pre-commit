@@ -1,0 +1,4 @@
+#!/bin/sh
+# Formatting and detekt before every commit, because main has no pull requests to catch them.
+# CI runs everything else. Turn it on once per clone: git config core.hooksPath .githooks
+exec ./gradlew --quiet spotlessCheck detekt

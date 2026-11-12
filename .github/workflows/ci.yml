@@ -14,24 +14,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build, lint and test
+  check:
+    name: Check and build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
-      # Until the Android project is scaffolded there's nothing to build.
-      # Drop these hashFiles conditions once the Gradle wrapper is committed.
       - uses: actions/setup-java@v6
-        if: hashFiles('gradlew') != ''
         with:
           distribution: temurin
           java-version: "21"
 
       - uses: gradle/actions/setup-gradle@v6
-        if: hashFiles('gradlew') != ''
 
-      - name: Build
-        if: hashFiles('gradlew') != ''
-        run: ./gradlew build
+      - name: Formatting, detekt, lint, unit tests and a debug build
+        run: ./gradlew check assembleDebug
+
+      - name: Keep the reports when something fails
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: app/build/reports

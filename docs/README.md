@@ -6,6 +6,7 @@ Short pages, one subject each, for the owner and for coding agents. Decisions li
 | Page | What it covers |
 | --- | --- |
 | [plan.md](plan.md) | How tansu is built, iteration by iteration, and where it stands |
+| [development.md](development.md) | Setting up a PC, the commands, the checks, the emulator and dependency updates |
 | [spec.md](spec.md) | What tansu does: drawers, the eight flows, jobs and progress, security, and what's left out |
 | [architecture.md](architecture.md) | How it's built: the layers, the file-system interface, jobs, sharing in, and where secrets live |
 | [design.md](design.md) | How tansu looks: Kiri's colours, type, shapes and motion, the rules every screen follows, and best practice for animation, navigation and experience |
