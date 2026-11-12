@@ -19,8 +19,11 @@ internal class Side(val files: FileSystem, val remote: Boolean, val name: String
 /** The server named [name] stopped answering for longer than a job waits. */
 internal class ConnectionLost(val name: String) : Exception("Lost $name")
 
-/** Where the files come from said no, rather than where they go: worded as that drawer's. */
-private class SourceRefused(val refusal: FileSystemException) : Exception(refusal)
+/**
+ * One file that can't be done, for [reason]: found by the job itself, or said by where the files
+ * come from ([atSource]) rather than where they go.
+ */
+private class FileFailed(val reason: Failure.Reason, val atSource: Boolean = false) : Exception()
 
 /**
  * Carries out one job, step by step, handing each new state of it to [report].
@@ -222,18 +225,32 @@ internal class JobRun(
             }
         if (!keep) walked += folder
         val steps = mutableListOf<Step>(MakeFolder(folder, path))
-        // Two names that differ only in case are one name on the phone and SMB: never merge them.
+        // Two names that differ only in case are one name on the phone and SMB: a second folder
+        // goes beside the first rather than into it. A second file is kept beside when named.
+        val names = children.mapTo(mutableSetOf()) { it.name.lowercase() }
         val seen = mutableSetOf<String>()
         for (child in children) {
-            val childPath = job.placed[child.path]?.path ?: join(path, child.name)
             val first = seen.add(child.name.lowercase())
+            val childPath =
+                job.placed[child.path]?.path
+                    ?: if (first || !child.isFolder) join(path, child.name)
+                    else apart(child, path, names)
             when {
                 child.isLink -> fail(child, Failure.Reason.Link)
                 child.isFolder -> steps += walk(child, childPath, replace && first, keep, walked)
-                else -> steps += CopyFile(child, childPath, replace && first, keep)
+                else -> steps += CopyFile(child, childPath, replace, keep)
             }
         }
         return steps
+    }
+
+    /** A folder whose name another beside it has but for case: placed apart, and remembered. */
+    private fun apart(folder: Entry, path: String, names: MutableSet<String>): String {
+        val name = freeName(folder.name, isFolder = true, names)
+        names += name.lowercase()
+        val apartPath = join(path, name)
+        job = job.copy(placed = job.placed + (folder.path to Placement(apartPath, replace = false)))
+        return apartPath
     }
 
     private suspend fun perform(
@@ -299,27 +316,41 @@ internal class JobRun(
                     }
                 } catch (e: FileSystemException) {
                     throw e.also { dropPartial(target) }
-                } catch (e: SourceRefused) {
+                } catch (e: FileFailed) {
                     throw e.also { dropPartial(target) }
                 }
-        if (job.kind == Job.Kind.Move && !step.keep) {
-            // Remembered, so a job that stops here checks the copy rather than making another.
-            job = job.copy(copied = job.copied + (from.path to path))
-            val copied = retrying { target.files.stat(path) }
-            if (copied?.size != from.size) {
-                fail(from, Failure.Reason.Mismatch)
-                return
-            }
-            atSource { retrying { source.files.delete(from.path) } }
-        }
+        if (job.kind == Job.Kind.Move && !step.keep) finishMove(from, path, target)
         // Its bytes were counted as they streamed.
         finished(from, bytes = 0)
+    }
+
+    /**
+     * Removes a moved file's original once its copy at [path] checks out. Remembered first, so a
+     * job that stops here checks that copy rather than making another.
+     */
+    private suspend fun finishMove(from: Entry, path: String, target: Side) {
+        job = job.copy(copied = job.copied + (from.path to path))
+        // Gone already: its delete went through, though the answer didn't.
+        val original = atSource { retrying { source.files.stat(from.path) } } ?: return
+        if (retrying { target.files.stat(path) }?.size != original.size) {
+            // A copy that doesn't match is no use: it goes, the original stays, and a retry
+            // copies it afresh.
+            tryOrNull { target.files.delete(path) }
+            job =
+                job.copy(copied = job.copied - from.path, written = job.written - path.lowercase())
+            throw FileFailed(Failure.Reason.Mismatch)
+        }
+        try {
+            atSource { retrying { source.files.delete(from.path) } }
+        } catch (e: FileFailed) {
+            if (e.reason != Failure.Reason.NotFound) throw e
+        }
     }
 
     /** What the job half wrote goes with a file that failed. */
     private suspend fun dropPartial(target: Side) {
         job.partial?.let { partial -> tryOrNull { target.files.delete(partial) } }
-        job = job.copy(partial = null)
+        job = job.copy(partial = null, landing = null)
     }
 
     /** Runs [block] against where the files come from; a refusal there is said as such. */
@@ -329,66 +360,106 @@ internal class JobRun(
         } catch (e: FileSystemException) {
             // A server that stops answering is waited out the same on either side.
             if (e is FileSystemException.Unreachable) throw e
-            throw SourceRefused(e)
+            throw FileFailed(reasonOf(e), atSource = true)
         }
 
     /**
-     * Writes [step]'s file under this job's hidden name beside where it goes, then gives it its
-     * name: over what's there only if the user chose Replace, beside it otherwise. Says where it
-     * went.
+     * This job's own hidden name for a file going to [path]: unique to the job, and short, so a
+     * long name still fits beside it.
+     */
+    private fun hiddenFor(path: String): String =
+        join(
+            parentOf(path),
+            ".tansu-${job.token}-${Integer.toUnsignedString(path.hashCode(), RADIX)}",
+        )
+
+    /**
+     * Writes [step]'s file under this job's hidden name beside where it goes, checks it's all
+     * there, then gives it its name. Says where it went.
      */
     private suspend fun place(step: CopyFile, target: Side): String {
-        val whole = join(parentOf(step.path), ".${nameOf(step.path)}.${job.id}.tansu")
-        stream(step.from, whole, target)
-        if (step.replace && target.files.stat(step.path)?.isFolder == true) {
-            // A file can't take a folder's place.
-            throw FileSystemException.Exists(step.path)
+        val hidden = hiddenFor(step.path)
+        val landing = job.landing
+        if (job.partial == hidden && landing != null) {
+            // It stopped as it was being named: if the hidden file's gone, the naming happened.
+            return if (target.files.stat(hidden) == null) landed(landing)
+            else name(step, hidden, target)
         }
-        val path =
-            try {
-                target.files.rename(whole, step.path, replace = step.replace)
-                step.path
-            } catch (_: FileSystemException.Exists) {
-                beside(step.from, whole, step.path, target)
-            }
-        job = job.copy(partial = null)
-        return path
+        // Known before it's opened, so a stop while it opens still knows what to remove.
+        job = job.copy(partial = hidden, landing = null)
+        val wrote = stream(step.from, hidden, target)
+        // Whole, as far as where it came from says now: a file still being written isn't.
+        if (atSource { source.files.stat(step.from.path) }?.size != wrote) {
+            throw FileFailed(Failure.Reason.Mismatch)
+        }
+        return name(step, hidden, target)
+    }
+
+    /**
+     * Gives the whole [hidden] file its name: over what's there only if the user chose Replace, and
+     * never over a file this job put there, or over the very file a move is moving.
+     */
+    private suspend fun name(step: CopyFile, hidden: String, target: Side): String {
+        val there = if (step.replace) target.files.stat(step.path) else null
+        // A file can't take a folder's place.
+        if (there?.isFolder == true) throw FileSystemException.Exists(step.path)
+        val itself =
+            job.kind == Job.Kind.Move &&
+                there?.size == step.from.size &&
+                there.modified == step.from.modified
+        val replace = there != null && step.path.lowercase() !in job.written && !itself
+        return try {
+            job = job.copy(landing = step.path)
+            target.files.rename(hidden, step.path, replace)
+            landed(step.path)
+        } catch (_: FileSystemException.Exists) {
+            beside(step.from, hidden, step.path, target)
+        }
     }
 
     /**
      * Keeps both when [path] turns out to be taken after all, say by a name that differs only in
-     * case or that arrived while the job was paused: [whole] takes the first free name, which a
+     * case or that arrived while the job was paused: [hidden] takes the first free name, which a
      * resumed job remembers.
      */
-    private suspend fun beside(from: Entry, whole: String, path: String, target: Side): String {
+    private suspend fun beside(from: Entry, hidden: String, path: String, target: Side): String {
         val folder = parentOf(path)
         val taken = target.files.list(folder).map { it.name.lowercase() }.toSet()
         val free = join(folder, freeName(nameOf(path), isFolder = false, taken))
-        target.files.rename(whole, free)
         job =
             job.copy(
+                landing = free,
                 placed = job.placed + (from.path to Placement(free, replace = false)),
                 keptBoth = job.keptBoth + 1,
             )
-        return free
+        target.files.rename(hidden, free)
+        return landed(free)
     }
 
-    /** Streams [from] into [path], this job's own hidden file, from its start. */
-    private suspend fun stream(from: Entry, path: String, target: Side) {
+    /** The file has its name at [path]: one this job wrote, so never one it replaces. */
+    private fun landed(path: String): String {
+        job = job.copy(partial = null, landing = null, written = job.written + path.lowercase())
+        return path
+    }
+
+    /** Streams [from] into [path], this job's own hidden file, from its start. Says how much. */
+    private suspend fun stream(from: Entry, path: String, target: Side): Long {
+        var wrote = 0L
         atSource { source.files.read(from.path) }
             .use { input ->
                 target.files.write(path, replace = true).use { output ->
-                    job = job.copy(partial = path)
                     val buffer = ByteArray(CHUNK)
                     while (true) {
                         currentCoroutineContext().ensureActive()
                         val read = input.read(buffer)
                         if (read < 0) break
                         output.write(buffer, 0, read)
+                        wrote += read
                         progress { it.copy(bytesDone = it.bytesDone + read) }
                     }
                 }
             }
+        return wrote
     }
 
     // Deleting
@@ -458,8 +529,8 @@ internal class JobRun(
             block()
         } catch (e: FileSystemException) {
             fail(entry, reasonOf(e), atSource = job.kind == Job.Kind.Delete)
-        } catch (e: SourceRefused) {
-            fail(entry, reasonOf(e.refusal), atSource = true)
+        } catch (e: FileFailed) {
+            fail(entry, e.reason, e.atSource)
         }
     }
 
@@ -532,6 +603,7 @@ internal class JobRun(
 
     companion object {
         const val CHUNK = 256 * 1024
+        private const val RADIX = 36
         const val RETRY_FOR_MILLIS = 30_000L
         const val RETRY_EVERY_MILLIS = 3_000L
         const val REPORT_EVERY_MILLIS = 150L

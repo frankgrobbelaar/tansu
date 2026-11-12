@@ -9,10 +9,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -44,8 +49,10 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import io.github.frankgrobbelaar.tansu.R
 import java.io.File
 import java.io.IOException
+import kotlin.math.sqrt
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,46 +72,75 @@ class PdfViewModel(
     private val _state = MutableStateFlow(PdfUiState())
     val state: StateFlow<PdfUiState> = _state.asStateFlow()
 
-    // The renderer draws one page at a time.
+    // The renderer draws one page at a time, and can't close while it draws: all under one lock.
     private val drawing = Mutex()
     private var pdf: PdfRenderer? = null
+    @Volatile private var cleared = false
 
     init {
         viewModelScope.launch {
-            pdf =
-                withContext(io) {
-                    try {
-                        PdfRenderer(
-                            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                        )
-                    } catch (_: IOException) {
-                        null
-                    } catch (_: SecurityException) {
-                        // Locked with a password.
-                        null
-                    }
-                }
+            val opened = withContext(io + NonCancellable) { open() }
+            drawing.withLock {
+                // Gone before it opened: it's closed rather than kept.
+                if (cleared) opened?.close() else pdf = opened
+            }
             _state.value =
-                PdfUiState(pages = pdf?.pageCount ?: 0, loading = false, failed = pdf == null)
+                PdfUiState(pages = opened?.pageCount ?: 0, loading = false, failed = opened == null)
         }
     }
 
-    /** Page [index], drawn [width] pixels wide on white. */
+    private fun open(): PdfRenderer? =
+        try {
+            PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY))
+        } catch (_: IOException) {
+            null
+        } catch (_: SecurityException) {
+            // Locked with a password.
+            null
+        }
+
+    /** Page [index], drawn [width] pixels wide on white, no bigger than a phone can hold. */
     suspend fun page(index: Int, width: Int): ImageBitmap? =
         withContext(io) {
             drawing.withLock {
-                pdf?.openPage(index)?.use { page ->
-                    val bitmap = createBitmap(width, width * page.height / page.width)
-                    bitmap.eraseColor(AndroidColor.WHITE)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    bitmap.asImageBitmap()
+                try {
+                    if (cleared || width <= 0) null else draw(index, width)
+                } finally {
+                    if (cleared) close()
                 }
             }
         }
 
+    private fun draw(index: Int, width: Int): ImageBitmap? =
+        pdf?.openPage(index)?.use { page ->
+            if (page.width <= 0 || page.height <= 0) return@use null
+            // A very tall page is drawn narrower rather than run out of memory.
+            val scale =
+                minOf(1.0, sqrt(MAX_PIXELS / (width.toDouble() * width * page.height / page.width)))
+            val wide = (width * scale).toInt().coerceAtLeast(1)
+            val high = (wide.toLong() * page.height / page.width).toInt().coerceAtLeast(1)
+            val bitmap = createBitmap(wide, high)
+            bitmap.eraseColor(AndroidColor.WHITE)
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            bitmap.asImageBitmap()
+        }
+
     override fun onCleared() {
-        // The renderer closes the file with it.
+        cleared = true
+        // Closing while a page is drawn throws: then the drawing closes it when it's done.
+        if (drawing.tryLock()) {
+            try {
+                close()
+            } finally {
+                drawing.unlock()
+            }
+        }
+    }
+
+    /** The renderer closes the file with it. */
+    private fun close() {
         pdf?.close()
+        pdf = null
     }
 
     companion object {
@@ -153,7 +189,11 @@ private fun Pages(
         val width = constraints.maxWidth
         LazyColumn(
             state = list,
-            modifier = Modifier.fillMaxSize(),
+            modifier =
+                Modifier.fillMaxSize()
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)
+                    ),
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 96.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -198,3 +238,6 @@ private fun Page(index: Int, width: Int, draw: suspend (Int, Int) -> ImageBitmap
 
 /** An A4 page's width over its height. */
 private const val A4 = 210f / 297f
+
+/** The most pixels one page is drawn with: about 64 MB of bitmap. */
+private const val MAX_PIXELS = 16_000_000.0

@@ -80,7 +80,7 @@ class SmbFileSystem(
             }
         }
 
-    override suspend fun read(path: String, offset: Long): InputStream =
+    override suspend fun read(path: String, offset: Long): InputStream = openedFor { opened ->
         onShare(path) { share ->
             val file =
                 share.openFile(
@@ -91,10 +91,11 @@ class SmbFileSystem(
                     SMB2CreateDisposition.FILE_OPEN,
                     null,
                 )
-            SmbInput(file, offset)
+            opened(SmbInput(file, offset))
         }
+    }
 
-    override suspend fun write(path: String, replace: Boolean): OutputStream =
+    override suspend fun write(path: String, replace: Boolean): OutputStream = openedFor { opened ->
         onShare(path) { share ->
             val file =
                 share.openFile(
@@ -107,8 +108,9 @@ class SmbFileSystem(
                     else SMB2CreateDisposition.FILE_CREATE,
                     null,
                 )
-            SmbOutput(file, path)
+            opened(SmbOutput(file, path))
         }
+    }
 
     override suspend fun createFolder(path: String) {
         onShare(path) { share -> share.mkdir(smbPath(path)) }
@@ -208,13 +210,22 @@ class SmbFileSystem(
             isFolder = isFolder,
             size = if (isFolder) 0 else info.endOfFile,
             modified = info.lastWriteTime.toEpochMillis(),
-            // A Windows link or junction: removing it removes only the link.
-            isLink =
-                EnumUtils.isSet(info.fileAttributes, FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT),
+            isLink = isLink(info),
         )
     }
 
+    /**
+     * A Windows link or junction: removing it removes only the link. Other reparse points, such as
+     * deduplicated files or cloud placeholders, are ordinary files.
+     */
+    private fun isLink(info: FileIdBothDirectoryInformation): Boolean =
+        EnumUtils.isSet(info.fileAttributes, FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT) &&
+            // With a reparse point, the field holds its tag.
+            info.eaSize in setOf(REPARSE_SYMLINK, REPARSE_MOUNT_POINT)
+
     private companion object {
+        const val REPARSE_SYMLINK = 0xA000000CL
+        const val REPARSE_MOUNT_POINT = 0xA0000003L
         const val TIMEOUT_SECONDS = 15L
         val LOGIN_REFUSED =
             setOf(

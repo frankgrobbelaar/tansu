@@ -117,7 +117,10 @@ fun TansuApp(modifier: Modifier = Modifier) {
 
     Scaffold(
         modifier = modifier,
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
+        // A viewer's dark backdrop reaches every edge; its controls keep clear of them themselves.
+        contentWindowInsets =
+            if (backStack.lastOrNull() is Viewer) WindowInsets(0)
+            else WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
         // The bar is for moving between places; a task opened from one has the screen to itself.
         bottomBar = {
             if (backStack.size == 1) {

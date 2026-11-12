@@ -43,23 +43,27 @@ class LocalFileSystem(private val io: CoroutineDispatcher = Dispatchers.IO) : Fi
     override suspend fun stat(path: String): Entry? =
         withContext(io) { mapErrors(path) { entryOf(Paths.get(path), counted = false) } }
 
-    override suspend fun read(path: String, offset: Long): InputStream =
+    override suspend fun read(path: String, offset: Long): InputStream = openedFor { opened ->
         withContext(io) {
             mapErrors(path) {
-                Files.newInputStream(Paths.get(path)).apply { if (offset > 0) skipNBytes(offset) }
+                opened(Files.newInputStream(Paths.get(path))).apply {
+                    if (offset > 0) skipNBytes(offset)
+                }
             }
         }
+    }
 
-    override suspend fun write(path: String, replace: Boolean): OutputStream =
+    override suspend fun write(path: String, replace: Boolean): OutputStream = openedFor { opened ->
         withContext(io) {
             mapErrors(path) {
                 val options =
                     if (replace)
                         arrayOf(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
                     else arrayOf(StandardOpenOption.CREATE_NEW)
-                LocalOutput(Files.newOutputStream(Paths.get(path), *options), path)
+                opened(LocalOutput(Files.newOutputStream(Paths.get(path), *options), path))
             }
         }
+    }
 
     override suspend fun createFolder(path: String) {
         withContext(io) { mapErrors(path) { Files.createDirectory(Paths.get(path)) } }

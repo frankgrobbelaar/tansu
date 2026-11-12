@@ -5,6 +5,15 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- Copying is safer again. A file is checked against where it came from before it takes its
+  name, so one still being written is caught rather than copied short; a move never replaces
+  the very file it's moving; a server's lost answer no longer leaves a second copy; two folders
+  whose names differ only in case stay apart on the phone and SMB; and long names fit.
+- Videos keep the screen on, keep playing when the phone turns, and pause for a call or when
+  headphones come out. Pictures, videos and PDFs reach the screen's edges.
+- A PDF with very tall pages no longer stops tansu, nor does leaving one while it draws.
+- Replace works on SFTP servers that can't rename over a file in one step.
+
 - Tapping a finished job's notification opens the folder its files went to. While tansu is in
   front it says how a job ended itself, without a notification too.
 

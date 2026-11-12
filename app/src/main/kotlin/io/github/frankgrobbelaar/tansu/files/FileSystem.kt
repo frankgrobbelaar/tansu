@@ -4,9 +4,14 @@ import io.github.frankgrobbelaar.tansu.servers.Secret
 import io.github.frankgrobbelaar.tansu.servers.SecretLost
 import io.github.frankgrobbelaar.tansu.servers.Secrets
 import io.github.frankgrobbelaar.tansu.servers.Server
+import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
  * One place files live: the phone, an SMB share or an SFTP server. Screens and jobs only ever see
@@ -69,6 +74,30 @@ internal fun isHiddenName(name: String) = name.startsWith(".")
  * connection. It carries the [refusal] to report.
  */
 class StreamRefused(val refusal: FileSystemException) : IOException(refusal.message, refusal)
+
+/**
+ * Opens a stream for a caller that may stop waiting meanwhile, as Coil and Media3 often do: [open]
+ * hands what it opened to the given function, and if the caller has gone by the time it's open,
+ * it's closed rather than lost with its handle still open on the server.
+ */
+internal suspend fun <T : Closeable> openedFor(open: suspend (opened: (T) -> T) -> T): T {
+    var stream: T? = null
+    try {
+        return open { it.also { opened -> stream = opened } }
+    } catch (e: CancellationException) {
+        stream?.let { withContext(NonCancellable + Dispatchers.IO) { closeQuietly(it) } }
+        throw e
+    }
+}
+
+/** Closes what nobody will read: its failing to close has no one to tell. */
+private fun closeQuietly(stream: Closeable) {
+    try {
+        stream.close()
+    } catch (_: IOException) {
+        // Its connection is gone already, and the server lets go of it with that.
+    }
+}
 
 /** A server's identity key, as its fingerprint is shown and pinned. */
 data class HostKey(val type: String, val fingerprint: String)

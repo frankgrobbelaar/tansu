@@ -3,6 +3,7 @@ package io.github.frankgrobbelaar.tansu.ui.viewer
 import android.net.Uri
 import android.util.Pair
 import android.view.View
+import androidx.activity.compose.LocalActivity
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -10,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +27,7 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -55,6 +58,9 @@ class VideoViewModel(app: TansuApplication, drawers: StateFlow<List<Drawer>>, ke
     val player: ExoPlayer =
         ExoPlayer.Builder(app)
             .setMediaSourceFactory(DefaultMediaSourceFactory(DrawerDataSource.Factory(drawers)))
+            // Other sound pauses it, and so does unplugging headphones.
+            .setAudioAttributes(AudioAttributes.DEFAULT, /* handleAudioFocus= */ true)
+            .setHandleAudioBecomingNoisy(true)
             .setSeekBackIncrementMs(SEEK_MILLIS)
             .setSeekForwardIncrementMs(SEEK_MILLIS)
             .build()
@@ -90,15 +96,19 @@ fun VideoRoute(
     viewModel: VideoViewModel = viewModel(factory = VideoViewModel.factory(key)),
 ) {
     val player = viewModel.player
+    val activity = LocalActivity.current
     DarkBars()
-    // Leaving tansu pauses it.
-    LifecycleStartEffect(player) { onStopOrDispose { player.pause() } }
+    // Leaving tansu pauses it; turning the phone doesn't.
+    LifecycleStartEffect(player) {
+        onStopOrDispose { if (activity?.isChangingConfigurations != true) player.pause() }
+    }
     var chrome by remember { mutableStateOf(true) }
     Box(modifier = modifier.fillMaxSize().background(Backdrop)) {
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
                     this.player = player
+                    keepScreenOn = true
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setErrorMessageProvider {
@@ -109,7 +119,9 @@ fun VideoRoute(
                     )
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            // Let go of the player as the view goes, so an old screen isn't kept by it.
+            onRelease = { it.player = null },
+            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
         )
         AnimatedVisibility(
             visible = chrome,
@@ -142,6 +154,10 @@ internal class DrawerDataSource(private val drawers: StateFlow<List<Drawer>>) :
         val (input, size) =
             runBlocking { files?.let { openAt(it, path, dataSpec.position) } }
                 ?: throw DataSourceException(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND)
+        if (dataSpec.position > size) {
+            input.close()
+            throw DataSourceException(PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
+        }
         stream = input
         left =
             if (dataSpec.length != C.LENGTH_UNSET.toLong()) dataSpec.length

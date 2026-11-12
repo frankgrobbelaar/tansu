@@ -55,13 +55,16 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
   names apart without case, as the phone and SMB do. A job remembers where each pick went and
   which files are done, so a paused, resumed or retried job carries on without asking again or
   doing anything twice.
-- Nothing is written over by accident. Every file is written under a hidden name of the job's
-  own (`.name.<job>.tansu`) beside where it goes, and only takes its name once it's whole: with a
-  rename that fails if the name is taken, so a clash the listing missed (or a file that arrived
-  while the job was paused) keeps both, or, when the user chose Replace, with a rename that
-  replaces the old file in one step. A half-written file is never visible under a real name, and
-  it's the only thing Cancel removes. Two names that differ only in case are never merged into
-  one.
+- Nothing is written over by accident. Every file is written under a short hidden name of the
+  job's own (`.tansu-<token>-<hash>`, the token random per job) beside where it goes, checked
+  against the source's size, and only then takes its name: with a rename that fails if the name
+  is taken, so a clash the listing missed (or a file that arrived while the job was paused) keeps
+  both, or, when the user chose Replace, with a rename that replaces the old file in one step. A
+  half-written file is never visible under a real name, and it's the only thing Cancel removes.
+- The job remembers every file it named, and never replaces one of them; nor does a move replace
+  the very file it's moving, reached another way. Two folders whose names differ only in case
+  stay apart. A rename whose answer was lost is recognised on the retry by its hidden file being
+  gone, so it isn't made twice.
 - A move remembers each copy it has made until it has checked it and removed the original, so a
   move that stops in between checks that copy rather than making another.
 - Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.

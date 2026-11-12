@@ -4,6 +4,7 @@ import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
@@ -53,10 +54,10 @@ class Jobs(
     }
 
     fun copy(picks: List<Entry>, from: Where, to: Where, clashes: Map<String, Clash>): Long =
-        add(Job(ids.incrementAndGet(), Job.Kind.Copy, picks, from, to, clashes))
+        add(Job(ids.incrementAndGet(), Job.Kind.Copy, picks, from, to, clashes, token = token()))
 
     fun move(picks: List<Entry>, from: Where, to: Where, clashes: Map<String, Clash>): Long =
-        add(Job(ids.incrementAndGet(), Job.Kind.Move, picks, from, to, clashes))
+        add(Job(ids.incrementAndGet(), Job.Kind.Move, picks, from, to, clashes, token = token()))
 
     /**
      * Copies files from outside the drawers, such as files shared with tansu, read from [files].
@@ -64,7 +65,17 @@ class Jobs(
      */
     fun copyIn(files: FileSystem, picks: List<Entry>, from: Where, to: Where): Long {
         outside[from.drawerId] = Side(files, remote = false, name = from.drawerName)
-        return add(Job(ids.incrementAndGet(), Job.Kind.Copy, picks, from, to, outside = true))
+        return add(
+            Job(
+                ids.incrementAndGet(),
+                Job.Kind.Copy,
+                picks,
+                from,
+                to,
+                outside = true,
+                token = token(),
+            )
+        )
     }
 
     fun delete(picks: List<Entry>, from: Where): Long =
@@ -111,6 +122,9 @@ class Jobs(
     fun clearFinished() {
         jobs.update { list -> list.filter { it.active } }
     }
+
+    /** A job's own mark for its hidden files, unlike any other job's on any phone. */
+    private fun token(): String = UUID.randomUUID().toString().take(TOKEN_LENGTH)
 
     private fun add(job: Job): Long {
         jobs.update { it + job }
@@ -203,6 +217,10 @@ class Jobs(
             ?: drawers.value
                 .find { it.id == where.drawerId }
                 ?.let { Side(it.fileSystem, remote = it.kind != Drawer.Kind.Phone, name = it.name) }
+
+    private companion object {
+        const val TOKEN_LENGTH = 8
+    }
 
     private enum class Stop {
         Pause,

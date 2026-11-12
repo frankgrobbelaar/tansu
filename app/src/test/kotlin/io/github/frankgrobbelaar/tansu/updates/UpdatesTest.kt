@@ -161,6 +161,16 @@ class UpdatesTest {
         }
 
     @Test
+    fun `GitHub not answering doesn't take back a version already on offer`() = runTest {
+        updates().check()
+        latest = null
+
+        val later = updates()
+        later.check()
+        assertTrue(later.update.value is Update.Available)
+    }
+
+    @Test
     fun `a cancelled download that fails later keeps quiet`() = runBlocking {
         val stalled = CountDownLatch(1)
         val firstTry = AtomicBoolean(true)

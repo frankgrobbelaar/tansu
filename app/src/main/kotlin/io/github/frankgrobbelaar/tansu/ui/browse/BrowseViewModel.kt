@@ -199,21 +199,27 @@ class BrowseViewModel(
             )
 
     /**
-     * The listing as Browse shows it: hidden files only when Settings says so, what matches a
-     * search, in the order chosen. Sorting thousands of names is real work, so it's done off the
-     * main thread.
+     * The listing in the order chosen, sorted once for each listing and order. Sorting thousands of
+     * names is real work, so it's done off the main thread.
+     */
+    private val sorted: StateFlow<Listing> =
+        combine(listing, settings.sort) { listing, sort ->
+                listing.copy(entries = listing.entries.sortedWith(browseOrder(sort)))
+            }
+            .flowOn(compute)
+            .stateIn(viewModelScope, SharingStarted.Eagerly, listing.value)
+
+    /**
+     * The listing as Browse shows it: hidden files only when Settings says so, and what matches a
+     * search, typed a letter at a time.
      */
     private val shown: StateFlow<Listing> =
-        combine(listing, settings.showHidden, settings.sort, search) {
-                listing,
-                showHidden,
-                sort,
-                search ->
+        combine(sorted, settings.showHidden, search) { listing, showHidden, search ->
                 val entries =
-                    listing.entries
-                        .filter { showHidden || !it.isHidden }
-                        .filter { search.isNullOrEmpty() || it.name.contains(search, true) }
-                        .sortedWith(browseOrder(sort))
+                    listing.entries.filter {
+                        (showHidden || !it.isHidden) &&
+                            (search.isNullOrEmpty() || it.name.contains(search, true))
+                    }
                 listing.copy(entries = entries)
             }
             .flowOn(compute)

@@ -33,6 +33,12 @@ data class Job(
     val copied: Map<String, String> = emptyMap(),
     /** This job's hidden file, half written when it stopped: cancelling removes it. */
     val partial: String? = null,
+    /** Where the hidden file was being renamed to, when it stopped as it was named. */
+    val landing: String? = null,
+    /** Every file this job named, by its path in lower case: never one it replaces. */
+    val written: Set<String> = emptySet(),
+    /** Part of this job's hidden names, so no other job or phone writes into them. */
+    val token: String = "",
     /** Read from another app, which only lends its files while it shares them: no retrying. */
     val outside: Boolean = false,
     /** Picks kept under a new name because the name was taken. */

@@ -13,7 +13,7 @@ enum class FileKind {
         private val byExtension =
             mapOf(
                     Image to "jpg jpeg png gif webp heic heif bmp avif",
-                    Video to "mp4 mkv mov webm avi m4v 3gp ts",
+                    Video to "mp4 mkv mov webm avi m4v 3gp",
                     Audio to "mp3 m4a aac flac wav ogg opus wma",
                     Archive to "zip rar 7z tar gz tgz xz bz2 zst",
                 )

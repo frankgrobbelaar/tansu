@@ -11,10 +11,15 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.CircularProgressIndicator
@@ -167,7 +172,10 @@ fun PictureScreen(
                     modifier = Modifier.align(Alignment.Center).padding(32.dp),
                 )
             else -> {
-                val pager = rememberPagerState(initialPage = state.start) { state.pictures.size }
+                val pager =
+                    rememberPagerState(initialPage = state.start.coerceIn(state.pictures.indices)) {
+                        state.pictures.size
+                    }
                 var zoomed by remember { mutableStateOf(false) }
                 HorizontalPager(
                     state = pager,
@@ -180,7 +188,7 @@ fun PictureScreen(
                         onTap = { chrome = !chrome },
                     )
                 }
-                val picture = state.pictures[pager.currentPage]
+                val picture = state.pictures[pager.currentPage.coerceIn(state.pictures.indices)]
                 Chrome(visible = chrome, modifier = Modifier.align(Alignment.TopCenter)) {
                     ViewerTopBar(name = picture.name, label = state.label, onBack = onBack)
                 }
@@ -212,6 +220,7 @@ private fun PictureFoot(picture: Entry, place: Int, of: Int, modifier: Modifier 
                 .fillMaxWidth()
                 .background(Brush.verticalGradient(listOf(Color.Transparent, FootShade)))
                 .navigationBarsPadding()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp)
     ) {
         Text(

@@ -102,7 +102,8 @@ class Updates(
 
     /** Asks GitHub for the newest release, unless an update is already on its way or here. */
     fun check() {
-        when (state.value) {
+        val before = state.value
+        when (before) {
             Update.Checking,
             is Update.Downloading,
             is Update.Ready -> return
@@ -128,7 +129,9 @@ class Updates(
                 Update.UpToDate -> settings.setOffer(null)
                 else -> Unit
             }
-            state.value = found
+            // GitHub not answering doesn't take back a version already on offer.
+            state.value =
+                if (found == Update.CheckFailed && before is Update.Available) before else found
         }
     }
 

@@ -40,6 +40,15 @@ class MemoryFileSystem(
     /** Fails deleting the path, though everything else about it works. */
     val deleteFailures = mutableMapOf<String, FileSystemException>()
 
+    /** Paths whose next rename or delete happens, but whose answer is lost on the way back. */
+    val lostAnswers = mutableSetOf<String>()
+
+    /** Files still being written: once read, each grows by its text, as a recording does. */
+    val growing = mutableMapOf<String, String>()
+
+    /** Holds the next file opened for writing in the folder, once it's made, until let go. */
+    val writeGates = mutableMapOf<String, CompletableDeferred<Unit>>()
+
     fun file(path: String, text: String) = apply {
         folderAt(parentOf(path))
         files[path] = text.toByteArray()
@@ -78,6 +87,7 @@ class MemoryFileSystem(
         check(path)
         gates.remove(path)?.await()
         val bytes = held(real(path))?.let { files[it] } ?: throw FileSystemException.NotFound(path)
+        growing.remove(path)?.let { more -> files[held(real(path))!!] = bytes + more.toByteArray() }
         return object : ByteArrayInputStream(bytes) {
                 override fun read(b: ByteArray, off: Int, len: Int): Int {
                     if (broken) throw IOException("Connection reset")
@@ -99,9 +109,11 @@ class MemoryFileSystem(
                 else -> null
             }
         refusal?.let { throw it }
+        fits(path)
         // Written under the name that's there, as a case-blind file system does.
         val name = there ?: at
         files[name] = ByteArray(0)
+        writeGates.remove(parentOf(path))?.await()
         return object : OutputStream() {
             override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
 
@@ -130,6 +142,12 @@ class MemoryFileSystem(
     override suspend fun rename(from: String, to: String, replace: Boolean) {
         check(from)
         check(to)
+        fits(to)
+        moveName(from, to, replace)
+        answer(to)
+    }
+
+    private fun moveName(from: String, to: String, replace: Boolean) {
         links.remove(from)?.let {
             links[to] = it
             return
@@ -165,6 +183,17 @@ class MemoryFileSystem(
             childrenOf(at).isEmpty() -> folders -= at
             else -> throw FileSystemException.Unreadable(path)
         }
+        answer(path)
+    }
+
+    /** What was done is done; the answer to it may not arrive. */
+    private fun answer(path: String) {
+        if (lostAnswers.remove(path)) throw FileSystemException.Unreachable("lost the answer")
+    }
+
+    /** Names are at most 255 long, as on the phone. */
+    private fun fits(path: String) {
+        if (nameOf(path).length > MAX_NAME) throw FileSystemException.Unreadable(path)
     }
 
     /** Where [path] really is, through any link on the way. */
@@ -195,5 +224,9 @@ class MemoryFileSystem(
             modified = 0,
             isLink = path in links,
         )
+    }
+
+    private companion object {
+        const val MAX_NAME = 255
     }
 }

@@ -4,6 +4,7 @@ import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.MemoryFileSystem
+import io.github.frankgrobbelaar.tansu.files.parentOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -402,7 +403,7 @@ class JobsTest {
         assertEquals(Job.Status.Paused(lost = "NAS"), jobs.job(id).status)
         // Half written under a hidden name of the job's own, never under the real one.
         assertFalse(nas.exists("/Photos/IMG_1.jpg"))
-        assertTrue(nas.paths().any { it.startsWith("/Photos/.IMG_1.jpg.") })
+        assertTrue(nas.paths().any { it.startsWith("/Photos/.tansu-") })
 
         jobs.cancel(id)
         advanceUntilIdle()
@@ -621,5 +622,131 @@ class JobsTest {
 
         assertEquals(Failure.Reason.AccessDenied, jobs.job(id).failures.single().reason)
         assertFalse(jobs.job(id).canRetry)
+    }
+
+    // What the review of the hidden names found
+
+    @Test
+    fun `a retried merge into a case-blind folder never replaces a file it moved there`() =
+        runTest {
+            share.folderAt("/Media/Pair")
+            nas.file("/Photos/Pair/a.jpg", "lower").file("/Photos/Pair/A.jpg", "upper")
+            val pair = entry(nas, "/Photos/Pair")
+            nas.failures["/Photos/Pair/A.jpg"] = FileSystemException.AccessDenied("A.jpg")
+            val jobs = jobs()
+
+            val id = jobs.move(listOf(pair), photos, media, mapOf("Pair" to Clash.Replace))
+            advanceUntilIdle()
+            nas.failures.clear()
+            jobs.retry(id)
+            advanceUntilIdle()
+
+            val texts = share.paths().filter { it.startsWith("/Media/Pair/") }.map(share::text)
+            assertEquals(setOf("lower", "upper"), texts.toSet())
+        }
+
+    @Test
+    fun `a move that would replace the very file it moves keeps it`() = runTest {
+        nas.file("/Library/film.mkv", "film").link("/Photos/media", "/Library")
+        val jobs = jobs()
+        val library = Where("nas", "/Library", "NAS", "NAS › Library")
+        val media = Where("nas", "/Photos/media", "NAS", "NAS › Photos › media")
+
+        jobs.move(
+            listOf(entry(nas, "/Library/film.mkv")),
+            library,
+            media,
+            mapOf("film.mkv" to Clash.Replace),
+        )
+        advanceUntilIdle()
+
+        assertEquals(listOf("film"), nas.paths().mapNotNull(nas::text))
+    }
+
+    @Test
+    fun `an answer lost as a file is named doesn't make a second copy`() = runTest {
+        nas.lostAnswers += "/Photos/IMG_1.jpg"
+        val jobs = jobs()
+
+        jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        assertEquals(setOf("/Photos", "/Photos/IMG_1.jpg"), nas.paths())
+    }
+
+    @Test
+    fun `an answer lost as a moved original is removed still ends well`() = runTest {
+        phone.lostAnswers += "/DCIM/Camera/IMG_1.jpg"
+        val jobs = jobs()
+
+        val id =
+            jobs.move(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        assertEquals(Job.Status.Done, jobs.job(id).status)
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+    }
+
+    @Test
+    fun `a file still being written fails as not matching, and a retry copies it whole`() =
+        runTest {
+            phone.growing["/DCIM/Camera/IMG_1.jpg"] = " more"
+            val jobs = jobs()
+
+            val id =
+                jobs.copy(
+                    listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")),
+                    camera,
+                    photos,
+                    emptyMap(),
+                )
+            advanceUntilIdle()
+            assertEquals(Failure.Reason.Mismatch, jobs.job(id).failures.single().reason)
+            assertEquals(setOf("/Photos"), nas.paths())
+
+            jobs.retry(id)
+            advanceUntilIdle()
+            assertEquals("one more", nas.text("/Photos/IMG_1.jpg"))
+        }
+
+    @Test
+    fun `a cancel while a file is being opened leaves nothing behind`() = runTest {
+        nas.writeGates["/Photos"] = CompletableDeferred()
+        val jobs = jobs()
+
+        val id =
+            jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), camera, photos, emptyMap())
+        runCurrent()
+        jobs.cancel(id)
+        advanceUntilIdle()
+
+        assertEquals(setOf("/Photos"), nas.paths())
+    }
+
+    @Test
+    fun `two folders whose names differ only in case stay apart where case is ignored`() = runTest {
+        nas.file("/Photos/Pair/Sub/a.jpg", "a").file("/Photos/Pair/sub/b.jpg", "b")
+        val jobs = jobs()
+
+        jobs.copy(listOf(entry(nas, "/Photos/Pair")), photos, media, emptyMap())
+        advanceUntilIdle()
+
+        val a = share.paths().single { share.text(it) == "a" }
+        val b = share.paths().single { share.text(it) == "b" }
+        assertTrue(parentOf(a) != parentOf(b))
+    }
+
+    @Test
+    fun `a long name still fits beside its hidden copy`() = runTest {
+        val long = "x".repeat(246) + ".jpg"
+        phone.file("/DCIM/Camera/$long", "long")
+        val jobs = jobs()
+
+        val id = jobs.copy(listOf(entry(phone, "/DCIM/Camera/$long")), camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertEquals("long", nas.text("/Photos/$long"))
     }
 }

@@ -73,22 +73,25 @@ class SftpFileSystem(
             }
         }
 
-    override suspend fun read(path: String, offset: Long): InputStream =
+    override suspend fun read(path: String, offset: Long): InputStream = openedFor { opened ->
         onServer(path) { sftp ->
             val file = sftp.open(path, EnumSet.of(OpenMode.READ))
             val stream = file.ReadAheadRemoteFileInputStream(READ_AHEAD, offset)
-            object : FilterInputStream(stream) {
-                override fun close() {
-                    try {
-                        super.close()
-                    } finally {
-                        file.close()
+            opened(
+                object : FilterInputStream(stream) {
+                    override fun close() {
+                        try {
+                            super.close()
+                        } finally {
+                            file.close()
+                        }
                     }
                 }
-            }
+            )
         }
+    }
 
-    override suspend fun write(path: String, replace: Boolean): OutputStream =
+    override suspend fun write(path: String, replace: Boolean): OutputStream = openedFor { opened ->
         onServer(path) { sftp ->
             val mode =
                 if (replace) EnumSet.of(OpenMode.WRITE, OpenMode.CREAT, OpenMode.TRUNC)
@@ -103,8 +106,9 @@ class SftpFileSystem(
                     }
                     throw e
                 }
-            SftpOutput(file.RemoteFileOutputStream(0, UNCONFIRMED_WRITES), file, path)
+            opened(SftpOutput(file.RemoteFileOutputStream(0, UNCONFIRMED_WRITES), file, path))
         }
+    }
 
     override suspend fun createFolder(path: String) {
         onServer(path) { sftp ->
@@ -132,11 +136,10 @@ class SftpFileSystem(
 
     /** [from] takes [to]'s place in one step where the server can, as OpenSSH's can. */
     private fun replaceWith(sftp: SFTPClient, from: String, to: String) {
-        try {
+        if (sftp.sftpEngine.supportsServerExtension("posix-rename", "openssh.com")) {
             sftp.rename(from, to, EnumSet.of(RenameFlags.OVERWRITE))
-        } catch (e: SFTPException) {
-            if (e.statusCode != Response.StatusCode.OP_UNSUPPORTED) throw e
-            // A server without posix-rename: the old one goes first.
+        } else {
+            // A server without it: the old one goes first.
             if (sftp.statExistence(to) != null) sftp.rm(to)
             sftp.rename(from, to)
         }
