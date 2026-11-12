@@ -109,4 +109,15 @@
 
     <string name="notification_channel_jobs">Copies, moves and deletes</string>
     <string name="notification_channel_jobs_body">Progress while a job runs, and how it ended.</string>
+
+    <string name="pick_waiting">Waiting</string>
+    <string name="pick_now">On it now</string>
+    <string name="pick_done">Done</string>
+    <string name="pick_skipped">Skipped</string>
+    <string name="pick_failed">Didn\'t make it</string>
+    <string name="pick_size">%1$s · %2$s</string>
+    <plurals name="job_more_picks">
+        <item quantity="one">And %1$d more</item>
+        <item quantity="other">And %1$d more</item>
+    </plurals>
 </resources>

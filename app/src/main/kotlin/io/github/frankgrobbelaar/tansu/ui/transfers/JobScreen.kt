@@ -27,13 +27,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.frankgrobbelaar.tansu.R
+import io.github.frankgrobbelaar.tansu.files.Entry
+import io.github.frankgrobbelaar.tansu.files.FileKind
+import io.github.frankgrobbelaar.tansu.files.nameOf
 import io.github.frankgrobbelaar.tansu.jobs.Job
 import io.github.frankgrobbelaar.tansu.ui.format.Human
 import io.github.frankgrobbelaar.tansu.ui.format.JobWords
+import io.github.frankgrobbelaar.tansu.ui.kit.FileTile
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuTopBar
 
@@ -99,6 +104,7 @@ fun JobScreen(job: Job, actions: JobActions, modifier: Modifier = Modifier) {
             Progress(job)
             Place(stringResource(R.string.job_from), job.from.label)
             job.to?.let { Place(stringResource(R.string.job_to), it.label) }
+            Picks(job)
             if (job.failures.isNotEmpty() && !job.active) Failures(job)
         }
         Controls(job, actions)
@@ -164,6 +170,65 @@ private fun Place(label: String, where: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** Each thing picked, under the name it went to, and where it stands. */
+@Composable
+private fun Picks(job: Job, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        job.picks.take(MAX_PICKS).forEach { pick ->
+            val state = stateOf(pick, job)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                FileTile(kind = FileKind.of(pick))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = job.placed[pick.path]?.path?.let(::nameOf) ?: pick.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = pickLine(pick, state),
+                        style = MaterialTheme.typography.bodySmall,
+                        color =
+                            if (state == PickState.Failed) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (job.picks.size > MAX_PICKS) {
+            Text(
+                text =
+                    pluralStringResource(
+                        R.plurals.job_more_picks,
+                        job.picks.size - MAX_PICKS,
+                        job.picks.size - MAX_PICKS,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun pickLine(pick: Entry, state: PickState): String {
+    val said =
+        stringResource(
+            when (state) {
+                PickState.Waiting -> R.string.pick_waiting
+                PickState.Now -> R.string.pick_now
+                PickState.Done -> R.string.pick_done
+                PickState.Skipped -> R.string.pick_skipped
+                PickState.Failed -> R.string.pick_failed
+            }
+        )
+    return if (pick.isFolder) said
+    else stringResource(R.string.pick_size, said, Human.size(pick.size))
+}
+
 @Composable
 private fun Failures(job: Job, modifier: Modifier = Modifier) {
     val resources = LocalResources.current
@@ -226,3 +291,6 @@ private fun WideButton(label: String, onClick: () -> Unit, main: Boolean) {
 }
 
 private const val PERCENT = 100
+
+/** A job's picks shown one by one; a bigger selection sums up the rest. */
+private const val MAX_PICKS = 50

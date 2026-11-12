@@ -5,6 +5,9 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- A job's detail lists what was picked, each with where it stands: waiting, on it now, done,
+  skipped or not done. A refusal names the drawer that said no.
+
 - Settings › About lists the open-source work tansu is built with, and its licences.
 
 ## 0.3.0 - 2026-11-13

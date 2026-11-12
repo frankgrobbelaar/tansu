@@ -288,7 +288,13 @@ internal class JobRun(
                     val before = job.progress.bytesDone
                     retrying {
                         // A retry starts the file again.
-                        progress { it.copy(bytesDone = before, current = from.name) }
+                        progress {
+                            it.copy(
+                                bytesDone = before,
+                                current = from.name,
+                                currentPath = from.path,
+                            )
+                        }
                         place(step, target)
                     }
                 } catch (e: FileSystemException) {
@@ -411,7 +417,7 @@ internal class JobRun(
                 // A folder that kept something it couldn't delete fails on its own: say it once.
                 entry.isFolder && job.failures.any { it.path.isWithin(entry.path) } -> Unit
                 else -> {
-                    progress { it.copy(current = entry.name) }
+                    progress { it.copy(current = entry.name, currentPath = entry.path) }
                     attempt(entry) {
                         try {
                             retrying { source.files.delete(entry.path) }

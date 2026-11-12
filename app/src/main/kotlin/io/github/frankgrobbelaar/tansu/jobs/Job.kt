@@ -105,8 +105,10 @@ data class Progress(
     val bytesTotal: Long = 0,
     val itemsDone: Int = 0,
     val itemsTotal: Int = 0,
-    /** The file being worked on. */
+    /** The file being worked on, by its name. */
     val current: String? = null,
+    /** The file being worked on, by its path. */
+    val currentPath: String? = null,
     val bytesPerSecond: Long = 0,
     /** Still walking folders to find out how much there is. */
     val counting: Boolean = true,
