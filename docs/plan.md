@@ -20,7 +20,7 @@ Tansu is built in small iterations. Each one goes through the same loop before i
 | 6 | Open files | Pictures, videos and PDFs in tansu; other files in another app | Done |
 | 7 | Browse extras and Settings | Search, sort and view, grid, hidden files, and Settings | Done |
 | 8 | Releases and updates | The `release` branch and its workflow, signing, the downloads page, and the in-app update | Done |
-| 9 | Polish | Accessibility, performance, dark theme and the small things | |
+| 9 | Polish | Accessibility, performance, dark theme and the small things | Under way: each job's picks in its detail, the finished notification opening the folder, TalkBack labels on rows, the licences |
 
 The release signing key and its GitHub secrets were made on 12 Nov 2026 (see
 [releasing.md](releasing.md)); the owner keeps the backup.
