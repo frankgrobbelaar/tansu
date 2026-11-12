@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,7 +60,13 @@ fun FileRow(
                     if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = SHADE)
                     else Color.Transparent
                 )
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    // TalkBack says what a long press does, and whether the row is picked.
+                    onLongClickLabel = stringResource(R.string.select),
+                )
+                .semantics { if (selecting) this.selected = selected }
                 .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),

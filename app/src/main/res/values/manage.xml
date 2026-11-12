@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Selecting, cutting, copying, pasting, renaming and deleting. -->
 <resources>
+    <string name="select">Select</string>
     <string name="row_selected">Selected</string>
     <string name="row_not_selected">Not selected</string>
     <plurals name="selection_count">

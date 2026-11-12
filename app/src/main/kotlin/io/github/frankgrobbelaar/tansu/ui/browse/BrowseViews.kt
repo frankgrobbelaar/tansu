@@ -174,7 +174,12 @@ private fun EntryTile(
     val colors = MaterialTheme.colorScheme
     val kind = FileKind.of(entry)
     Column(
-        modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        modifier =
+            modifier.combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = stringResource(R.string.select),
+            ),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(
