@@ -145,6 +145,10 @@ data class Failure(
         Exists,
         Unreadable,
         Unreachable,
+        /** The server turned the login down, or the private key can't be read. */
+        LoginRefused,
+        /** The server's key isn't the one trusted. */
+        KeyChanged,
         /** A folder can't be copied or moved into itself. */
         IntoItself,
         /** The copy's size didn't match, so the original was kept. */

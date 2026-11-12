@@ -560,10 +560,11 @@ internal fun reasonOf(e: FileSystemException): Failure.Reason =
         is FileSystemException.NoSpace -> Failure.Reason.NoSpace
         is FileSystemException.Exists -> Failure.Reason.Exists
         is FileSystemException.Unreadable -> Failure.Reason.Unreadable
-        is FileSystemException.Unreachable,
+        is FileSystemException.Unreachable -> Failure.Reason.Unreachable
         is FileSystemException.AuthFailed,
-        is FileSystemException.BadKey,
-        is FileSystemException.ShareMissing,
+        is FileSystemException.BadKey -> Failure.Reason.LoginRefused
+        // The share is gone, and what was in it with it.
+        is FileSystemException.ShareMissing -> Failure.Reason.NotFound
         is FileSystemException.HostKeyUnknown,
-        is FileSystemException.HostKeyChanged -> Failure.Reason.Unreachable
+        is FileSystemException.HostKeyChanged -> Failure.Reason.KeyChanged
     }

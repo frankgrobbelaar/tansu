@@ -118,6 +118,8 @@ object JobWords {
             Failure.Reason.Exists -> res.getString(R.string.failure_exists)
             Failure.Reason.Unreadable -> res.getString(R.string.failure_unreadable)
             Failure.Reason.Unreachable -> res.getString(R.string.failure_unreachable, drawer)
+            Failure.Reason.LoginRefused -> res.getString(R.string.failure_login, drawer)
+            Failure.Reason.KeyChanged -> res.getString(R.string.failure_key, drawer)
             Failure.Reason.IntoItself -> res.getString(R.string.failure_into_itself)
             Failure.Reason.Mismatch -> res.getString(R.string.failure_mismatch)
             Failure.Reason.Link -> res.getString(R.string.failure_link)

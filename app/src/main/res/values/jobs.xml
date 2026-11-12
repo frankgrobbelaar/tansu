@@ -83,6 +83,8 @@
     <string name="failure_exists">Something with that name was already there.</string>
     <string name="failure_unreadable">It couldn\'t be read or written.</string>
     <string name="failure_unreachable">%1$s stopped answering.</string>
+    <string name="failure_login">%1$s turned the login down. Edit the server to update it.</string>
+    <string name="failure_key">%1$s sent a key other than the one trusted, so tansu stopped. Open it in Browse to see why.</string>
     <string name="failure_into_itself">A folder can\'t go inside itself.</string>
     <string name="failure_mismatch">The copy didn\'t match, so the original was kept.</string>
     <string name="failure_link">It\'s a link to somewhere else, so tansu left it where it is.</string>
