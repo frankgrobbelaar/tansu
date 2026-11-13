@@ -43,7 +43,7 @@ Decided with the owner on 2026-11-12:
 - DataStore for settings and saved servers; SMB and SFTP passwords encrypted with an Android Keystore key.
 - Coil 3 for pictures and thumbnails, Media3 for video and Android's `PdfRenderer` for PDFs. Jobs (copy, move, delete) run in a data sync foreground service. User-initiated data transfer jobs were the first plan, but Android makes them wait for a network, which a copy on the phone alone doesn't need (changed 2026-11-12, while building jobs).
 - One `:app` module, Gradle Kotlin DSL with a version catalog.
-- Gradle 9.8 with AGP 9.5 and Kotlin 2.4; compile and target SDK 37, minimum 34. Versions live in `gradle/libs.versions.toml`.
+- Gradle 9.9 with AGP 9.5 and Kotlin 2.4; compile and target SDK 37, minimum 34. Versions live in `gradle/libs.versions.toml`.
 
 ## Commands
 
