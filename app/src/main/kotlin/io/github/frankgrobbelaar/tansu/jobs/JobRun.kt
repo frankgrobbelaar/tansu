@@ -9,6 +9,8 @@ import io.github.frankgrobbelaar.tansu.files.join
 import io.github.frankgrobbelaar.tansu.files.nameOf
 import io.github.frankgrobbelaar.tansu.files.parentOf
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -18,6 +20,31 @@ internal class Side(val files: FileSystem, val remote: Boolean, val name: String
 
 /** The server named [name] stopped answering for longer than a job waits. */
 internal class ConnectionLost(val name: String) : Exception("Lost $name")
+
+/** One step of a copy or move, from [from] to [path]. */
+private sealed class Step(val from: Entry, val path: String)
+
+private class MakeFolder(from: Entry, path: String) : Step(from, path)
+
+/** [from] copied to [path]; over what's there if [replace]; a move [keep]s the original. */
+private class CopyFile(from: Entry, path: String, val replace: Boolean, val keep: Boolean) :
+    Step(from, path)
+
+private class Rename(from: Entry, path: String) : Step(from, path)
+
+/** The target folder's names, and which of them this job put there, all in lower case. */
+private class Names(val there: MutableSet<String>, val ours: MutableSet<String>)
+
+private const val HASH_RADIX = 36
+
+/**
+ * This job's own hidden name for [step]'s file, beside where it goes: unique to the job, the same
+ * wherever the file ends up being named, and short, so a long name still fits beside it.
+ */
+private fun hiddenFor(step: CopyFile, token: String): String {
+    val hash = Integer.toUnsignedString(step.from.path.hashCode(), HASH_RADIX)
+    return join(parentOf(step.path), ".tansu-$token-$hash")
+}
 
 /**
  * One file that can't be done, for [reason]: found by the job itself, or said by where the files
@@ -32,25 +59,49 @@ private class FileFailed(val reason: Failure.Reason, val atSource: Boolean = fal
  * it's whole: it never writes over anything unless the user chose Replace, and a stop part-way
  * leaves nothing but that hidden file, which the job's [Job.partial] names for cancelling. Whatever
  * goes wrong with one file or folder is put against it and the job goes on.
+ *
+ * What the job must remember to carry on goes to [note], for its [Journal], before each step on a
+ * drawer, so a job brought back after Android ends tansu is as safe as one resumed after a pause.
  */
 internal class JobRun(
     job: Job,
-    private val source: Side,
-    private val target: Side?,
+    source: Side,
+    target: Side?,
     private val report: (Job) -> Unit,
+    private val note: (List<Change>) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
     private val wait: suspend (Long) -> Unit = { delay(it) },
 ) {
     /** All of the job but the sets that grow with every file, which are kept apart below. */
     private var state: Job = job
-    private val done = job.done.toHashSet()
-    private val written = job.written.toHashSet()
+    private val notes = Notes(job, note)
+    private val done = notes.done
+    private val written = notes.written
+
+    // Nothing changes on a drawer before the job has written down where it stands, so a job brought
+    // back knows of every step it may have taken: the same as a pause just before that step, or
+    // just after it with the answer lost.
+    private val source =
+        Side(source.files.before { notes.writeDown(state) }, source.remote, source.name)
+    private val target = target?.let {
+        Side(it.files.before { notes.writeDown(state) }, it.remote, it.name)
+    }
+
+    // A broken stream between two places on the phone is its storage, not a network to wait out.
+    private val patience =
+        Patience(
+            local = !source.remote && target?.remote != true,
+            lost = (target?.takeIf { it.remote } ?: source).name,
+            clock = clock,
+            wait = wait,
+        )
 
     /** The job as it stands, for reports and for whoever stops it. */
     val job: Job
         get() = state.copy(done = done.toSet(), written = written.toSet())
 
     private var lastReport = 0L
+
     private var speedFrom = 0L to 0L
 
     suspend fun run(): Job {
@@ -75,19 +126,6 @@ internal class JobRun(
 
     // Copying and moving
 
-    private sealed class Step(val from: Entry, val path: String)
-
-    private class MakeFolder(from: Entry, path: String) : Step(from, path)
-
-    /** [from] copied to [path]; over what's there if [replace]; a move [keep]s the original. */
-    private class CopyFile(from: Entry, path: String, val replace: Boolean, val keep: Boolean) :
-        Step(from, path)
-
-    private class Rename(from: Entry, path: String) : Step(from, path)
-
-    /** The target folder's names, and which of them this job put there, all in lower case. */
-    private class Names(val there: MutableSet<String>, val ours: MutableSet<String>)
-
     private suspend fun transfer() {
         val to = checkNotNull(state.to)
         val target = checkNotNull(target)
@@ -105,6 +143,7 @@ internal class JobRun(
             } catch (e: FileSystemException) {
                 // The folder they were going to is gone or closed: none of them can go there.
                 state.picks.filter { it.path !in done }.forEach { fail(it, reasonOf(e)) }
+                dropPartial(target)
                 return
             }
         val walked = mutableListOf<Entry>()
@@ -122,6 +161,9 @@ internal class JobRun(
             steps.forEach { step -> perform(step, target, blocked) }
             if (pick.isFolder && steps.isNotEmpty()) finishFolder(pick, walked)
         }
+        // A half kept from before for a file this run never reached, say one gone from where it
+        // was, goes: a finished job can't be cancelled to remove it.
+        dropPartial(target)
     }
 
     /**
@@ -141,7 +183,7 @@ internal class JobRun(
         }
         // A moved folder that's still there, say with something new in it, is tried again.
         val gone = !moving || there(source.files, folder.path) == false
-        if (!failedIn(folder.path) && gone) done += folder.path
+        if (!failedIn(folder.path) && gone) notes.markDone(folder.path)
     }
 
     /**
@@ -154,7 +196,7 @@ internal class JobRun(
         val from = state.partialOf
         val landing = state.landing ?: return
         if (from != null && wasNamed(hidden, landing, target)) {
-            written += landing.lowercase()
+            notes.markWritten(landing)
             state = state.copy(copied = state.copied + (from to landing))
         } else {
             // Not being named any more before it goes, so a stop as it goes can't pass for a
@@ -319,19 +361,12 @@ internal class JobRun(
         } catch (e: FileSystemException) {
             if (e is FileSystemException.NotFound && folder.path in state.removing) {
                 // Its last delete went through as the job stopped: it went with the move.
-                done += folder.path
+                notes.markDone(folder.path)
             } else {
                 fail(folder, reasonOf(e), atSource = true)
             }
             null
         }
-
-    /** A free place in [path] for a folder whose name another beside it has but for case. */
-    private fun apart(name: String, path: String, names: MutableSet<String>): String {
-        val free = freeName(name, isFolder = true, names)
-        names += free.lowercase()
-        return join(path, free)
-    }
 
     /** Remembers where [folder] goes, so a resumed job that lists its twin first agrees. */
     private fun remember(folder: Entry, path: String): String {
@@ -453,7 +488,7 @@ internal class JobRun(
         val short = !changed && retrying { target.files.stat(path) }?.size != original.size
         if (short) {
             tryOrNull { target.files.delete(path) }
-            written -= path.lowercase()
+            notes.unmarkWritten(path)
         }
         if (changed || short) {
             state = state.copy(copied = state.copied - from.path)
@@ -481,20 +516,11 @@ internal class JobRun(
         }
 
     /**
-     * This job's own hidden name for [step]'s file, beside where it goes: unique to the job, the
-     * same wherever the file ends up being named, and short, so a long name still fits beside it.
-     */
-    private fun hiddenFor(step: CopyFile): String {
-        val hash = Integer.toUnsignedString(step.from.path.hashCode(), RADIX)
-        return join(parentOf(step.path), ".tansu-${state.token}-$hash")
-    }
-
-    /**
      * Writes [step]'s file under this job's hidden name beside where it goes, checks it's all
      * there, then gives it its name. Says where it went.
      */
     private suspend fun place(step: CopyFile, target: Side): String {
-        val hidden = hiddenFor(step)
+        val hidden = hiddenFor(step, state.token)
         val landing = state.landing
         if (state.partial == hidden && landing != null) {
             // It stopped as it was being named: if the hidden file's gone, the naming happened.
@@ -502,15 +528,16 @@ internal class JobRun(
             else name(step, hidden, target)
         }
         val start = carryOnFrom(step, hidden, target)
-        // Known before it's opened, so a stop while it opens still knows what to remove.
+        // Known before it's opened, so a stop while it opens still knows what to remove; and the
+        // file as it is now, to carry on with later only while it stays so.
+        val stamp = if (start > 0) state.partialAs else stampOf(step)
         state =
             state.copy(
                 partial = hidden,
                 partialOf = step.from.path,
-                partialAs = step.from.modified,
+                partialAs = stamp,
                 landing = null,
             )
-        if (start > 0) progress { it.copy(bytesDone = it.bytesDone + start) }
         val wrote = stream(step.from, hidden, target, start)
         // Whole, as far as where it came from says now: a file still being written isn't. Another
         // app's shared file may not say its size, which it gives as 0.
@@ -519,6 +546,7 @@ internal class JobRun(
                 ?: throw FileFailed(Failure.Reason.Mismatch)
         val unsized = state.outside && now.size == 0L
         if (!unsized && now.size != wrote) throw FileFailed(Failure.Reason.Mismatch)
+        if (start > 0) checkCarriedOn(now, hidden, wrote, target)
         state = state.copy(asCopied = state.asCopied + (step.from.path to now.modified))
         return name(step, hidden, target)
     }
@@ -530,21 +558,42 @@ internal class JobRun(
      * before it was through, goes, and that file starts again when its turn comes.
      */
     private suspend fun carryOnFrom(step: CopyFile, hidden: String, target: Side): Long {
-        val partial = state.partial
-        if (partial != null && partial != hidden) {
+        val partial = state.partial ?: return 0
+        // Two paths can share a hidden name's short hash, so whose half it is is checked too.
+        if (partial != hidden || state.partialOf != step.from.path) {
             // Removed before it's forgotten, so a stop in between can't leave it behind.
             tryOrNull { retrying { target.files.delete(partial) } }
             state = state.copy(partial = null, partialOf = null, partialAs = null)
             return 0
         }
-        if (partial == null) return 0
+        val stamp = state.partialAs ?: return 0
         val written = target.files.stat(hidden)?.size ?: return 0
-        // Too little to be worth asking the source about.
         if (written <= WRITTEN_AGAIN) return 0
         // The file as it is now, not as the job found it: it may have changed while it was paused.
         val now = atSource { source.files.stat(step.from.path) } ?: return 0
-        val same = now.modified == state.partialAs && written <= now.size
+        val same = now.size == stamp.size && now.modified == stamp.modified && written <= now.size
         return if (same) written - WRITTEN_AGAIN else 0
+    }
+
+    /**
+     * [step]'s file as its source says it is now, for a file worth carrying on with; another app's
+     * shared file isn't, as nothing tells when it changed.
+     */
+    private suspend fun stampOf(step: CopyFile): Stamp? =
+        if (state.outside || step.from.size <= WRITTEN_AGAIN) null
+        else atSource { source.files.stat(step.from.path) }?.let { Stamp(it.size, it.modified) }
+
+    /**
+     * Fails a carried-on file unless it's what a straight copy would be: the source still as it was
+     * when its half was begun, and nothing left past the end of what was written, as a source that
+     * shrank meanwhile would leave.
+     */
+    private suspend fun checkCarriedOn(now: Entry, hidden: String, wrote: Long, target: Side) {
+        val stamp = state.partialAs
+        val same = stamp != null && now.size == stamp.size && now.modified == stamp.modified
+        if (!same || target.files.stat(hidden)?.size != wrote) {
+            throw FileFailed(Failure.Reason.Mismatch)
+        }
     }
 
     /**
@@ -595,35 +644,35 @@ internal class JobRun(
 
     /** The file has its name at [path]: one this job wrote, so never one it replaces. */
     private fun landed(path: String): String {
-        written += path.lowercase()
+        notes.markWritten(path)
         state = state.copy(partial = null, partialOf = null, partialAs = null, landing = null)
         return path
     }
 
     /**
-     * Streams [from] into [path], this job's own hidden file, from [start] on. Says how much the
-     * hidden file holds now.
+     * Streams [from] into [path], this job's own hidden file, from [start] on: from nothing if a
+     * server won't write part-way into a file. Says how much the hidden file holds now.
      */
     private suspend fun stream(from: Entry, path: String, target: Side, start: Long): Long {
-        var wrote = start
-        atSource { source.files.read(from.path, start) }
-            .use { input ->
-                val out =
-                    if (start > 0) target.files.writeAt(path, start)
-                    else target.files.write(path, replace = true)
-                out.use { output ->
-                    val buffer = ByteArray(CHUNK)
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        output.write(buffer, 0, read)
-                        wrote += read
-                        progress { it.copy(bytesDone = it.bytesDone + read) }
-                    }
+        val carried = if (start > 0) target.files.writingFrom(path, start) else null
+        if (carried == null) {
+            // Where the file comes from first, so one that can't be read leaves nothing behind.
+            return atSource { source.files.read(from.path) }
+                .use { input ->
+                    target.files.write(path, replace = true).use { pump(input, it, 0, ::moved) }
                 }
-            }
-        return wrote
+        }
+        progress { it.copy(bytesDone = it.bytesDone + start) }
+        return carried.use { output ->
+            atSource { source.files.read(from.path, start) }
+                .use { pump(it, output, start, ::moved) }
+        }
+    }
+
+    /** [count] more bytes went through, just now. */
+    private fun moved(count: Int) {
+        patience.moved()
+        progress { it.copy(bytesDone = it.bytesDone + count) }
     }
 
     // Deleting
@@ -699,7 +748,7 @@ internal class JobRun(
     }
 
     private fun finished(entry: Entry, bytes: Long) {
-        done += entry.path
+        notes.markDone(entry.path)
         state =
             state.copy(copied = state.copied - entry.path, asCopied = state.asCopied - entry.path)
         progress { it.copy(itemsDone = it.itemsDone + 1, bytesDone = it.bytesDone + bytes) }
@@ -711,41 +760,8 @@ internal class JobRun(
         progress { it.copy(itemsDone = it.itemsDone + 1) }
     }
 
-    /**
-     * Runs [block], trying again for a while when a server stops answering: Wi-Fi drops and
-     * Tailscale reconnects. After that the job pauses, saying which server it lost. A full disk or
-     * a refusal isn't waited out. The while counts from the first failure, so a big file that broke
-     * minutes in gets the same chance as a small one.
-     */
-    private suspend fun <T> retrying(block: suspend () -> T): T {
-        var failingSince: Long? = null
-        while (true) {
-            try {
-                return block()
-            } catch (e: FileSystemException.Unreachable) {
-                failingSince = giveUpAfter(failingSince, e)
-            } catch (e: StreamRefused) {
-                throw e.refusal
-            } catch (e: IOException) {
-                // A stream that broke part-way: the network, or the phone's storage.
-                if (!source.remote && target?.remote != true) {
-                    throw FileSystemException.Unreadable(state.progress.current ?: "", e)
-                }
-                failingSince = giveUpAfter(failingSince, e)
-            }
-            wait(RETRY_EVERY_MILLIS)
-        }
-    }
-
-    /** Gives up once a server has been failing for long enough; says since when it has been. */
-    private fun giveUpAfter(failingSince: Long?, cause: Exception): Long {
-        val since = failingSince ?: clock()
-        if (clock() - since >= RETRY_FOR_MILLIS) {
-            val lost = target?.takeIf { it.remote } ?: source
-            throw ConnectionLost(lost.name).apply { initCause(cause) }
-        }
-        return since
-    }
+    private suspend fun <T> retrying(block: suspend () -> T): T =
+        patience.retrying({ state.progress.current }, block)
 
     private fun progress(change: (Progress) -> Progress) {
         val now = clock()
@@ -778,12 +794,60 @@ internal class JobRun(
          * than SFTP's 16 writes of 32 KiB in flight, which a broken connection may leave with gaps.
          */
         const val WRITTEN_AGAIN = 1024 * 1024L
-        private const val RADIX = 36
         const val RETRY_FOR_MILLIS = 30_000L
         const val RETRY_EVERY_MILLIS = 3_000L
         const val REPORT_EVERY_MILLIS = 150L
         const val SPEED_WINDOW_MILLIS = 1_000L
         const val MILLIS_PER_SECOND = 1_000L
+    }
+}
+
+/**
+ * Tries a step again for a while when a server stops answering: Wi-Fi drops and Tailscale
+ * reconnects. After that it gives up, saying it [lost] that server. A full disk or a refusal isn't
+ * waited out. The while counts from the first failure, or from when bytes last moved, so a big file
+ * that breaks minutes in, or a link that drops now and then, still gets through. A [local] step's
+ * broken stream is the phone's storage, which waiting won't fix.
+ */
+internal class Patience(
+    private val local: Boolean,
+    private val lost: String,
+    private val clock: () -> Long,
+    private val wait: suspend (Long) -> Unit,
+) {
+    private var movedAt = 0L
+
+    /** Bytes went through, just now. */
+    fun moved() {
+        movedAt = clock()
+    }
+
+    /** Runs [block], trying again as above; [what] names what it's working on, for a refusal. */
+    suspend fun <T> retrying(what: () -> String?, block: suspend () -> T): T {
+        var failingSince: Long? = null
+        while (true) {
+            try {
+                return block()
+            } catch (e: FileSystemException.Unreachable) {
+                failingSince = giveUpAfter(failingSince, e)
+            } catch (e: StreamRefused) {
+                throw e.refusal
+            } catch (e: IOException) {
+                // A stream that broke part-way: the network, or the phone's storage.
+                if (local) throw FileSystemException.Unreadable(what() ?: "", e)
+                failingSince = giveUpAfter(failingSince, e)
+            }
+            wait(JobRun.RETRY_EVERY_MILLIS)
+        }
+    }
+
+    /** Gives up once a server has been failing for long enough; says since when it has been. */
+    private fun giveUpAfter(failingSince: Long?, cause: Exception): Long {
+        val since = maxOf(failingSince ?: clock(), movedAt)
+        if (clock() - since >= JobRun.RETRY_FOR_MILLIS) {
+            throw ConnectionLost(lost).apply { initCause(cause) }
+        }
+        return since
     }
 }
 
@@ -797,6 +861,45 @@ internal fun freeName(name: String, isFolder: Boolean, taken: Set<String>): Stri
     return generateSequence(1) { it + 1 }
         .map { "$base ($it)$extension" }
         .first { it.lowercase() !in taken }
+}
+
+/** A free place in [path] for a folder whose name another beside it has but for case. */
+private fun apart(name: String, path: String, names: MutableSet<String>): String {
+    val free = freeName(name, isFolder = true, names)
+    names += free.lowercase()
+    return join(path, free)
+}
+
+/** The file at [path], open to write from [start] on; null if this file system won't. */
+private suspend fun FileSystem.writingFrom(path: String, start: Long): OutputStream? =
+    try {
+        writeAt(path, start)
+    } catch (e: FileSystemException) {
+        if (e is FileSystemException.Unreachable) throw e
+        null
+    }
+
+/**
+ * Copies [input] into [output], which holds [start] bytes already, telling [moved] of each piece.
+ * Says how many it holds.
+ */
+private suspend fun pump(
+    input: InputStream,
+    output: OutputStream,
+    start: Long,
+    moved: (Int) -> Unit,
+): Long {
+    var wrote = start
+    val buffer = ByteArray(JobRun.CHUNK)
+    while (true) {
+        currentCoroutineContext().ensureActive()
+        val read = input.read(buffer)
+        if (read < 0) break
+        output.write(buffer, 0, read)
+        wrote += read
+        moved(read)
+    }
+    return wrote
 }
 
 /** Every failure a file system can report, as the reason a file didn't make it. */

@@ -17,6 +17,7 @@ import io.github.frankgrobbelaar.tansu.files.LocalFileSystem
 import io.github.frankgrobbelaar.tansu.files.SftpFileSystem
 import io.github.frankgrobbelaar.tansu.files.SmbFileSystem
 import io.github.frankgrobbelaar.tansu.jobs.Clipboard
+import io.github.frankgrobbelaar.tansu.jobs.FileJournal
 import io.github.frankgrobbelaar.tansu.jobs.Jobs
 import io.github.frankgrobbelaar.tansu.jobs.TransferService
 import io.github.frankgrobbelaar.tansu.servers.LiveServerCheck
@@ -29,6 +30,7 @@ import io.github.frankgrobbelaar.tansu.servers.ServerStore
 import io.github.frankgrobbelaar.tansu.servers.Servers
 import io.github.frankgrobbelaar.tansu.servers.StoredSecrets
 import io.github.frankgrobbelaar.tansu.updates.Updates
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -90,7 +92,13 @@ class AppContainer(
 
     val serverShares: ServerShares = LiveServerShares(::fileSystemFor)
 
-    val jobs = Jobs(drawers.all, scope, onBusy = { TransferService.start(context) })
+    val jobs =
+        Jobs(
+            drawers.all,
+            scope,
+            onBusy = { TransferService.start(context) },
+            journal = FileJournal(File(context.filesDir, "jobs")),
+        )
 
     val clipboard = Clipboard()
 

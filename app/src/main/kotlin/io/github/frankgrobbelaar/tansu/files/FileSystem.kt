@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 
 /**
  * One place files live: the phone, an SMB share or an SFTP server. Screens and jobs only ever see
@@ -57,6 +58,7 @@ interface FileSystem {
 }
 
 /** A file or folder as Browse shows it. */
+@Serializable
 data class Entry(
     val name: String,
     val path: String,

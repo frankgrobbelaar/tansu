@@ -46,13 +46,14 @@ could pass for its naming, that a folder gone before its move began counted as m
 server unable to say a folder was gone could end the job, and that the original's state as
 copied didn't survive a pause; all four are fixed and tested. A seventh review found one
 regression, an empty moved folder failing as missing after a pause, and nothing that could lose
-a file; it's fixed and tested.
+a file; it's fixed and tested. An eighth review, of carrying on with a file that broke off, found
+that a half could be carried on with by another file whose hidden name shared its hash, that a
+half never reached stayed behind, that a source rewritten with its date kept or cut short could be
+stitched, and that the retry window didn't count progress; each is fixed and tested. Jobs now
+survive Android ending tansu, tested by ending the process at every step.
 
 ## Left for later
 
-- Jobs live in memory: a job queued or paused when Android ends tansu's process is lost. The
-  architecture plans for saving them. What a stopped job half wrote is only ever a hidden
-  `.tansu-<token>-<hash>` file, so nothing broken shows under a real name.
 - The job detail lists each pick and where it stands, but not each file inside a picked folder.
 
 ## Decided

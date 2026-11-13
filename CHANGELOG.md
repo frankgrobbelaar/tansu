@@ -7,8 +7,11 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 - In dark mode, text on the first run and in Save to (sharing into tansu) is light, where it was
   black and hard to read.
+- Jobs survive Android closing tansu: one that was running, waiting or paused comes back paused
+  the next time tansu opens, to carry on where it was.
 - A big file whose copy breaks off, as when the phone moves from Wi-Fi to mobile data, carries on
-  from where it was, rather than starting again; so does one paused part-way and resumed.
+  from where it was, rather than starting again; so does one paused part-way and resumed. A link
+  that drops now and then keeps a job going, as long as each go gets further.
 - Pasted files show up in the folder as they land, rather than when the whole job ends.
 - When an SMB server has no share by the name given, tansu lists the shares it does have. In
   Browse, tapping one points the drawer at it; in the server form, it goes in the Share field.

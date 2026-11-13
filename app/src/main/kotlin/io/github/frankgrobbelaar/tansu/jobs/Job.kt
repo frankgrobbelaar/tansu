@@ -1,11 +1,17 @@
 package io.github.frankgrobbelaar.tansu.jobs
 
 import io.github.frankgrobbelaar.tansu.files.Entry
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * One copy, move or delete: what it works on, where it puts things, and how far it got. Jobs are
  * immutable; the engine replaces a job with its next state as it runs.
+ *
+ * A job's [Journal] keeps all of it but how it's going (its status, progress and failures), which a
+ * job brought back works out afresh.
  */
+@Serializable
 data class Job(
     val id: Long,
     val kind: Kind,
@@ -16,9 +22,9 @@ data class Job(
     val to: Where?,
     /** What to do about each picked name that's already in the target folder. */
     val clashes: Map<String, Clash> = emptyMap(),
-    val status: Status = Status.Queued,
-    val progress: Progress = Progress(),
-    val failures: List<Failure> = emptyList(),
+    @Transient val status: Status = Status.Queued,
+    @Transient val progress: Progress = Progress(),
+    @Transient val failures: List<Failure> = emptyList(),
     /** Source paths already done, so a resumed job carries on where it was. */
     val done: Set<String> = emptySet(),
     /**
@@ -46,10 +52,11 @@ data class Job(
     /** The source path of the file in [partial], so a resumed job knows whose it is. */
     val partialOf: String? = null,
     /**
-     * When the file in [partial] last changed, as its source said when the job began writing it:
-     * the job carries on with what it wrote only while the source still says so.
+     * The file in [partial] as its source said it was when the job began writing it: the job
+     * carries on with what it wrote only while the source still says so. None for a file too small
+     * to be worth carrying on with.
      */
-    val partialAs: Long? = null,
+    val partialAs: Stamp? = null,
     /** Where the hidden file was being renamed to, when it stopped as it was named. */
     val landing: String? = null,
     /** Every file this job named, by its path in lower case: never one it replaces. */
@@ -60,8 +67,8 @@ data class Job(
     val outside: Boolean = false,
     /** Picks kept under a new name because the name was taken. */
     val keptBoth: Int = 0,
-    val skipped: Int = 0,
-    val finishedAt: Long? = null,
+    @Transient val skipped: Int = 0,
+    @Transient val finishedAt: Long? = null,
 ) {
     enum class Kind {
         Copy,
@@ -102,10 +109,14 @@ data class Job(
         get() = picks.sumOf { it.size }
 }
 
+/** A file's [size] and when it last [modified]: what tells a changed file apart. */
+@Serializable data class Stamp(val size: Long, val modified: Long)
+
 /** Where something went: its [path], and whether it was to [replace] what was there. */
-data class Placement(val path: String, val replace: Boolean)
+@Serializable data class Placement(val path: String, val replace: Boolean)
 
 /** A folder in a drawer, with the names the UI shows for it. */
+@Serializable
 data class Where(
     val drawerId: String,
     val folder: String,

@@ -134,16 +134,20 @@ class MemoryFileSystem(
         check(path)
         val name =
             held(real(path))?.takeIf { it in files } ?: throw FileSystemException.NotFound(path)
-        // What was written from the offset on is written again.
-        files[name] = files.getValue(name).copyOf(offset.toInt())
         writeOffsets += offset
+        // Written over from the offset on, as real files are: what's past what's written stays.
+        var at = offset.toInt()
         return object : OutputStream() {
             override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
 
             override fun write(b: ByteArray, off: Int, len: Int) {
                 if (full) throw StreamRefused(FileSystemException.NoSpace(path))
                 writes += len
-                files[name] = files.getValue(name) + b.copyOfRange(off, off + len)
+                val held = files.getValue(name)
+                val grown = held.copyOf(maxOf(held.size, at + len))
+                b.copyInto(grown, at, off, off + len)
+                files[name] = grown
+                at += len
             }
         }
     }

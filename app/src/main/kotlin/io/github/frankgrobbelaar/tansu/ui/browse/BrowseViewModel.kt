@@ -47,6 +47,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -193,6 +195,12 @@ class BrowseViewModel(
     private val fetched = MutableStateFlow<BrowseUiState.Fetched?>(null)
     private val search = MutableStateFlow<String?>(null)
     private var loading: kotlinx.coroutines.Job? = null
+
+    /** A listing asked for while another ran, to make once it's through. */
+    private var relist = false
+
+    /** Whether Browse is on screen, watching its state. */
+    private val onScreen = MutableStateFlow(false)
     private var fetchingJob: kotlinx.coroutines.Job? = null
 
     /** The drawer and folder on show. A drawer that's gone falls back to the phone. */
@@ -298,6 +306,9 @@ class BrowseViewModel(
                     search = arranged.search,
                 )
             }
+            // On screen while something watches it, as Browse does only while it's in front.
+            .onStart { onScreen.value = true }
+            .onCompletion { onScreen.value = false }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(STOP_AFTER_MILLIS),
@@ -361,6 +372,11 @@ class BrowseViewModel(
     /** Lists the folder again, keeping what's shown until the new listing arrives. */
     fun refresh() {
         if (loading?.isActive != true) load(here.value, fresh = false)
+    }
+
+    /** Lists the folder again for what a job changed, once any listing on its way is through. */
+    private fun catchUp() {
+        if (loading?.isActive == true) relist = true else load(here.value, fresh = false)
     }
 
     /** Pins the key the server sent, after the user chose to trust it. */
@@ -533,7 +549,7 @@ class BrowseViewModel(
             newlyEnded.lastOrNull()?.let { job ->
                 if (job.status == Job.Status.Done) notice.value = BrowseUiState.Notice.JobEnded(job)
                 val drawer = here.value.drawer.id
-                if (job.from.drawerId == drawer || job.to?.drawerId == drawer) refresh()
+                if (job.from.drawerId == drawer || job.to?.drawerId == drawer) catchUp()
             }
         }
     }
@@ -543,25 +559,27 @@ class BrowseViewModel(
      * every couple of seconds, so pasted files show up as they land rather than when the job ends.
      */
     private suspend fun watchLanding() {
-        jobs.all
-            .map { all ->
-                all.firstOrNull { it.status == Job.Status.Running && touchesHere(it) }
+        // Only while Browse is on screen: in the background it would list a server for hours.
+        combine(onScreen, jobs.all) { shown, all ->
+                all.takeIf { shown }
+                    ?.firstOrNull { it.status == Job.Status.Running && touchesHere(it) }
                     ?.let { it.id to it.progress.itemsDone }
             }
             .distinctUntilChanged()
             .collect { landed ->
                 if (landed != null && landed.second > 0) {
-                    refresh()
+                    if (loading?.isActive != true) load(here.value, fresh = false, quiet = true)
                     // A slow collector skips to the latest: at most one listing in this while.
                     delay(LANDING_EVERY_MILLIS)
                 }
             }
     }
 
-    /** Whether [job] puts files in the folder on show, or takes them from it. */
+    /** Whether [job] puts files in the folder on show, or takes them from it, as a copy doesn't. */
     private fun touchesHere(job: Job): Boolean {
         val here = here.value
-        return listOfNotNull(job.from, job.to).any {
+        val from = job.from.takeIf { job.kind != Job.Kind.Copy }
+        return listOfNotNull(from, job.to).any {
             it.drawerId == here.drawer.id && here.path.isWithin(it.folder)
         }
     }
@@ -600,8 +618,13 @@ class BrowseViewModel(
         paths.update { it + (drawerId to path) }
     }
 
-    private fun load(here: Here, fresh: Boolean) {
+    /**
+     * Lists [here]: afresh, or keeping what's shown until the listing arrives. A [quiet] listing,
+     * made only to catch up with a job, keeps what's shown if it fails.
+     */
+    private fun load(here: Here, fresh: Boolean, quiet: Boolean = false) {
         loading?.cancel()
+        relist = false
         loading = viewModelScope.launch {
             listing.update { if (fresh) Listing(loading = true) else it.copy(loading = true) }
             // A server slow to answer is said to be, rather than left looking like an empty folder.
@@ -614,6 +637,10 @@ class BrowseViewModel(
             // smbj and sshj can't be stopped part-way: a listing someone moved on from may still
             // finish, or fail. It mustn't land on the folder they're looking at now.
             ensureActive()
+            if (quiet && result.problem != null) {
+                listing.update { it.copy(loading = false, slow = false) }
+                return@launch
+            }
             val drawerId = here.drawer.id
             troubled.update {
                 if (result.problem.isServerWide()) it + drawerId else it - drawerId
@@ -622,6 +649,7 @@ class BrowseViewModel(
             val there = result.entries.mapTo(HashSet()) { it.path }
             picked.update { it.intersect(there) }
             listing.value = result
+            if (relist) load(here, fresh = false)
         }
     }
 

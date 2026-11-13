@@ -571,6 +571,50 @@ class BrowseViewModelTest {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `files landing while Browse isn't on screen aren't listed for`() = runTest {
+        // In the background, a long job would have it list a server every couple of seconds.
+        val shelf = MemoryFileSystem().file("/a.mkv", "a").file("/b.mkv", "b").folderAt("/Films")
+        var listings = 0
+        val counted =
+            object : FileSystem by shelf {
+                override suspend fun list(path: String): List<Entry> {
+                    if (path == "/Films") listings++
+                    return shelf.list(path)
+                }
+            }
+        drawers.value = listOf(phone, nas.copy(fileSystem = counted))
+        val held = CompletableDeferred<Unit>()
+        shelf.gates["/b.mkv"] = held
+        var now = 0L
+        val jobs =
+            Jobs(
+                drawers,
+                CoroutineScope(SupervisorJob() + main.dispatcher),
+                io = main.dispatcher,
+                clock = { now.also { now += JobRun.REPORT_EVERY_MILLIS } },
+            )
+        val browse = viewModel(jobs = jobs)
+        browse.select("nas")
+        browse.open(folder("", "Films"))
+        val before = listings
+        val picks = listOf("/a.mkv", "/b.mkv").map { checkNotNull(shelf.stat(it)) }
+
+        jobs.copy(
+            picks,
+            Where("nas", "/", "NAS", "NAS"),
+            Where("nas", "/Films", "NAS", "NAS › Films"),
+            emptyMap(),
+        )
+        advanceTimeBy(LANDING_WHILE_MILLIS)
+
+        // Only the job's own look at where it's copying to.
+        assertEquals(before + 1, listings)
+        held.complete(Unit)
+        advanceUntilIdle()
+    }
+
     @Test
     fun `a listing given up on can't land on the drawer you moved to`() = runTest {
         // smbj and sshj can't be stopped: the old listing still ends, here with a failure.
@@ -658,5 +702,6 @@ class BrowseViewModelTest {
 
     private companion object {
         const val SLEEPY_MILLIS = 5_000L
+        const val LANDING_WHILE_MILLIS = 10_000L
     }
 }

@@ -20,13 +20,15 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
  * The job queue. Jobs run one at a time, in the order they were started, and each can be paused,
  * resumed, cancelled or retried. [onBusy] is told whenever there's work, so the app can stay alive
- * for it.
+ * for it. Each job still to finish is kept in [journal], so one Android ended tansu in the middle
+ * of comes back, paused, the next time it starts.
  */
 class Jobs(
     private val drawers: StateFlow<List<Drawer>>,
@@ -35,6 +37,7 @@ class Jobs(
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val clock: () -> Long = System::currentTimeMillis,
     private val wait: suspend (Long) -> Unit = { delay(it) },
+    private val journal: Journal = Journal.None,
 ) {
     private val jobs = MutableStateFlow<List<Job>>(emptyList())
     private val ids = AtomicLong()
@@ -44,10 +47,12 @@ class Jobs(
 
     @Volatile private var running: Running? = null
 
-    /** Every job since the app started, oldest first. */
+    /** Every job since the app started, and those it brought back, oldest first. */
     val all: StateFlow<List<Job>> = jobs.asStateFlow()
 
     init {
+        jobs.value = broughtBack()
+        ids.set(jobs.value.maxOfOrNull { it.id } ?: 0)
         scope.launch {
             for (signal in wake) work()
         }
@@ -100,6 +105,7 @@ class Jobs(
         val waiting = jobs.value.find { it.id == id && it.active && running?.id != id }
         stop(id, Stop.Cancel) {
             if (it.active) {
+                journal.end(id)
                 it.copy(
                     status = Job.Status.Cancelled,
                     finishedAt = clock(),
@@ -131,7 +137,36 @@ class Jobs(
     /** A job's own mark for its hidden files, unlike any other job's on any phone. */
     private fun token(): String = UUID.randomUUID().toString().take(TOKEN_LENGTH)
 
+    /**
+     * The jobs Android ended tansu in the middle of, as their logs have them: paused, for the user
+     * to carry on with. Another app's files are only lent while it shares them, so a share-in can't
+     * go on: it's cancelled, without the half of a file it was writing.
+     */
+    private fun broughtBack(): List<Job> =
+        journal.saved().map { job ->
+            if (!job.outside) return@map job.copy(status = Job.Status.Paused())
+            journal.end(job.id)
+            val partial = job.partial
+            val to = job.to
+            if (partial != null && to != null) removeWhenThere(to, partial)
+            job.copy(
+                status = Job.Status.Cancelled,
+                finishedAt = clock(),
+                partial = null,
+                partialAs = null,
+            )
+        }
+
+    /** Removes a half-written file once its drawer is there: servers come after the phone. */
+    private fun removeWhenThere(where: Where, partial: String) {
+        scope.launch(io) {
+            drawers.first { list -> list.any { it.id == where.drawerId } }
+            sideOf(where)?.let { removeHalfWritten(it, partial) }
+        }
+    }
+
     private fun add(job: Job): Long {
+        journal.begin(job)
         jobs.update { it + job }
         nudge()
         return job.id
@@ -171,19 +206,33 @@ class Jobs(
         val target = job.to?.let(::sideOf)
         if (source == null || (job.to != null && target == null)) {
             // The drawer was removed while the job waited.
+            journal.end(job.id)
             put(job.copy(status = Job.Status.Cancelled, finishedAt = clock()))
             return
         }
-        val run = JobRun(job, source, target, report = ::put, clock = clock, wait = wait)
+        // Written down afresh as it starts, so its log holds only what it knows now.
+        journal.begin(job)
+        val run =
+            JobRun(
+                job,
+                source,
+                target,
+                report = ::put,
+                note = { journal.note(job.id, it) },
+                clock = clock,
+                wait = wait,
+            )
         val work = scope.async(io) { run.run() }
         running = Running(job.id, work)
         try {
             work.await()
+            journal.end(job.id)
         } catch (e: ConnectionLost) {
-            put(run.job.copy(status = Job.Status.Paused(lost = e.name)))
+            paused(run.job.copy(status = Job.Status.Paused(lost = e.name)))
         } catch (e: FileSystemException) {
             // The run puts what goes wrong against each file; anything else ends the job, saying
             // so.
+            journal.end(job.id)
             put(run.job.ended(clock(), reasonOf(e)))
         } catch (_: CancellationException) {
             settle(run, target, stops.remove(job.id))
@@ -201,6 +250,7 @@ class Jobs(
     /** Leaves a stopped job paused, or cancelled without the file it was half way through. */
     private suspend fun settle(run: JobRun, target: Side?, stop: Stop?) {
         if (stop == Stop.Cancel) {
+            journal.end(run.job.id)
             val partial = run.job.partial
             if (partial != null && target != null) removeHalfWritten(target, partial)
             put(
@@ -212,8 +262,14 @@ class Jobs(
                 )
             )
         } else {
-            put(run.job.copy(status = Job.Status.Paused()))
+            paused(run.job.copy(status = Job.Status.Paused()))
         }
+    }
+
+    /** A job that stopped part-way, written down afresh with everything it knows. */
+    private fun paused(job: Job) {
+        journal.begin(job)
+        put(job)
     }
 
     private suspend fun removeHalfWritten(target: Side, path: String) {

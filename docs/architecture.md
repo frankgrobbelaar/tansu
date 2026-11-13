@@ -82,10 +82,16 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   as when Tailscale moves from Wi-Fi to mobile data, carries on from where it was rather than
   starting again, whether the job tried again by itself or was paused and resumed: its hidden
   half stays, and the job writes on from its end, less the last MiB, which a broken connection
-  may have left with gaps (SFTP keeps 16 writes of 32 KiB in flight). It does so only if the
-  source still says it last changed when the half was begun; otherwise the file starts again. A
-  job has one hidden half at a time: another file's, left when it stopped, goes as soon as a
-  different file begins.
+  may have left with gaps (SFTP keeps about 16 writes of 32 KiB in flight). It does so only for
+  the file the half is of (two paths can share a hidden name's short hash), and only while the
+  source still has the size and date a fresh look gave when the half was begun, before it's
+  carried on with and again after; otherwise the file starts again. Afterwards the half must hold
+  exactly what was written, so a source that shrank meanwhile fails the file rather than leaving
+  a stale tail. Files of 1 MiB or less, and files shared from other apps, which may not say when
+  they changed, always start again, as does a file on a server that won't write part-way into
+  one. A job has one hidden half at a time: another file's, left when it stopped, goes as soon as
+  a different file begins, and one never reached, say because its file is gone, goes when the run
+  ends.
 - Name clashes are settled before the job starts (Keep both, Replace or Skip, per name), telling
   names apart without case, as the phone and SMB do. A job remembers where each pick went and
   which files are done, so a paused, resumed or retried job carries on without asking again or
@@ -120,8 +126,8 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   job resumes counts as moved only if the job had begun removing it, which it remembers first.
 - Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.
   A full disk or a refusal fails the file at once; a server that stops answering is retried for
-  at least 30 seconds from when it stopped, however long the file had been copying, then the job
-  pauses and says which server it lost. Cancelling, even a paused job,
+  at least 30 seconds from when it stopped, or from when bytes last went through, so a link that
+  drops now and then keeps going, then the job pauses and says which server it lost. Cancelling, even a paused job,
   deletes the file half written; finished files stay.
 - Links on SFTP are never gone through to delete or move what they point to. A picked link is
   followed for what's in it, and a move removes only the link; links inside a folder are left.
@@ -130,8 +136,22 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   up to tell the two apart, and a write that fails isn't waited out.
 - Saving shared files can't be retried: the other app only lends them while it shares them.
 - Progress is a `StateFlow` read by the Browse card, the Transfers tab and the notification (which
-  updates at most once a second). Browse lists the folder on show again as a running job puts
-  files in it or takes them away, at most every 2 seconds, so pasted files show up as they land.
+  updates at most once a second). While Browse is on screen, it lists the folder on show again as
+  a running job puts files in it or takes them away (a copy doesn't change where it copies from),
+  at most every 2 seconds, so pasted files show up as they land; such a listing that fails keeps
+  what's shown. A job's end lists the folder again even if a listing was already on its way.
+- Jobs survive Android ending tansu. `Jobs` keeps a log for each job still to finish
+  (`files/jobs/<id>.log`, through `FileJournal`): the job as it stood when it last started, as
+  JSON, then a line for each change since: what's done, which files it named, where each pick
+  went, the move's copies and the hidden file under way. Every change to a drawer goes through a
+  wrapper that writes down what changed before the step, so a log never knows less than the
+  drawers show: ending there is the same as a pause just before that step, or just after it with
+  its answer lost, which the job already settles. A line cut short as the process ended is left
+  out. When tansu starts, each logged job comes back paused for the user to resume; a share-in
+  comes back cancelled, without its hidden half, since the other app's files are gone. A job's log
+  goes when it ends, and is written afresh when it starts or pauses. A test ends the process at
+  every step of a copy, a move with clashes, a move within a drawer, a delete and case twins, then
+  brings the job back and checks every drawer ends as a straight run left it.
 
 ## Sharing in
 
