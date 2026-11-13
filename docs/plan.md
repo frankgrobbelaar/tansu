@@ -41,7 +41,10 @@ fixed and tested. A fifth review of those fixes found that a job resumed after s
 could still copy that file twice if another went first, that SFTP answers a re-run rename with
 Exists, that share-ins had lost their size check, and that the notification's way in didn't
 survive Android closing tansu; each is fixed and tested, and a move now leaves an original that
-changed after it was copied.
+changed after it was copied. A sixth review found that a pause as a refused copy was cleared away
+could pass for its naming, that a folder gone before its move began counted as moved, that a
+server unable to say a folder was gone could end the job, and that the original's state as
+copied didn't survive a pause; all four are fixed and tested.
 
 ## Left for later
 

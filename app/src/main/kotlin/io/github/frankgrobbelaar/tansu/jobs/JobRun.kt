@@ -50,9 +50,6 @@ internal class JobRun(
     val job: Job
         get() = state.copy(done = done.toSet(), written = written.toSet())
 
-    /** The file last copied, as its source said right after: what a move expects to remove. */
-    private var copiedAs: Entry? = null
-
     private var lastReport = 0L
     private var speedFrom = 0L to 0L
 
@@ -141,7 +138,7 @@ internal class JobRun(
                 .forEach { emptied -> tryOrNull { retrying { source.files.delete(emptied.path) } } }
         }
         // A moved folder that's still there, say with something new in it, is tried again.
-        val gone = !moving || retrying { source.files.stat(folder.path) } == null
+        val gone = !moving || there(source.files, folder.path) == false
         if (!failedIn(folder.path) && gone) done += folder.path
     }
 
@@ -158,6 +155,9 @@ internal class JobRun(
             written += landing.lowercase()
             state = state.copy(copied = state.copied + (from to landing))
         } else {
+            // Not being named any more before it goes, so a stop as it goes can't pass for a
+            // naming.
+            state = state.copy(landing = null)
             try {
                 retrying { target.files.delete(hidden) }
             } catch (_: FileSystemException) {
@@ -167,10 +167,21 @@ internal class JobRun(
         state = state.copy(partial = null, partialOf = null, landing = null)
     }
 
-    /** Whether [hidden] took the name [landing]: it's gone, and something has that name. */
+    /**
+     * Whether [hidden] took the name [landing]: it's gone, and something has that name. When that
+     * can't be told, it's taken as not, so the file is copied again: never lost, at worst kept
+     * twice.
+     */
     private suspend fun wasNamed(hidden: String, landing: String, target: Side): Boolean =
-        retrying { target.files.stat(hidden) } == null &&
-            retrying { target.files.stat(landing) } != null
+        there(target.files, hidden) == false && there(target.files, landing) == true
+
+    /** Whether [files] has something at [path]; null when it can't say, short of not answering. */
+    private suspend fun there(files: FileSystem, path: String): Boolean? =
+        try {
+            retrying { files.stat(path) } != null
+        } catch (_: FileSystemException) {
+            null
+        }
 
     /** The steps for one pick: none if it can't go there or is skipped. */
     private suspend fun plan(
@@ -313,13 +324,13 @@ internal class JobRun(
         }
 
     /**
-     * Whether [folder], gone from where it was, was moved to [path] by this job: its last delete
-     * went through as the job stopped.
+     * Whether [folder], gone from where it was, was moved to [path] by this job: it had moved
+     * things out of it, and its last delete went through as the job stopped.
      */
     private suspend fun movedAway(folder: Entry, path: String): Boolean =
         state.kind == Job.Kind.Move &&
-            folder.path in state.placed &&
-            retrying { checkNotNull(target).files.stat(path) } != null
+            done.any { it.isWithin(folder.path) } &&
+            there(checkNotNull(target).files, path) == true
 
     /** A free place in [path] for a folder whose name another beside it has but for case. */
     private fun apart(name: String, path: String, names: MutableSet<String>): String {
@@ -443,8 +454,8 @@ internal class JobRun(
      * does the copy. A copy that doesn't match is no use: it goes, and a retry copies afresh.
      */
     private suspend fun checkCopy(from: Entry, original: Entry, path: String, target: Side) {
-        val copied = copiedAs?.takeIf { it.path == from.path }
-        val changed = copied != null && original.modified != copied.modified
+        val copiedAt = state.asCopied[from.path]
+        val changed = copiedAt != null && original.modified != copiedAt
         val short = !changed && retrying { target.files.stat(path) }?.size != original.size
         if (short) {
             tryOrNull { target.files.delete(path) }
@@ -458,8 +469,11 @@ internal class JobRun(
 
     /** What the job half wrote goes with a file that failed. */
     private suspend fun dropPartial(target: Side) {
-        state.partial?.let { partial -> tryOrNull { target.files.delete(partial) } }
-        state = state.copy(partial = null, partialOf = null, landing = null)
+        val partial = state.partial
+        // Not being named any more before it goes, so a stop as it goes can't pass for a naming.
+        state = state.copy(landing = null)
+        partial?.let { tryOrNull { target.files.delete(it) } }
+        state = state.copy(partial = null, partialOf = null)
     }
 
     /** Runs [block] against where the files come from; a refusal there is said as such. */
@@ -498,10 +512,12 @@ internal class JobRun(
         val wrote = stream(step.from, hidden, target)
         // Whole, as far as where it came from says now: a file still being written isn't. Another
         // app's shared file may not say its size, which it gives as 0.
-        val now = atSource { source.files.stat(step.from.path) }
-        val unsized = state.outside && now?.size == 0L
-        if (!unsized && now?.size != wrote) throw FileFailed(Failure.Reason.Mismatch)
-        copiedAs = now
+        val now =
+            atSource { source.files.stat(step.from.path) }
+                ?: throw FileFailed(Failure.Reason.Mismatch)
+        val unsized = state.outside && now.size == 0L
+        if (!unsized && now.size != wrote) throw FileFailed(Failure.Reason.Mismatch)
+        state = state.copy(asCopied = state.asCopied + (step.from.path to now.modified))
         return name(step, hidden, target)
     }
 
@@ -652,7 +668,8 @@ internal class JobRun(
 
     private fun finished(entry: Entry, bytes: Long) {
         done += entry.path
-        state = state.copy(copied = state.copied - entry.path)
+        state =
+            state.copy(copied = state.copied - entry.path, asCopied = state.asCopied - entry.path)
         progress { it.copy(itemsDone = it.itemsDone + 1, bytesDone = it.bytesDone + bytes) }
     }
 

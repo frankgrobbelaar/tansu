@@ -31,6 +31,11 @@ data class Job(
      * source's path, and where its copy is.
      */
     val copied: Map<String, String> = emptyMap(),
+    /**
+     * When each file copied but not yet done last changed, as its source said right after it was
+     * copied: a move removes the original only while it still says so.
+     */
+    val asCopied: Map<String, Long> = emptyMap(),
     /** This job's hidden file, half written when it stopped: cancelling removes it. */
     val partial: String? = null,
     /** The source path of the file in [partial], so a resumed job knows whose it is. */

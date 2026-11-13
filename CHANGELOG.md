@@ -5,6 +5,12 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- A move paused at just the wrong moment can no longer take the file it was replacing for its
+  own copy, and it leaves an original that changed while the job was paused.
+- A moved folder the server can't yet say is gone no longer fails the rest of the job, and a
+  folder that disappeared before its move began says so.
+- Opening tansu again from Recents no longer jumps back to a finished job's folder.
+
 ## 0.4.1 - 2026-11-13
 
 Copying and moving that hold up when a server's answer goes missing, and a handful of fixes.

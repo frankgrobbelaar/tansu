@@ -36,8 +36,10 @@ class MainActivity : ComponentActivity() {
 
     /** A finished job's notification opens the folder its files went to. */
     private fun showAsked(intent: Intent) {
-        // Only through tansu's own way in, which no other app can use.
-        if (intent.component?.className != SHOW_FOLDER) return
+        // Only through tansu's own way in, which no other app can use, and once: reopened from
+        // Recents, it's the old request again.
+        val fromRecents = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (intent.component?.className != SHOW_FOLDER || fromRecents) return
         val drawer = intent.getStringExtra(EXTRA_DRAWER) ?: return
         val folder = intent.getStringExtra(EXTRA_FOLDER) ?: return
         (application as TansuApplication).container.showFolder(drawer, folder)

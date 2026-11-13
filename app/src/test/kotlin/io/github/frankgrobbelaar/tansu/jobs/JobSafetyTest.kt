@@ -5,12 +5,14 @@ import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.MemoryFileSystem
+import io.github.frankgrobbelaar.tansu.files.nameOf
 import io.github.frankgrobbelaar.tansu.files.parentOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -534,5 +536,119 @@ class JobSafetyTest : JobsFixture() {
         assertTrue(jobs.job(id).failures.isEmpty())
         assertEquals("three", nas.text("/Photos/Trip/IMG_3.jpg"))
         assertFalse(phone.exists("/DCIM/Camera/Trip"))
+    }
+
+    // What the sixth review found
+
+    @Test
+    fun `a pause as a refused copy is cleared away can't pass for its naming`() = runTest {
+        nas.file("/Photos/IMG_1.jpg", "old")
+        var id = 0L
+        var refusing = true
+        val jobs = jobs()
+        // Replacing is refused, as for a file open elsewhere, and the job is paused just as its
+        // copy is cleared away.
+        val busy =
+            object : FileSystem by nas {
+                override suspend fun rename(from: String, to: String, replace: Boolean) {
+                    if (replace && refusing) throw FileSystemException.AccessDenied(to)
+                    nas.rename(from, to, replace)
+                }
+
+                override suspend fun delete(path: String) {
+                    nas.delete(path)
+                    if (refusing && nameOf(path).startsWith(".tansu-")) {
+                        jobs.pause(id)
+                        yield()
+                    }
+                }
+            }
+        drawers.value += Drawer("busy", "Busy", Drawer.Kind.Smb, "/", busy)
+        val busyPhotos = Where("busy", "/Photos", "Busy", "Busy › Photos")
+        val pick = entry(phone, "/DCIM/Camera/IMG_1.jpg")
+
+        id = jobs.move(listOf(pick), camera, busyPhotos, mapOf("IMG_1.jpg" to Clash.Replace))
+        runCurrent()
+        refusing = false
+        jobs.resume(id)
+        advanceUntilIdle()
+
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+        assertFalse(phone.exists("/DCIM/Camera/IMG_1.jpg"))
+    }
+
+    @Test
+    fun `a folder gone before its move began fails, though one with its name is there`() = runTest {
+        nas.folderAt("/Photos/Trip")
+        val trip = entry(phone, "/DCIM/Camera/Trip")
+        phone.delete("/DCIM/Camera/Trip/IMG_3.jpg")
+        phone.delete("/DCIM/Camera/Trip")
+        val jobs = jobs()
+
+        val id = jobs.move(listOf(trip), camera, photos, mapOf("Trip" to Clash.Replace))
+        advanceUntilIdle()
+
+        assertEquals(Failure.Reason.NotFound, jobs.job(id).failures.single().reason)
+    }
+
+    @Test
+    fun `a moved folder the server can't yet say is gone doesn't fail the rest`() = runTest {
+        // As SMB answers while someone else still has the folder open: it goes once they let go.
+        val pending =
+            object : FileSystem by phone {
+                override suspend fun stat(path: String): Entry? {
+                    if (path == "/DCIM/Camera/Trip" && !phone.exists(path)) {
+                        throw FileSystemException.Unreadable(path)
+                    }
+                    return phone.stat(path)
+                }
+            }
+        drawers.value += Drawer("pending", "Pending", Drawer.Kind.Smb, "/", pending)
+        val jobs = jobs()
+        val from = Where("pending", "/DCIM/Camera", "Pending", "Pending › DCIM › Camera")
+        val picks = listOf("Trip", "IMG_1.jpg").map { entry(phone, "/DCIM/Camera/$it") }
+
+        val id = jobs.move(picks, from, photos, emptyMap())
+        advanceUntilIdle()
+
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+    }
+
+    @Test
+    fun `a moved original changed while the job was paused stays`() = runTest {
+        var id = 0L
+        var edits = 0L
+        var pausing = true
+        val jobs = jobs()
+        // Says when it last changed, and the job is paused as the original is about to go.
+        val edited =
+            object : FileSystem by phone {
+                override suspend fun stat(path: String) = phone.stat(path)?.copy(modified = edits)
+
+                override suspend fun delete(path: String) {
+                    if (pausing) {
+                        pausing = false
+                        jobs.pause(id)
+                        yield()
+                    }
+                    phone.delete(path)
+                }
+            }
+        drawers.value += Drawer("edited", "Edited", Drawer.Kind.Phone, "/", edited)
+        val from = Where("edited", "/DCIM/Camera", "Edited", "Edited › DCIM › Camera")
+
+        id = jobs.move(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), from, photos, emptyMap())
+        runCurrent()
+        // Edited while the job was paused, to the same size.
+        phone.file("/DCIM/Camera/IMG_1.jpg", "ONE")
+        edits++
+        jobs.resume(id)
+        advanceUntilIdle()
+
+        assertEquals(Failure.Reason.Mismatch, jobs.job(id).failures.single().reason)
+        assertEquals("ONE", phone.text("/DCIM/Camera/IMG_1.jpg"))
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
     }
 }
