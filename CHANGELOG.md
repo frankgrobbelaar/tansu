@@ -5,28 +5,33 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
-- In dark mode, text on the first run and in Save to (sharing into tansu) is light, where it was
-  black and hard to read.
+## 0.5.0 - 2026-11-13
+
+Jobs survive Android closing tansu and carry on where a file broke off; quicker photo grids,
+the shares on a NAS, and text that reads in dark mode.
+
 - Jobs survive Android closing tansu: one that was running, waiting or paused comes back paused
   the next time tansu opens, to carry on where it was. A delete comes back cancelled, so it never
   takes files that arrived since.
-- Replace replaces only the file you chose to replace: one saved again since is kept, beside the
-  copy. A move never deletes a copy that's changed on the server since it was made.
-- The Add a server chip beside the drawers shows until you've added a server; then it's in More
-  and Settings, so the drawers fit on a narrow phone.
 - A big file whose copy breaks off, as when the phone moves from Wi-Fi to mobile data, carries on
   from where it was, rather than starting again; so does one paused part-way and resumed. A link
   that drops now and then keeps a job going, as long as each go gets further.
-- Pasted files show up in the folder as they land, rather than when the whole job ends.
-- An empty folder, or a message about a server, can be pulled down to look again, as a folder of
-  files can.
-- A job's detail opens each picked folder to show the files in it, and where each stands.
-- When an SMB server has no share by the name given, tansu lists the shares it does have. In
-  Browse, tapping one points the drawer at it; in the server form, it goes in the Share field. A
-  share the server has but can't open, as when its disk isn't mounted, says just that.
 - Pictures in the grid show much sooner from servers, and at once when you come back to a
   folder, even after tansu restarts: for a photo from a camera, tansu reads only the small
   picture saved inside it, not the whole photo, and it keeps the thumbnails it makes.
+- When an SMB server has no share by the name given, tansu lists the shares it does have. In
+  Browse, tapping one points the drawer at it; in the server form, it goes in the Share field. A
+  share the server has but can't open, as when its disk isn't mounted, says just that.
+- Pasted files show up in the folder as they land, rather than when the whole job ends.
+- A job's detail opens each picked folder to show the files in it, and where each stands.
+- Replace replaces only the file you chose to replace: one saved again since is kept, beside the
+  copy. A move never deletes a copy that's changed on the server since it was made.
+- An empty folder, or a message about a server, can be pulled down to look again, as a folder of
+  files can.
+- The Add a server chip beside the drawers shows until you've added a server; then it's in More
+  and Settings, so the drawers fit on a narrow phone.
+- In dark mode, text on the first run and in Save to (sharing into tansu) is light, where it was
+  black and hard to read.
 
 ## 0.4.4 - 2026-11-13
 
