@@ -676,15 +676,16 @@ internal class JobRun(
     /**
      * Runs [block], trying again for a while when a server stops answering: Wi-Fi drops and
      * Tailscale reconnects. After that the job pauses, saying which server it lost. A full disk or
-     * a refusal isn't waited out.
+     * a refusal isn't waited out. The while counts from the first failure, so a big file that broke
+     * minutes in gets the same chance as a small one.
      */
     private suspend fun <T> retrying(block: suspend () -> T): T {
-        val started = clock()
+        var failingSince: Long? = null
         while (true) {
             try {
                 return block()
             } catch (e: FileSystemException.Unreachable) {
-                giveUpAfter(started, e)
+                failingSince = giveUpAfter(failingSince, e)
             } catch (e: StreamRefused) {
                 throw e.refusal
             } catch (e: IOException) {
@@ -692,17 +693,20 @@ internal class JobRun(
                 if (!source.remote && target?.remote != true) {
                     throw FileSystemException.Unreadable(state.progress.current ?: "", e)
                 }
-                giveUpAfter(started, e)
+                failingSince = giveUpAfter(failingSince, e)
             }
             wait(RETRY_EVERY_MILLIS)
         }
     }
 
-    private fun giveUpAfter(started: Long, cause: Exception) {
-        if (clock() - started >= RETRY_FOR_MILLIS) {
+    /** Gives up once a server has been failing for long enough; says since when it has been. */
+    private fun giveUpAfter(failingSince: Long?, cause: Exception): Long {
+        val since = failingSince ?: clock()
+        if (clock() - since >= RETRY_FOR_MILLIS) {
             val lost = target?.takeIf { it.remote } ?: source
             throw ConnectionLost(lost.name).apply { initCause(cause) }
         }
+        return since
     }
 
     private fun progress(change: (Progress) -> Progress) {

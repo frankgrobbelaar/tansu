@@ -1,8 +1,13 @@
 package io.github.frankgrobbelaar.tansu.jobs
 
+import io.github.frankgrobbelaar.tansu.files.Drawer
+import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
+import java.io.IOException
+import java.io.InputStream
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -414,6 +419,32 @@ class JobsTest : JobsFixture() {
     }
 
     @Test
+    fun `a big file that breaks minutes in is tried again, not paused at once`() = runTest {
+        // Its stream breaks as Tailscale moves from Wi-Fi to mobile data, long after it began.
+        var broke = false
+        val slow =
+            object : FileSystem by phone {
+                override suspend fun read(path: String, offset: Long): InputStream {
+                    if (broke) return phone.read(path, offset)
+                    broke = true
+                    delay(MINUTES_IN)
+                    return object : InputStream() {
+                        override fun read(): Int = throw IOException("Connection reset")
+                    }
+                }
+            }
+        drawers.value += Drawer("slow", "Slow", Drawer.Kind.Phone, "/", slow)
+        val from = Where("slow", "/DCIM/Camera", "Slow", "Slow › DCIM › Camera")
+        val jobs = jobs()
+
+        val id = jobs.copy(listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")), from, photos, emptyMap())
+        advanceUntilIdle()
+
+        assertEquals(Job.Status.Done, jobs.job(id).status)
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+    }
+
+    @Test
     fun `a full disk fails the file at once, without waiting it out`() = runTest {
         nas.full = true
         val jobs = jobs()
@@ -427,5 +458,9 @@ class JobsTest : JobsFixture() {
         assertEquals(Failure.Reason.NoSpace, job.failures.single().reason)
         assertTrue(testScheduler.currentTime < JobRun.RETRY_FOR_MILLIS)
         assertEquals(setOf("/Photos"), nas.paths())
+    }
+
+    private companion object {
+        const val MINUTES_IN = 3 * 60_000L
     }
 }

@@ -105,7 +105,8 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   job resumes counts as moved only if the job had begun removing it, which it remembers first.
 - Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.
   A full disk or a refusal fails the file at once; a server that stops answering is retried for
-  at least 30 seconds, then the job pauses and says which server it lost. Cancelling, even a paused job,
+  at least 30 seconds from when it stopped, however long the file had been copying, then the job
+  pauses and says which server it lost. Cancelling, even a paused job,
   deletes the file half written; finished files stay.
 - Links on SFTP are never gone through to delete or move what they point to. A picked link is
   followed for what's in it, and a move removes only the link; links inside a folder are left.
