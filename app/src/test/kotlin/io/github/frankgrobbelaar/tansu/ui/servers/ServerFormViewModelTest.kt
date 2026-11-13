@@ -9,6 +9,7 @@ import io.github.frankgrobbelaar.tansu.servers.ReversingCipher
 import io.github.frankgrobbelaar.tansu.servers.Secret
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.servers.ServerCheck
+import io.github.frankgrobbelaar.tansu.servers.ServerShares
 import io.github.frankgrobbelaar.tansu.servers.ServerStore
 import io.github.frankgrobbelaar.tansu.servers.Servers
 import io.github.frankgrobbelaar.tansu.servers.StoredSecrets
@@ -23,6 +24,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -38,9 +40,15 @@ class ServerFormViewModelTest {
         checked += server to secret
         answer(server)
     }
+    private val asked = mutableListOf<Pair<Server, Secret>>()
+    private var found: () -> List<String> = { emptyList() }
+    private val shares = ServerShares { server, secret ->
+        asked += server to secret
+        found()
+    }
 
     private fun form(kind: Server.Kind, serverId: String? = null) =
-        ServerFormViewModel(kind, serverId, servers, check, SavedStateHandle())
+        ServerFormViewModel(kind, serverId, servers, check, shares, SavedStateHandle())
 
     private fun ServerFormViewModel.fillSmb() {
         edit { it.copy(name = "NAS", host = "nas", share = "Media", username = "sam") }
@@ -88,6 +96,50 @@ class ServerFormViewModelTest {
         assertEquals(ServerFormUiState.Step.Filling, form.state.value.step)
         assertFalse(form.state.value.done)
         assertTrue(servers.all.first().isEmpty())
+        assertTrue(asked.isEmpty())
+    }
+
+    @Test
+    fun `a missing share offers the server's shares, and one tapped goes in the Share field`() =
+        runTest {
+            answer = { server ->
+                if (server.share != "Media 2026")
+                    throw FileSystemException.ShareMissing(server.share)
+            }
+            found = { listOf("Backups", "Media 2026") }
+            val form = form(Server.Kind.Smb)
+            form.fillSmb()
+            form.edit { it.copy(share = "smb://nas/Medai/Photos") }
+
+            form.connect()
+            assertEquals(
+                ServerFormUiState.Failure.ShareMissing(listOf("Backups", "Media 2026")),
+                form.state.value.failure,
+            )
+            // Asked with the details as typed, password and all.
+            assertEquals(checked.single(), asked.single())
+
+            // The folder typed after the share stays.
+            form.useShare("Media 2026")
+            assertEquals("Media 2026/Photos", form.state.value.draft.share)
+            assertNull(form.state.value.failure)
+
+            form.connect()
+            val saved = servers.all.first().single()
+            assertEquals("Media 2026" to "Photos", saved.share to saved.folder)
+        }
+
+    @Test
+    fun `a missing share on a server that can't list its shares is just missing`() = runTest {
+        answer = { server -> throw FileSystemException.ShareMissing(server.share) }
+        found = { throw FileSystemException.AccessDenied("IPC$") }
+        val form = form(Server.Kind.Smb)
+        form.fillSmb()
+
+        form.connect()
+
+        assertEquals(ServerFormUiState.Failure.ShareMissing(), form.state.value.failure)
+        assertEquals(ServerFormUiState.Step.Filling, form.state.value.step)
     }
 
     @Test
@@ -241,7 +293,14 @@ class ServerFormViewModelTest {
             }
         }
         val form =
-            ServerFormViewModel(Server.Kind.Sftp, null, servers, stubborn, SavedStateHandle())
+            ServerFormViewModel(
+                Server.Kind.Sftp,
+                null,
+                servers,
+                stubborn,
+                shares,
+                SavedStateHandle(),
+            )
         form.edit { it.copy(host = "typo-host", username = "sam") }
 
         form.connect()

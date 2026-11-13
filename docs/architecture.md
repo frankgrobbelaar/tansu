@@ -53,6 +53,14 @@ kilobytes. smbj's own stream would ask for the next piece early, but it takes a 
 turns down for the end of the file, so tansu reads with its own. SFTP reads keep 16 requests in
 flight.
 
+An SMB share that isn't there comes with the shares the server does have: Browse offers them in
+place of the missing one, and saves the one tapped as the drawer's share; the server form puts it
+in the Share field. smbj can't list shares, so `files/Srvsvc.kt` writes the one call needed by
+hand, as plain bytes: MS-SRVS NetrShareEnum at level 1, in DCE/RPC over the srvsvc pipe on IPC$.
+`SmbFileSystem.shares()` signs in on a connection of its own, binds to the pipe, asks, reads the
+answer to its last fragment, and hangs up. Only disk shares are offered, not IPC$, printers or
+special shares like C$. When the server can't say, the message stands alone, with Edit server.
+
 BouncyCastle is registered in full at start-up, in place of Android's cut-down copy, because
 sshj's key exchanges need it; smbj uses it for NTLM.
 

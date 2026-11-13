@@ -1,6 +1,7 @@
 package io.github.frankgrobbelaar.tansu.servers
 
 import io.github.frankgrobbelaar.tansu.files.FileSystem
+import io.github.frankgrobbelaar.tansu.files.ListsShares
 import java.io.Closeable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -20,6 +21,9 @@ interface SavedServers {
 
     /** Pins a new host key after the user chose to trust it. */
     suspend fun trustKey(serverId: String, fingerprint: String)
+
+    /** Points an SMB server at [share], one it has, in place of a share that's gone. */
+    suspend fun useShare(serverId: String, share: String)
 
     /** Forgets the server and its secret. */
     suspend fun remove(serverId: String)
@@ -50,6 +54,10 @@ class Servers(private val store: ServerStore, private val secrets: Secrets) : Sa
         store.update(serverId) { it.copy(hostKey = fingerprint) }
     }
 
+    override suspend fun useShare(serverId: String, share: String) {
+        store.update(serverId) { it.copy(share = share) }
+    }
+
     override suspend fun remove(serverId: String) {
         store.remove(serverId)
         secrets.forget(serverId)
@@ -71,6 +79,21 @@ class LiveServerCheck(private val fileSystemFor: (Server, Secrets) -> FileSystem
             withContext(NonCancellable + Dispatchers.IO) { (files as? Closeable)?.close() }
         }
     }
+}
+
+/** Lists the shares an SMB server has, to offer when the one asked for isn't there. */
+fun interface ServerShares {
+    /** The shares on [server], signing in with [secret]; none for a server without shares. */
+    suspend fun shares(server: Server, secret: Secret): List<String>
+}
+
+/**
+ * [ServerShares] over the real network. Listing shares hangs up its own connection, so unlike a
+ * check there's nothing left to close.
+ */
+class LiveServerShares(private val fileSystemFor: (Server, Secrets) -> FileSystem) : ServerShares {
+    override suspend fun shares(server: Server, secret: Secret): List<String> =
+        (fileSystemFor(server, OneSecret(secret)) as? ListsShares)?.shares().orEmpty()
 }
 
 /** The one secret being tried while a server is added. */

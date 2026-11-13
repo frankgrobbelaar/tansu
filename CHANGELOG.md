@@ -10,6 +10,8 @@ What changed in each version of tansu, newest first, in plain words. A release m
 - A big file whose copy breaks off, as when the phone moves from Wi-Fi to mobile data, carries on
   from where it was, rather than starting again; so does one paused part-way and resumed.
 - Pasted files show up in the folder as they land, rather than when the whole job ends.
+- When an SMB server has no share by the name given, tansu lists the shares it does have. In
+  Browse, tapping one points the drawer at it; in the server form, it goes in the Share field.
 
 ## 0.4.4 - 2026-11-13
 

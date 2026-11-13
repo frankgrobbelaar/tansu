@@ -54,9 +54,6 @@ a file; it's fixed and tested.
   architecture plans for saving them. What a stopped job half wrote is only ever a hidden
   `.tansu-<token>-<hash>` file, so nothing broken shows under a real name.
 - The job detail lists each pick and where it stands, but not each file inside a picked folder.
-- A missing SMB share should list the shares the server does have (spec, flow 8). Listing shares
-  needs SMB's RPC calls, which smbj leaves to another library; until then the message offers Edit
-  server.
 
 ## Decided
 

@@ -14,6 +14,7 @@ import io.github.frankgrobbelaar.tansu.files.Fetcher
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
+import io.github.frankgrobbelaar.tansu.files.ListsShares
 import io.github.frankgrobbelaar.tansu.files.MemoryFileSystem
 import io.github.frankgrobbelaar.tansu.files.Sort
 import io.github.frankgrobbelaar.tansu.files.SortBy
@@ -52,10 +53,15 @@ class BrowseViewModelTest {
         override val all = MutableStateFlow(emptyList<Server>())
         override val added = MutableSharedFlow<Server>(extraBufferCapacity = 1)
         val trusted = mutableMapOf<String, String>()
+        val shares = mutableMapOf<String, String>()
         val removed = mutableListOf<String>()
 
         override suspend fun trustKey(serverId: String, fingerprint: String) {
             trusted[serverId] = fingerprint
+        }
+
+        override suspend fun useShare(serverId: String, share: String) {
+            shares[serverId] = share
         }
 
         override suspend fun remove(serverId: String) {
@@ -378,6 +384,61 @@ class BrowseViewModelTest {
 
             browse.trustNewKey()
             assertEquals("SHA256:new", servers.trusted["nas"])
+        }
+    }
+
+    @Test
+    fun `a missing share lists the shares the server has, and the one picked is listed`() =
+        runTest {
+            val gone =
+                object : FileSystem by nasFiles, ListsShares {
+                    override suspend fun list(path: String): List<Entry> =
+                        throw FileSystemException.ShareMissing("Media")
+
+                    override suspend fun shares() = listOf("Backups", "Media 2026")
+                }
+            drawers.value = listOf(phone, nas.copy(fileSystem = gone))
+            val browse = viewModel()
+            browse.state.test {
+                browse.select("nas")
+                val missing = expectMostRecentItem()
+                assertEquals(
+                    BrowseUiState.Problem.ShareMissing("Media", listOf("Backups", "Media 2026")),
+                    missing.problem,
+                )
+                assertTrue(missing.drawers.single { it.id == "nas" }.troubled)
+
+                browse.useShare("Media 2026")
+                assertEquals(mapOf("nas" to "Media 2026"), servers.shares)
+
+                // The server, saved with the share picked, comes back as the drawer.
+                val moved = nasServer.copy(share = "Media 2026")
+                drawers.value = listOf(phone, nas.copy(fileSystem = nasFiles, server = moved))
+                val listed = expectMostRecentItem()
+                assertNull(listed.problem)
+                assertEquals(listOf("Films"), listed.entries.map { it.name })
+                assertFalse(listed.drawers.single { it.id == "nas" }.troubled)
+            }
+        }
+
+    @Test
+    fun `a missing share on a server that can't list its shares is just missing`() = runTest {
+        val refusing =
+            object : FileSystem by nasFiles, ListsShares {
+                override suspend fun list(path: String): List<Entry> =
+                    throw FileSystemException.ShareMissing("Media")
+
+                override suspend fun shares(): List<String> =
+                    throw FileSystemException.AccessDenied("IPC$")
+            }
+        drawers.value = listOf(phone, nas.copy(fileSystem = refusing))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("nas")
+            assertEquals(
+                BrowseUiState.Problem.ShareMissing("Media"),
+                expectMostRecentItem().problem,
+            )
         }
     }
 

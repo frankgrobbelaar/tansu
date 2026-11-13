@@ -15,6 +15,7 @@ import io.github.frankgrobbelaar.tansu.servers.Secret
 import io.github.frankgrobbelaar.tansu.servers.SecretLost
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.servers.ServerCheck
+import io.github.frankgrobbelaar.tansu.servers.ServerShares
 import io.github.frankgrobbelaar.tansu.servers.Servers
 import java.net.URI
 import java.net.URISyntaxException
@@ -83,31 +84,43 @@ data class ServerFormUiState(
             Step
     }
 
-    enum class Failure {
-        Unreachable,
+    sealed interface Failure {
+        data object Unreachable : Failure
+
         /** No server has the name typed. */
-        UnknownName,
+        data object UnknownName : Failure
+
         /** The server is there, but turned the connection away. */
-        Refused,
-        LoginRefused,
-        BadKey,
-        ShareMissing,
-        Locked,
-        FolderMissing,
-        Unreadable,
-        NotAKey,
+        data object Refused : Failure
+
+        data object LoginRefused : Failure
+
+        data object BadKey : Failure
+
+        /** There's no share by that name; [shares] are the ones the server has, if it said. */
+        data class ShareMissing(val shares: List<String> = emptyList()) : Failure
+
+        data object Locked : Failure
+
+        data object FolderMissing : Failure
+
+        data object Unreadable : Failure
+
+        data object NotAKey : Failure
     }
 }
 
 /**
  * Adds a server, or edits one: the fields, a check that they work, the host key to trust, then the
- * save. Nothing is saved until a connection with these details has listed the starting folder.
+ * save. Nothing is saved until a connection with these details has listed the starting folder. A
+ * share that isn't there comes with the shares the server does have, to pick from.
  */
 class ServerFormViewModel(
     kind: Server.Kind,
     private val serverId: String?,
     private val servers: Servers,
     private val check: ServerCheck,
+    private val shares: ServerShares,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -172,9 +185,19 @@ class ServerFormViewModel(
                 servers.save(server, secret)
                 _state.update { it.copy(done = true) }
             } catch (e: FileSystemException) {
+                val found =
+                    if (e is FileSystemException.ShareMissing) sharesOn(server, secret)
+                    else emptyList()
                 ensureActive()
-                _state.update { it.withRefusal(e, server) }
+                _state.update { it.withRefusal(e, server, found) }
             }
+        }
+    }
+
+    /** Puts [share], one the server has, in the Share field, keeping any folders typed after it. */
+    fun useShare(share: String) {
+        edit { draft ->
+            draft.copy(share = (listOf(share) + shareNames(draft).drop(1)).joinToString("/"))
         }
     }
 
@@ -236,6 +259,14 @@ class ServerFormViewModel(
         )
     }
 
+    /** The shares [server] has, or none when it can't say: the message then stands alone. */
+    private suspend fun sharesOn(server: Server, secret: Secret): List<String> =
+        try {
+            shares.shares(server, secret)
+        } catch (_: FileSystemException) {
+            emptyList()
+        }
+
     private fun secretOf(form: ServerFormUiState): Secret =
         when (serverOf(form).signIn) {
             Server.SignIn.Password -> Secret(password = form.password)
@@ -259,6 +290,7 @@ class ServerFormViewModel(
                         serverId = serverId,
                         servers = container.servers,
                         check = container.serverCheck,
+                        shares = container.serverShares,
                         savedState = createSavedStateHandle(),
                     )
                 }
@@ -346,9 +378,11 @@ private fun looksLikePrivateKey(text: String): Boolean {
 
 private const val KEY_HEADER_CHARS = 64
 
+/** The form after [e] turned [server] down; a missing share comes with the server's [shares]. */
 private fun ServerFormUiState.withRefusal(
     e: FileSystemException,
     server: Server,
+    shares: List<String>,
 ): ServerFormUiState {
     val filling = copy(step = ServerFormUiState.Step.Filling)
     return when (e) {
@@ -375,7 +409,7 @@ private fun ServerFormUiState.withRefusal(
             filling.copy(failure = ServerFormUiState.Failure.LoginRefused)
         is FileSystemException.BadKey -> filling.copy(failure = ServerFormUiState.Failure.BadKey)
         is FileSystemException.ShareMissing ->
-            filling.copy(failure = ServerFormUiState.Failure.ShareMissing)
+            filling.copy(failure = ServerFormUiState.Failure.ShareMissing(shares))
         is FileSystemException.AccessDenied ->
             filling.copy(failure = ServerFormUiState.Failure.Locked)
         is FileSystemException.NotFound ->

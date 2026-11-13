@@ -68,6 +68,8 @@
     <string name="update_login">Update the login</string>
     <string name="share_missing_title">There\'s no %1$s share on %2$s</string>
     <string name="share_missing_body">It may have been renamed or removed. Edit the server to use another share.</string>
+    <string name="share_missing_choose_body">It may have been renamed or removed. %1$s has these shares instead:</string>
+    <string name="share_choose_note">Tap one to use it for this drawer.</string>
     <string name="key_changed_title">%1$s\'s key has changed</string>
     <string name="key_changed_body">That happens when a server is reinstalled, or when something is pretending to be it. Tansu won\'t connect until you decide.</string>
     <string name="key_trusted">Trusted key</string>
@@ -116,6 +118,7 @@
     <string name="fail_login">%1$s didn\'t accept the login. Check the username and password.</string>
     <string name="fail_bad_key">Tansu can\'t open that key. If it has a passphrase, check it.</string>
     <string name="fail_share">There\'s no share called %1$s on %2$s.</string>
+    <string name="fail_share_choose">There\'s no share called %1$s on %2$s. It has these instead:</string>
     <string name="fail_locked">%1$s won\'t let this login open that folder.</string>
     <string name="fail_folder">There\'s no folder called %1$s on %2$s.</string>
     <string name="fail_unreadable">%1$s couldn\'t list that folder. Try again.</string>

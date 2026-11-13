@@ -22,12 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.ui.kit.EmptyState
 import io.github.frankgrobbelaar.tansu.ui.kit.HostKeyBox
+import io.github.frankgrobbelaar.tansu.ui.kit.ShareChoices
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.theme.KiriCorners
 
@@ -112,6 +114,8 @@ private fun ServerProblem(
                 main = Choice(stringResource(R.string.update_login), actions.onEditServer),
                 other = tryAgain,
             )
+        is BrowseUiState.Problem.ShareMissing if problem.shares.isNotEmpty() ->
+            ShareChoice(problem, name, actions.onUseShare)
         is BrowseUiState.Problem.ShareMissing ->
             Problem(
                 icon = TansuIcons.MissingFolder,
@@ -122,6 +126,38 @@ private fun ServerProblem(
         is BrowseUiState.Problem.KeyChanged -> KeyChanged(problem, name, actions)
         else -> Unit
     }
+}
+
+/** The drawer's share has gone, but the server has others: one tap uses one for the drawer. */
+@Composable
+private fun ShareChoice(
+    problem: BrowseUiState.Problem.ShareMissing,
+    name: String,
+    onUseShare: (String) -> Unit,
+) {
+    EmptyState(
+        icon = TansuIcons.MissingFolder,
+        title = stringResource(R.string.share_missing_title, problem.share, name),
+        body = stringResource(R.string.share_missing_choose_body, name),
+        action = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                ShareChoices(
+                    shares = problem.shares,
+                    onPick = onUseShare,
+                    arrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                )
+                Text(
+                    text = stringResource(R.string.share_choose_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        },
+    )
 }
 
 /** Why the server couldn't be reached, as far as the network said, and what to check. */

@@ -82,6 +82,7 @@ fun ServerFormRoute(
         onConnect = { localNetwork.ask(viewModel::connect) },
         onCancel = viewModel::cancel,
         onTrust = viewModel::trust,
+        onUseShare = viewModel::useShare,
         onBack = onBack,
         modifier = modifier,
         localNetworkBlocked = !localNetwork.allowed && LocalNetwork.looksLocal(state.hostName),
@@ -99,6 +100,7 @@ fun ServerFormScreen(
     onConnect: () -> Unit,
     onCancel: () -> Unit,
     onTrust: () -> Unit,
+    onUseShare: (String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     localNetworkBlocked: Boolean = false,
@@ -131,6 +133,7 @@ fun ServerFormScreen(
             state = state,
             onConnect = onConnect,
             onCancel = onCancel,
+            onUseShare = onUseShare,
             localNetworkBlocked = localNetworkBlocked,
         )
     }

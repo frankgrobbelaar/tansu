@@ -70,4 +70,14 @@ class ServersTest {
 
         assertEquals("SHA256:abc", servers.find("home")?.hostKey)
     }
+
+    @Test
+    fun `using another share changes only the share`() = runTest {
+        servers.save(nas.copy(folder = "Photos"), Secret(password = "oak"))
+
+        servers.useShare("nas", "Media 2026")
+
+        assertEquals(nas.copy(share = "Media 2026", folder = "Photos"), servers.find("nas"))
+        assertEquals("oak", servers.secret("nas").password)
+    }
 }

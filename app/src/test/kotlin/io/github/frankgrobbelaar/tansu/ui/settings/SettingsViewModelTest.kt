@@ -34,6 +34,8 @@ class SettingsViewModelTest {
 
         override suspend fun trustKey(serverId: String, fingerprint: String) = Unit
 
+        override suspend fun useShare(serverId: String, share: String) = Unit
+
         override suspend fun remove(serverId: String) = Unit
     }
 

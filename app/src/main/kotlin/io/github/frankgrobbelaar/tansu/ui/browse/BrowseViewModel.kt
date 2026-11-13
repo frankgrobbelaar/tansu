@@ -16,6 +16,7 @@ import io.github.frankgrobbelaar.tansu.files.Fetcher
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.files.HostKey
+import io.github.frankgrobbelaar.tansu.files.ListsShares
 import io.github.frankgrobbelaar.tansu.files.Sort
 import io.github.frankgrobbelaar.tansu.files.browseOrder
 import io.github.frankgrobbelaar.tansu.files.isWithin
@@ -157,8 +158,8 @@ data class BrowseUiState(
         /** The server turned the login down, or the private key can't be read. */
         data object LoginRefused : Problem
 
-        /** The drawer's SMB share isn't on the server. */
-        data class ShareMissing(val share: String) : Problem
+        /** The drawer's SMB share isn't on the server; [shares] are the ones it has, if it said. */
+        data class ShareMissing(val share: String, val shares: List<String> = emptyList()) : Problem
 
         /**
          * The SFTP server sent a key other than the one trusted; [trusted] is empty if none was.
@@ -372,6 +373,15 @@ class BrowseViewModel(
     /** Leaves a server whose key changed blocked, and goes back to the phone. */
     fun keepBlocked() {
         drawerId.value = phone.id
+    }
+
+    /**
+     * Uses [share], one the server has, for this drawer in place of the share that's gone. The
+     * drawer comes back with the server changed, and is listed.
+     */
+    fun useShare(share: String) {
+        val serverId = here.value.drawer.id
+        viewModelScope.launch { servers.useShare(serverId, share) }
     }
 
     fun removeServer() {
@@ -622,7 +632,7 @@ class BrowseViewModel(
             try {
                 Listing(here.drawer.fileSystem.list(here.path))
             } catch (e: FileSystemException) {
-                Listing(problem = problemOf(e))
+                Listing(problem = problemOf(e).withShares(here.drawer.fileSystem))
             }
         }
 
@@ -729,6 +739,18 @@ private fun problemOf(e: FileSystemException): BrowseUiState.Problem =
         is FileSystemException.HostKeyChanged ->
             BrowseUiState.Problem.KeyChanged(e.trusted, e.presented)
         is FileSystemException.HostKeyUnknown -> BrowseUiState.Problem.KeyChanged("", e.key)
+    }
+
+/** A share that's gone comes with the ones the server does have, to pick from. */
+private suspend fun BrowseUiState.Problem.withShares(files: FileSystem): BrowseUiState.Problem =
+    if (this is BrowseUiState.Problem.ShareMissing) copy(shares = sharesOn(files)) else this
+
+/** The shares on [files]' server, or none when it can't say: Browse then offers Edit server. */
+private suspend fun sharesOn(files: FileSystem): List<String> =
+    try {
+        (files as? ListsShares)?.shares().orEmpty()
+    } catch (_: FileSystemException) {
+        emptyList()
     }
 
 /** Whether a problem is the whole server's, not just one folder's. */

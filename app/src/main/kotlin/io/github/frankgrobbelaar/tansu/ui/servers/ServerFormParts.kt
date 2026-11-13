@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.kit.HostKeyBox
+import io.github.frankgrobbelaar.tansu.ui.kit.ShareChoices
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.theme.KiriCorners
 
@@ -72,12 +73,16 @@ internal fun KeyFileCard(keyName: String?, onPick: () -> Unit, modifier: Modifie
     }
 }
 
-/** The foot of the form: what went wrong and Connect, or what's being checked and Cancel. */
+/**
+ * The foot of the form: what went wrong and Connect, or what's being checked and Cancel. A share
+ * that isn't there comes with the server's shares, one tap from the Share field.
+ */
 @Composable
 internal fun ConnectBar(
     state: ServerFormUiState,
     onConnect: () -> Unit,
     onCancel: () -> Unit,
+    onUseShare: (String) -> Unit,
     modifier: Modifier = Modifier,
     localNetworkBlocked: Boolean = false,
 ) {
@@ -100,6 +105,10 @@ internal fun ConnectBar(
             } else {
                 state.failure?.let {
                     FailureNote(text = failureText(it, state, localNetworkBlocked))
+                }
+                val missing = state.failure as? ServerFormUiState.Failure.ShareMissing
+                if (missing != null && missing.shares.isNotEmpty()) {
+                    ShareChoices(shares = missing.shares, onPick = onUseShare)
                 }
                 Button(
                     onClick = onConnect,
@@ -182,8 +191,12 @@ private fun failureText(
             else stringResource(R.string.fail_refused, host, stringResource(serviceOf(state.kind)))
         ServerFormUiState.Failure.LoginRefused -> stringResource(R.string.fail_login, host)
         ServerFormUiState.Failure.BadKey -> stringResource(R.string.fail_bad_key)
-        ServerFormUiState.Failure.ShareMissing ->
-            stringResource(R.string.fail_share, state.shareName, host)
+        is ServerFormUiState.Failure.ShareMissing ->
+            stringResource(
+                if (failure.shares.isEmpty()) R.string.fail_share else R.string.fail_share_choose,
+                state.shareName,
+                host,
+            )
         ServerFormUiState.Failure.Locked -> stringResource(R.string.fail_locked, host)
         ServerFormUiState.Failure.FolderMissing ->
             stringResource(R.string.fail_folder, state.draft.folder.trim().ifEmpty { "/" }, host)

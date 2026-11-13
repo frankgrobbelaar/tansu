@@ -248,6 +248,7 @@ private fun BrowseViewModel.actions(
         onGrantAccess = { openAllFilesAccess(outside.context) },
         onTrustKey = ::trustNewKey,
         onKeepBlocked = ::keepBlocked,
+        onUseShare = ::useShare,
         onAllowLocalNetwork = { localNetwork.allow(::refresh) },
         onClearSelection = ::clearSelection,
         onSelectAll = ::selectAll,
@@ -405,6 +406,8 @@ class BrowseActions(
     val onGrantAccess: () -> Unit,
     val onTrustKey: () -> Unit,
     val onKeepBlocked: () -> Unit,
+    /** Uses one of the server's shares in place of the drawer's, which is gone. */
+    val onUseShare: (String) -> Unit,
     val onAllowLocalNetwork: () -> Unit,
     val onClearSelection: () -> Unit,
     val onSelectAll: () -> Unit,

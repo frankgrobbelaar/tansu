@@ -7,6 +7,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.AfterClass
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -73,6 +74,26 @@ class SmbFileSystemTest {
     @Test
     fun `a share that isn't there says so`() {
         smb(share = "Gone").use { files -> refusal<FileSystemException.ShareMissing>(files) }
+    }
+
+    @Test
+    fun `a share that isn't there can still say which shares there are`() {
+        smb(share = "Gone").use { files ->
+            val shares = runBlocking { files.shares() }
+
+            assertTrue("Media" in shares)
+            // IPC$ is a share of pipes, not of files.
+            assertFalse(shares.any { it.endsWith("$") })
+        }
+    }
+
+    @Test
+    fun `a wrong password can't list the shares either`() {
+        smb(share = "Gone", password = "elm").use { files ->
+            assertThrows(FileSystemException.AuthFailed::class.java) {
+                runBlocking { files.shares() }
+            }
+        }
     }
 
     @Test

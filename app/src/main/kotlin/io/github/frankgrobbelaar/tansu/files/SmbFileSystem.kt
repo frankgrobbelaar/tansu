@@ -4,6 +4,7 @@ import com.hierynomus.msdtyp.AccessMask
 import com.hierynomus.msfscc.FileAttributes
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation
 import com.hierynomus.mssmb2.SMB2CreateDisposition
+import com.hierynomus.mssmb2.SMB2ImpersonationLevel
 import com.hierynomus.mssmb2.SMB2ShareAccess
 import com.hierynomus.mssmb2.SMBApiException
 import com.hierynomus.protocol.commons.EnumWithValue.EnumUtils
@@ -14,8 +15,11 @@ import com.hierynomus.smbj.SmbConfig
 import com.hierynomus.smbj.auth.AuthenticationContext
 import com.hierynomus.smbj.common.SMBRuntimeException
 import com.hierynomus.smbj.connection.Connection
+import com.hierynomus.smbj.session.Session as SmbSession
 import com.hierynomus.smbj.share.DiskShare
 import com.hierynomus.smbj.share.File
+import com.hierynomus.smbj.share.NamedPipe
+import com.hierynomus.smbj.share.PipeShare
 import io.github.frankgrobbelaar.tansu.servers.Secrets
 import io.github.frankgrobbelaar.tansu.servers.Server
 import java.io.Closeable
@@ -28,12 +32,18 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** A file system that can say which shares its server has, as SMB's can. */
+interface ListsShares {
+    /** The disk shares on the server that this login can see, by name. */
+    suspend fun shares(): List<String>
+}
+
 /** An SMB share (SMB 2 or 3) through smbj, with one connection kept open and reused. */
 class SmbFileSystem(
     private val server: Server,
     private val secrets: Secrets,
     private val io: CoroutineDispatcher = Dispatchers.IO,
-) : FileSystem, Closeable {
+) : FileSystem, ListsShares, Closeable {
 
     // No socket timeout: smbj treats one as a dead connection, so an idle minute would end it.
     // Each request still has its own, and connecting has its own too, longer than smbj's five
@@ -161,6 +171,20 @@ class SmbFileSystem(
         }
     }
 
+    /**
+     * Asks the server which shares it has, for when [Server.share] isn't one of them. On a
+     * connection of its own, it signs in, asks the srvsvc pipe on IPC$, and hangs up.
+     */
+    override suspend fun shares(): List<String> =
+        withContext(io) {
+            val session = signIn()
+            try {
+                askForShares(session)
+            } finally {
+                quietly { session.connection.close(true) }
+            }
+        }
+
     override fun close() = sessions.close()
 
     /** Runs [block] on the share, off the main thread, connecting first if need be. */
@@ -174,35 +198,79 @@ class SmbFileSystem(
         }
 
     private suspend fun connect(): Session {
+        val session = signIn()
+        var connected = false
+        try {
+            val share = mapErrors("") { openShare(session) }
+            connected = true
+            return Session(session.connection, share)
+        } finally {
+            if (!connected) quietly { session.connection.close(true) }
+        }
+    }
+
+    /** A new connection to the server, signed in. It's ended again if signing in fails. */
+    private suspend fun signIn(): SmbSession {
         val secret = secretOf(secrets, server)
         val connection = mapErrors("") { client.connect(server.host, server.port) }
-        var connected = false
+        var signedIn = false
         try {
             val login =
                 if (server.signIn == Server.SignIn.Guest) AuthenticationContext.guest()
                 else AuthenticationContext(server.username, secret.password.toCharArray(), null)
-            // Any refusal while signing in is about the login, whatever status it comes with.
             val session =
-                try {
-                    connection.authenticate(login)
-                } catch (e: SMBApiException) {
-                    throw FileSystemException.AuthFailed(server.host, e)
+                mapErrors("") {
+                    try {
+                        connection.authenticate(login)
+                    } catch (e: SMBApiException) {
+                        // Any refusal while signing in is about the login, whatever status it comes
+                        // with. A connection lost meanwhile is still the network's.
+                        throw FileSystemException.AuthFailed(server.host, e)
+                    }
                 }
-            val share = mapErrors("") { openShare(session) }
-            connected = true
-            return Session(connection, share)
+            signedIn = true
+            return session
         } finally {
-            if (!connected) quietly { connection.close(true) }
+            if (!signedIn) quietly { connection.close(true) }
         }
     }
 
-    private fun openShare(session: com.hierynomus.smbj.session.Session): DiskShare =
+    private fun openShare(session: SmbSession): DiskShare =
         try {
             session.connectShare(server.share) as? DiskShare
         } catch (_: IllegalArgumentException) {
             // smbj won't take a share name with a backslash in it.
             null
         } ?: throw FileSystemException.ShareMissing(server.share)
+
+    /** Asks the srvsvc pipe on IPC$ for the server's shares: a bind, then NetrShareEnum. */
+    private fun askForShares(session: SmbSession): List<String> =
+        try {
+            mapErrors(IPC) {
+                val ipc =
+                    session.connectShare(IPC) as? PipeShare
+                        ?: throw ShareEnumFailed("$IPC isn't a share of pipes")
+                // Hanging up closes the pipe and the share with it, without waiting on the server.
+                val pipe =
+                    ipc.open(
+                        SRVSVC_PIPE,
+                        SMB2ImpersonationLevel.Impersonation,
+                        EnumSet.of(AccessMask.GENERIC_READ, AccessMask.GENERIC_WRITE),
+                        null,
+                        EnumSet.of(
+                            SMB2ShareAccess.FILE_SHARE_READ,
+                            SMB2ShareAccess.FILE_SHARE_WRITE,
+                        ),
+                        SMB2CreateDisposition.FILE_OPEN,
+                        null,
+                    )
+                Srvsvc.checkBound(pipe.call(Srvsvc.bind()))
+                Srvsvc.shares(pipe.call(Srvsvc.shareEnum()))
+            }
+        } catch (e: ShareEnumFailed) {
+            throw if (e.denied) FileSystemException.AccessDenied(IPC)
+            else FileSystemException.Unreadable(IPC, e)
+        }
 
     /** Turns smbj's and the network's failures into the ones the UI explains. */
     private inline fun <T> mapErrors(path: String, block: () -> T): T =
@@ -249,6 +317,9 @@ class SmbFileSystem(
             info.eaSize in setOf(REPARSE_SYMLINK, REPARSE_MOUNT_POINT)
 
     private companion object {
+        /** The share every SMB server has for its named pipes, and the pipe that lists shares. */
+        const val IPC = "IPC$"
+        const val SRVSVC_PIPE = "srvsvc"
         const val REPARSE_SYMLINK = 0xA000000CL
         const val REPARSE_MOUNT_POINT = 0xA0000003L
         val LOGIN_REFUSED =
@@ -360,6 +431,21 @@ private class SmbOutput(private val file: File, private val path: String, start:
             throw IOException(e)
         }
     }
+}
+
+/**
+ * Sends [pdu] down the pipe and reads the answer, to its last fragment: a long list of shares can
+ * come in several, and the first read may not hold them all.
+ */
+private fun NamedPipe.call(pdu: ByteArray): ByteArray {
+    var answer = transact(pdu)
+    val chunk = ByteArray(Srvsvc.MAX_FRAGMENT)
+    while (!Srvsvc.isWhole(answer)) {
+        val read = read(chunk)
+        if (read <= 0) throw ShareEnumFailed("The answer stopped part-way")
+        answer += chunk.copyOf(read)
+    }
+    return answer
 }
 
 /** Ends a connection without waiting on the server; one that's already gone is ended enough. */
