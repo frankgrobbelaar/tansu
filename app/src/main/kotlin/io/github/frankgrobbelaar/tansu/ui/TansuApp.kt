@@ -47,7 +47,6 @@ import androidx.navigation3.ui.NavDisplay
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.appContainer
 import io.github.frankgrobbelaar.tansu.files.Drawer
-import io.github.frankgrobbelaar.tansu.jobs.Job
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.ui.browse.BrowseRoute
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
@@ -111,7 +110,8 @@ fun TansuApp(modifier: Modifier = Modifier) {
     // Jobs still to finish, counted on the Transfers tab; a new version, marked on Settings.
     val container = appContainer()
     val jobs by container.jobs.all.collectAsStateWithLifecycle()
-    val toDo = jobs.count { it.status == Job.Status.Running || it.status == Job.Status.Queued }
+    // Paused ones too, such as a job brought back after Android closed tansu: still to do.
+    val toDo = jobs.count { it.active }
     val update by container.updates.update.collectAsStateWithLifecycle()
 
     Scaffold(

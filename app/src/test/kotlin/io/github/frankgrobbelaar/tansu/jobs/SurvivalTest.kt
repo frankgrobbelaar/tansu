@@ -4,6 +4,7 @@ import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileSystem
 import io.github.frankgrobbelaar.tansu.files.MemoryFileSystem
+import io.github.frankgrobbelaar.tansu.files.nameOf
 import java.io.FilterOutputStream
 import java.io.OutputStream
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -83,8 +84,81 @@ class SurvivalTest {
     }
 
     @Test
-    fun `a delete survives at every step`() = survives { world, jobs ->
-        jobs.delete(picks(world, "IMG_2.jpg", "Trip"), camera)
+    fun `a delete brought back is cancelled at every step, taking nothing more`() = runTest {
+        // Brought back days later, it would list its folders afresh and take what's arrived since.
+        val start: (World, Jobs) -> Unit = { world, jobs ->
+            jobs.delete(picks(world, "IMG_2.jpg", "Trip"), camera)
+        }
+        val steps = stepsOf(World(), start)
+        for (step in 1..steps) {
+            for (after in listOf(false, true)) {
+                val world = World()
+                val journal = Freezing(FileJournal(folder.newFolder()))
+                val death = Death(atStep = step, after = after).also { it.journal = journal }
+                val dying = processOn(world, journal, death)
+                start(world, dying.jobs)
+                advanceUntilIdle()
+                dying.scope.cancel()
+                val left = world.state()
+
+                val again = processOn(world, journal.thawed(), death = null)
+                advanceUntilIdle()
+
+                val back = again.jobs.all.value.single()
+                assertEquals(
+                    "Ended at step $step, after: $after",
+                    Job.Status.Cancelled,
+                    back.status,
+                )
+                assertEquals(left, world.state())
+                assertTrue(again.journal.saved().isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `a moved file's copy changed on the server while tansu was closed is kept`() = runTest {
+        // The copy has its name; tansu ends before the original goes. Someone edits the copy.
+        val world = World()
+        val journal = Freezing(FileJournal(folder.newFolder()))
+        val death = Death(atStep = BEFORE_ORIGINAL_GOES).also { it.journal = journal }
+        val dying = processOn(world, journal, death)
+        dying.jobs.move(picks(world, "IMG_1.jpg"), camera, photos, emptyMap())
+        advanceUntilIdle()
+        dying.scope.cancel()
+        world.nas.file("/Photos/IMG_1.jpg", "one, edited")
+
+        val again = processOn(world, journal.thawed(), death = null)
+        again.jobs.resume(again.jobs.all.value.single().id)
+        advanceUntilIdle()
+
+        assertEquals("one, edited", world.nas.text("/Photos/IMG_1.jpg"))
+        assertEquals("one", world.phone.text("/DCIM/Camera/IMG_1.jpg"))
+        val failure = again.jobs.all.value.single().failures.single()
+        assertEquals(Failure.Reason.Mismatch, failure.reason)
+    }
+
+    @Test
+    fun `a share-in brought back is cancelled, without its half`() = runTest {
+        // The other app only lent its files while it shared them: they're gone with the process.
+        val film = "0123456789abcdef".repeat(BIG / SIXTEEN)
+        val lent = MemoryFileSystem().file("/film.mp4", film)
+        val world = World()
+        val journal = Freezing(FileJournal(folder.newFolder()))
+        val death = Death(atStep = Int.MAX_VALUE, atByte = BREAK).also { it.journal = journal }
+        val dying = processOn(world, journal, death)
+        val from = Where("shared", "/", "Gallery", "Gallery")
+        dying.jobs.copyIn(lent, listOf(checkNotNull(lent.stat("/film.mp4"))), from, photos)
+        advanceUntilIdle()
+        dying.scope.cancel()
+        assertTrue(world.nas.paths().any { nameOf(it).startsWith(".tansu-") })
+
+        val again = processOn(world, journal.thawed(), death = null)
+        advanceUntilIdle()
+
+        assertEquals(Job.Status.Cancelled, again.jobs.all.value.single().status)
+        assertEquals(setOf("/Photos"), world.nas.paths())
+        assertTrue(again.journal.saved().isEmpty())
     }
 
     @Test
@@ -161,13 +235,24 @@ class SurvivalTest {
         dying.scope.cancel()
 
         val again = processOn(world, journal.thawed(), death = null)
-        assertTrue(again.jobs.all.value.all { it.status is Job.Status.Paused })
-        again.jobs.all.value.forEach { again.jobs.resume(it.id) }
+        val back = again.jobs.all.value.single()
+        assertTrue(back.status is Job.Status.Paused)
+        again.jobs.resume(back.id)
         advanceUntilIdle()
-        assertTrue(again.jobs.all.value.all { it.status == Job.Status.Done })
+        val ended = again.jobs.all.value.single()
+        assertEquals(Job.Status.Done, ended.status)
+        assertTrue(ended.failures.isEmpty())
+        assertTrue(again.journal.saved().isEmpty())
+        assertTrue(dying.unexpected.isEmpty() && again.unexpected.isEmpty())
     }
 
-    private class Process(val jobs: Jobs, val scope: CoroutineScope)
+    /** One process: its jobs, its scope, its journal, and anything but its end that escaped it. */
+    private class Process(
+        val jobs: Jobs,
+        val scope: CoroutineScope,
+        val journal: Journal,
+        val unexpected: List<Throwable>,
+    )
 
     private fun TestScope.jobsOn(world: World, journal: Journal, death: Death?): Jobs =
         processOn(world, journal, death).jobs
@@ -182,12 +267,13 @@ class SurvivalTest {
                     Drawer("share", "Share", Drawer.Kind.Smb, "/", wrap(world.share)),
                 )
             )
-        // The process's end escapes the engine, as nothing else does: it's swallowed here.
+        // The process's end escapes the engine, as nothing else may: anything else is kept.
+        val unexpected = mutableListOf<Throwable>()
         val scope =
             CoroutineScope(
                 SupervisorJob() +
                     StandardTestDispatcher(testScheduler) +
-                    CoroutineExceptionHandler { _, _ -> }
+                    CoroutineExceptionHandler { _, e -> if (e !is Ended) unexpected += e }
             )
         val jobs =
             Jobs(
@@ -197,7 +283,7 @@ class SurvivalTest {
                 clock = { testScheduler.currentTime },
                 journal = journal,
             )
-        return Process(jobs, scope)
+        return Process(jobs, scope, journal, unexpected)
     }
 
     /** The process ending: nothing after it happens, and nothing more is written down. */
@@ -278,6 +364,11 @@ class SurvivalTest {
     }
 
     private companion object {
+        /**
+         * A move of one file: its hidden file is written (1), named (2), then the original goes.
+         */
+        const val BEFORE_ORIGINAL_GOES = 3
+
         const val SIXTEEN = 16
         const val BIG = 3 * 1024 * 1024
         const val BREAK = 5 * 512 * 1024L

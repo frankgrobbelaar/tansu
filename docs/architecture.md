@@ -101,8 +101,10 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   the name stays the same wherever the file ends up) beside where it goes, checked against the
   source's size (unless another app shared it, which may not say), and only then takes its name: with a rename that fails if the name
   is taken, so a clash the listing missed (or a file that arrived while the job was paused) keeps
-  both, or, when the user chose Replace, with a rename that replaces the old file in one step. A
-  half-written file is never visible under a real name, and it's the only thing Cancel removes.
+  both, or, when the user chose Replace, with a rename that replaces the old file in one step:
+  only the file as it was when the clash was settled, by its size and date, so one saved again
+  since, as a job resumed later may find, is kept beside the copy. A half-written file is never
+  visible under a real name, and it's the only thing Cancel removes.
 - The job remembers every file it named, and never replaces one of them; nor does a move replace
   the very file it's moving, reached another way (a link, or a second drawer on the same disk):
   that shows as the hidden file appearing beside the original too. Two folders whose names differ
@@ -114,7 +116,8 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   move that stops in between checks that copy rather than making another. The original goes only
   as it was when copied: one that has changed since, or that turns out to be the copy itself,
   stays, and so does the copy. The job keeps what the original said when it was copied, so this
-  holds across a pause.
+  holds across a pause. A copy that no longer matches, as one edited on the server meanwhile
+  wouldn't, is kept too: a move deletes nothing on a guess.
 - A job that stops as a file is being named remembers which file it was; resumed, it settles that
   file before any other, so another file can't take its place and the file is never copied twice.
   A hidden file stops being named before it's removed, so a stop as it goes can't pass for a
@@ -149,11 +152,17 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   wrapper that writes down what changed before the step, so a log never knows less than the
   drawers show: ending there is the same as a pause just before that step, or just after it with
   its answer lost, which the job already settles. A line cut short as the process ended is left
-  out. When tansu starts, each logged job comes back paused for the user to resume; a share-in
-  comes back cancelled, without its hidden half, since the other app's files are gone. A job's log
-  goes when it ends, and is written afresh when it starts or pauses. A test ends the process at
-  every step of a copy, a move with clashes, a move within a drawer, a delete and case twins, then
-  brings the job back and checks every drawer ends as a straight run left it.
+  out; a log spoiled anywhere else, or of another version (its first line says which), is
+  dropped rather than bringing back a job that knows less than it did. When tansu starts, each
+  logged job comes back paused for the user to resume, counted on the Transfers tab. Some come
+  back cancelled, without their hidden half, as they can't safely go on: a share-in, whose other
+  app's files are gone; a delete, which would list its folders afresh and could take what's
+  arrived since; and one the user cancelled before its half was cleared away, which a cancel
+  marks first and then clears, keeping the log until the half is gone. A job's log goes when it
+  ends, and is written afresh when it starts or pauses and every 500 writes, so it stays quick to
+  read back. A test ends the process at every step of a copy, a move with clashes, a move within
+  a drawer and case twins, then brings the job back and checks every drawer ends as a straight
+  run left it; and that a delete, a share-in or a copy changed meanwhile comes back safely.
 
 ## Sharing in
 

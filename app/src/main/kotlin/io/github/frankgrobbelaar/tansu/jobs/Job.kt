@@ -117,8 +117,12 @@ data class Job(
 /** A file's [size] and when it last [modified]: what tells a changed file apart. */
 @Serializable data class Stamp(val size: Long, val modified: Long)
 
-/** Where something went: its [path], and whether it was to [replace] what was there. */
-@Serializable data class Placement(val path: String, val replace: Boolean)
+/**
+ * Where something went: its [path], and whether it was to [replace] what was there, which was
+ * [replacing] when the choice was settled: a file that's changed since isn't replaced.
+ */
+@Serializable
+data class Placement(val path: String, val replace: Boolean, val replacing: Stamp? = null)
 
 /** A folder in a drawer, with the names the UI shows for it. */
 @Serializable

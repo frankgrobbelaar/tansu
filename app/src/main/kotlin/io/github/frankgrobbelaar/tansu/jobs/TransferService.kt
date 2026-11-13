@@ -32,6 +32,9 @@ class TransferService : Service() {
     private val notifications by lazy { getSystemService(NotificationManager::class.java) }
     private var watching = false
 
+    /** The job the service last kept going: its ending is the one to show. */
+    private var lastBusy: Long? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -80,13 +83,14 @@ class TransferService : Service() {
         if (running == null) {
             // Done: the last job's ending stays in the shade, unless tansu is in front saying so
             // itself; the service's own notification goes.
-            all.lastOrNull { !it.busy }
+            all.find { it.id == lastBusy }
                 ?.takeUnless { container.front.shown }
                 ?.let { ending -> notifications.notify(ENDING_ID, endingNotification(ending)) }
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             watching = false
         } else {
+            lastBusy = running.id
             notifications.notify(NOTIFICATION_ID, progressNotification(running))
         }
     }

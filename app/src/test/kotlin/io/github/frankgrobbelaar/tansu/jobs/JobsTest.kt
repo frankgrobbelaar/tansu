@@ -331,6 +331,25 @@ class JobsTest : JobsFixture() {
     }
 
     @Test
+    fun `a file that changed after Replace was chosen is kept, beside the copy`() = runTest {
+        nas.file("/Photos/IMG_1.jpg", "theirs")
+        val held = CompletableDeferred<Unit>()
+        phone.gates["/DCIM/Camera/IMG_1.jpg"] = held
+        val jobs = jobs()
+
+        val pick = entry(phone, "/DCIM/Camera/IMG_1.jpg")
+        jobs.copy(listOf(pick), camera, photos, mapOf("IMG_1.jpg" to Clash.Replace))
+        runCurrent()
+        // Saved again on the server as the copy was on its way, as days later can't be ruled out.
+        nas.file("/Photos/IMG_1.jpg", "theirs, newer")
+        held.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("theirs, newer", nas.text("/Photos/IMG_1.jpg"))
+        assertEquals("one", nas.text("/Photos/IMG_1 (1).jpg"))
+    }
+
+    @Test
     fun `a replace keeps the original until the new copy is whole`() = runTest {
         nas.file("/Photos/IMG_1.jpg", "theirs")
         val jobs = jobs()

@@ -63,6 +63,16 @@ class JournalTest {
     }
 
     @Test
+    fun `a log spoiled before its last line doesn't bring its job back`() {
+        val journal = FileJournal(folder.root)
+        journal.begin(job)
+        File(folder.root, "4.log").appendText("not a change\n")
+        journal.note(job.id, listOf(Change.Done("/DCIM/IMG_1.jpg")))
+
+        assertTrue(FileJournal(folder.root).saved().isEmpty())
+    }
+
+    @Test
     fun `an ended job is forgotten, and a log that can't be read is cleared away`() {
         val journal = FileJournal(folder.root)
         journal.begin(job)
@@ -82,6 +92,7 @@ class JournalTest {
         journal.begin(job.copy(done = setOf("/DCIM/IMG_1.jpg")))
 
         assertEquals(setOf("/DCIM/IMG_1.jpg"), FileJournal(folder.root).saved().single().done)
-        assertEquals(1, File(folder.root, "4.log").readLines().size)
+        // Its version, then the job.
+        assertEquals(2, File(folder.root, "4.log").readLines().size)
     }
 }

@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.frankgrobbelaar.tansu.R
 import io.github.frankgrobbelaar.tansu.appContainer
+import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.Sort
 import io.github.frankgrobbelaar.tansu.jobs.Clash
@@ -445,7 +446,12 @@ internal fun BrowseScreen(
                 drawers = state.drawers,
                 selected = state.drawer.id,
                 onSelect = actions.onSelectDrawer,
-                onAdd = actions.onAddServer,
+                // Only until there's a server, as on the boards: then it's in More and Settings,
+                // and the row keeps to the drawers, which a narrow phone has room for.
+                onAdd =
+                    actions.onAddServer.takeIf {
+                        state.drawers.all { it.kind == Drawer.Kind.Phone }
+                    },
             )
         }
         AnimatedVisibility(visible = state.offerServers && !state.selecting) {

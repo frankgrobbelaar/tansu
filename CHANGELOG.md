@@ -8,7 +8,12 @@ What changed in each version of tansu, newest first, in plain words. A release m
 - In dark mode, text on the first run and in Save to (sharing into tansu) is light, where it was
   black and hard to read.
 - Jobs survive Android closing tansu: one that was running, waiting or paused comes back paused
-  the next time tansu opens, to carry on where it was.
+  the next time tansu opens, to carry on where it was. A delete comes back cancelled, so it never
+  takes files that arrived since.
+- Replace replaces only the file you chose to replace: one saved again since is kept, beside the
+  copy. A move never deletes a copy that's changed on the server since it was made.
+- The Add a server chip beside the drawers shows until you've added a server; then it's in More
+  and Settings, so the drawers fit on a narrow phone.
 - A big file whose copy breaks off, as when the phone moves from Wi-Fi to mobile data, carries on
   from where it was, rather than starting again; so does one paused part-way and resumed. A link
   that drops now and then keeps a job going, as long as each go gets further.

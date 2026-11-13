@@ -5,6 +5,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -69,6 +71,9 @@ sealed interface Change {
 
     /** A moved folder the job has begun removing from where it was. */
     @Serializable @SerialName("removing") data class Removing(val folder: String) : Change
+
+    /** The user cancelled the job: brought back, it only clears away what it half wrote. */
+    @Serializable @SerialName("cancelled") data object Cancelled : Change
 
     /** The file under way: its hidden name, whose it is, as of when, and where it's being named. */
     @Serializable
@@ -214,8 +219,13 @@ class FileJournal(private val folder: File) : Journal {
             // Written beside, then put in the old one's place in one step, so a log is never half
             // written.
             val fresh = File(folder, "${job.id}$FRESH")
-            fresh.writeText(json.encodeToString(job) + "\n")
-            if (!fresh.renameTo(logOf(job.id))) throw IOException("Can't keep ${fresh.name}")
+            fresh.writeText(VERSION + "\n" + json.encodeToString(job) + "\n")
+            Files.move(
+                fresh.toPath(),
+                logOf(job.id).toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
         }
     }
 
@@ -244,17 +254,25 @@ class FileJournal(private val folder: File) : Journal {
 
     private fun logOf(id: Long) = File(folder, "$id$LOG")
 
-    /** The job [file] holds, or null if it can't be read. A last line cut short is left out. */
+    /**
+     * The job [file] holds, or null if it can't be read: one of another version's making, or one
+     * spoiled. Only a last line can be cut short, by the process ending as it was written, and only
+     * it is left out: a job brought back must know all its log said, or not come back.
+     */
     private fun read(file: File): Job? =
         try {
             val lines = file.readLines()
-            val replay = Replay(json.decodeFromString<Job>(lines.first()))
-            for (line in lines.drop(1)) {
-                // Only the last line can be cut short, by the process ending as it was written.
-                val change = decodeOrNull(line) ?: break
-                replay.make(change)
+            if (lines.first() != VERSION) return null
+            val replay = Replay(json.decodeFromString<Job>(lines[1]))
+            val changes = lines.drop(2)
+            for ((index, line) in changes.withIndex()) {
+                val change = decodeOrNull(line)
+                if (change == null && index < changes.lastIndex) return null
+                change?.let(replay::make)
             }
             replay.job()
+        } catch (_: IndexOutOfBoundsException) {
+            null
         } catch (_: IOException) {
             null
         } catch (_: NoSuchElementException) {
@@ -279,7 +297,13 @@ class FileJournal(private val folder: File) : Journal {
     private companion object {
         const val LOG = ".log"
         const val FRESH = ".new"
-        val json = Json { ignoreUnknownKeys = true }
+
+        /** The first line of every log: one without it is of another version's making. */
+        const val VERSION = """{"v":1}"""
+        val json = Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
     }
 }
 
@@ -292,6 +316,7 @@ private class Replay(private val job: Job) {
     private val asCopied = job.asCopied.toMutableMap()
     private val removing = job.removing.toMutableSet()
     private var state = stateOf(job)
+    private var cancelled = false
 
     fun make(change: Change) {
         when (change) {
@@ -303,6 +328,7 @@ private class Replay(private val job: Job) {
             is Change.AsCopied -> asCopied.putOrRemove(change.from, change.modified)
             is Change.Removing -> removing += change.folder
             is Change.State -> state = change
+            Change.Cancelled -> cancelled = true
         }
     }
 
@@ -319,6 +345,7 @@ private class Replay(private val job: Job) {
             partialAs = state.partialAs,
             landing = state.landing,
             keptBoth = state.keptBoth,
+            status = if (cancelled) Job.Status.Cancelled else Job.Status.Queued,
         )
 
     /** Puts [value] at [key], or takes [key] away for null. */

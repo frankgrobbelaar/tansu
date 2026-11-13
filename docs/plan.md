@@ -50,7 +50,13 @@ a file; it's fixed and tested. An eighth review, of carrying on with a file that
 that a half could be carried on with by another file whose hidden name shared its hash, that a
 half never reached stayed behind, that a source rewritten with its date kept or cut short could be
 stitched, and that the retry window didn't count progress; each is fixed and tested. Jobs now
-survive Android ending tansu, tested by ending the process at every step.
+survive Android ending tansu, tested by ending the process at every step. A ninth review, of
+that, found no step where the log knew less than the drawers, but that a job resumed days later
+could act on what had changed meanwhile: a delete could take files that arrived since, a move
+could delete a copy edited on the server, and Replace could replace a newer file. A delete now
+comes back cancelled, a move never deletes a copy on a guess, and Replace replaces only the file
+it was chosen for; long logs are rewritten, a spoiled one is dropped, and a cancel clears its
+half before its log goes. All are tested.
 
 ## Left for later
 

@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The job queue. Jobs run one at a time, in the order they were started, and each can be paused,
@@ -105,7 +107,6 @@ class Jobs(
         val waiting = jobs.value.find { it.id == id && it.active && running?.id != id }
         stop(id, Stop.Cancel) {
             if (it.active) {
-                journal.end(id)
                 it.copy(
                     status = Job.Status.Cancelled,
                     finishedAt = clock(),
@@ -116,9 +117,7 @@ class Jobs(
                 it
             }
         }
-        val partial = waiting?.partial ?: return
-        val target = waiting.to?.let(::sideOf) ?: return
-        scope.launch(io) { removeHalfWritten(target, partial) }
+        waiting?.let(::clearAway)
     }
 
     /** Runs a finished job again for what didn't make it; what arrived is left alone. */
@@ -139,16 +138,18 @@ class Jobs(
 
     /**
      * The jobs Android ended tansu in the middle of, as their logs have them: paused, for the user
-     * to carry on with. Another app's files are only lent while it shares them, so a share-in can't
-     * go on: it's cancelled, without the half of a file it was writing.
+     * to carry on with. Some can't safely go on, and come back cancelled, without the half of a
+     * file they were writing: a share-in, as the other app's files were only lent while it shared
+     * them; a delete, which would list its folders afresh and could take what's arrived since; and
+     * a job the user had cancelled before its half was cleared away.
      */
     private fun broughtBack(): List<Job> =
         journal.saved().map { job ->
-            if (!job.outside) return@map job.copy(status = Job.Status.Paused())
-            journal.end(job.id)
-            val partial = job.partial
-            val to = job.to
-            if (partial != null && to != null) removeWhenThere(to, partial)
+            val stopped = job.outside || job.kind == Job.Kind.Delete
+            if (!stopped && job.status != Job.Status.Cancelled) {
+                return@map job.copy(status = Job.Status.Paused())
+            }
+            clearAway(job)
             job.copy(
                 status = Job.Status.Cancelled,
                 finishedAt = clock(),
@@ -157,11 +158,23 @@ class Jobs(
             )
         }
 
-    /** Removes a half-written file once its drawer is there: servers come after the phone. */
-    private fun removeWhenThere(where: Where, partial: String) {
+    /**
+     * Removes cancelled [job]'s half-written file, then forgets it; marked first, so a job ended
+     * before its half is gone comes back to finish clearing it. Its drawer may not be there yet, as
+     * servers come after the phone; one out of reach keeps the log for next time.
+     */
+    private fun clearAway(job: Job) {
+        journal.note(job.id, listOf(Change.Cancelled))
+        val partial = job.partial
+        val to = job.to
+        if (partial == null || to == null) {
+            journal.end(job.id)
+            return
+        }
         scope.launch(io) {
-            drawers.first { list -> list.any { it.id == where.drawerId } }
-            sideOf(where)?.let { removeHalfWritten(it, partial) }
+            drawers.first { list -> list.any { it.id == to.drawerId } }
+            val target = sideOf(to) ?: return@launch
+            if (removed(target, partial)) journal.end(job.id)
         }
     }
 
@@ -202,29 +215,25 @@ class Jobs(
     }
 
     private suspend fun execute(job: Job) {
-        val source = sideOf(job.from)
-        val target = job.to?.let(::sideOf)
+        val source = sideOf(job.from) ?: sideWhenThere(job.from)
+        val target = job.to?.let { sideOf(it) ?: sideWhenThere(it) }
         if (source == null || (job.to != null && target == null)) {
             // The drawer was removed while the job waited.
             journal.end(job.id)
             put(job.copy(status = Job.Status.Cancelled, finishedAt = clock()))
             return
         }
-        // Written down afresh as it starts, so its log holds only what it knows now.
-        journal.begin(job)
-        val run =
-            JobRun(
-                job,
-                source,
-                target,
-                report = ::put,
-                note = { journal.note(job.id, it) },
-                clock = clock,
-                wait = wait,
-            )
-        val work = scope.async(io) { run.run() }
+        val run = runOf(job, source, target)
+        val work = scope.async(io, start = CoroutineStart.LAZY) { run.run() }
         running = Running(job.id, work)
         try {
+            // Paused or cancelled just as it was about to start: that stands.
+            if (jobs.value.none { it.id == job.id && it.status == Job.Status.Queued }) {
+                work.cancel()
+                return
+            }
+            // Written down afresh as it starts, so its log holds only what it knows now.
+            journal.begin(job)
             work.await()
             journal.end(job.id)
         } catch (e: ConnectionLost) {
@@ -240,19 +249,45 @@ class Jobs(
             currentCoroutineContext().ensureActive()
         } finally {
             running = null
-            // Another app's files are only lent while it shares them: done is done.
-            if (job.outside && jobs.value.none { it.id == job.id && it.active }) {
-                outside.remove(job.from.drawerId)
-            }
+            letGoOfLent(job)
+        }
+    }
+
+    /** A run of [job], writing down as it goes; afresh now and then, so its log stays short. */
+    private fun runOf(job: Job, source: Side, target: Side?): JobRun {
+        var notes = 0
+        lateinit var run: JobRun
+        run =
+            JobRun(
+                job,
+                source,
+                target,
+                report = ::put,
+                note = { changes ->
+                    if (++notes % REWRITE_EVERY == 0) journal.begin(run.job)
+                    else journal.note(job.id, changes)
+                },
+                clock = clock,
+                wait = wait,
+            )
+        return run
+    }
+
+    /** Another app's files are only lent while it shares them: a share-in that's done is done. */
+    private fun letGoOfLent(job: Job) {
+        if (job.outside && jobs.value.none { it.id == job.id && it.active }) {
+            outside.remove(job.from.drawerId)
         }
     }
 
     /** Leaves a stopped job paused, or cancelled without the file it was half way through. */
     private suspend fun settle(run: JobRun, target: Side?, stop: Stop?) {
         if (stop == Stop.Cancel) {
-            journal.end(run.job.id)
+            journal.note(run.job.id, listOf(Change.Cancelled))
             val partial = run.job.partial
-            if (partial != null && target != null) removeHalfWritten(target, partial)
+            if (partial == null || target == null || removed(target, partial)) {
+                journal.end(run.job.id)
+            }
             put(
                 run.job.copy(
                     status = Job.Status.Cancelled,
@@ -272,13 +307,23 @@ class Jobs(
         put(job)
     }
 
-    private suspend fun removeHalfWritten(target: Side, path: String) {
+    /** Removes a half-written file; says whether it's gone. A server out of reach keeps it. */
+    private suspend fun removed(target: Side, path: String): Boolean =
         try {
             target.files.delete(path)
+            true
+        } catch (_: FileSystemException.NotFound) {
+            true
         } catch (_: FileSystemException) {
-            // Best effort: a server that's gone keeps it until the user deletes it.
+            false
         }
-    }
+
+    /** A drawer's side, after a moment's wait for servers, which come after the phone at start. */
+    private suspend fun sideWhenThere(where: Where): Side? =
+        withTimeoutOrNull(DRAWERS_WAIT_MILLIS) {
+                drawers.first { list -> list.any { it.id == where.drawerId } }
+            }
+            ?.let { sideOf(where) }
 
     private fun sideOf(where: Where): Side? =
         outside[where.drawerId]
@@ -288,6 +333,10 @@ class Jobs(
 
     private companion object {
         const val TOKEN_LENGTH = 8
+
+        /** How many writes down a job's log takes before it's written afresh. */
+        const val REWRITE_EVERY = 500
+        const val DRAWERS_WAIT_MILLIS = 5_000L
     }
 
     private enum class Stop {

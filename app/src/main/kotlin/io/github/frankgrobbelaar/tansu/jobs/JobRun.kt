@@ -26,14 +26,29 @@ private sealed class Step(val from: Entry, val path: String)
 
 private class MakeFolder(from: Entry, path: String) : Step(from, path)
 
-/** [from] copied to [path]; over what's there if [replace]; a move [keep]s the original. */
-private class CopyFile(from: Entry, path: String, val replace: Boolean, val keep: Boolean) :
-    Step(from, path)
+/**
+ * [from] copied to [path]; over what's there if [replace], while it's still [replacing]; a move
+ * [keep]s the original.
+ */
+private class CopyFile(
+    from: Entry,
+    path: String,
+    val replace: Boolean,
+    val keep: Boolean,
+    val replacing: Stamp? = null,
+) : Step(from, path)
 
 private class Rename(from: Entry, path: String) : Step(from, path)
 
-/** The target folder's names, and which of them this job put there, all in lower case. */
-private class Names(val there: MutableSet<String>, val ours: MutableSet<String>)
+/**
+ * The target folder's names, and which of them this job put there, all in lower case; and what was
+ * [found] there by each name.
+ */
+private class Names(
+    val there: MutableSet<String>,
+    val ours: MutableSet<String>,
+    val found: Map<String, Entry>,
+)
 
 private const val HASH_RADIX = 36
 
@@ -133,13 +148,16 @@ internal class JobRun(
         settleLeftover(target)
         val names =
             try {
-                val there = retrying { target.files.list(to.folder) }.map { it.name.lowercase() }
+                val found = retrying {
+                    target.files.list(to.folder)
+                }
+                    .associateBy { it.name.lowercase() }
                 // What this job placed before it stopped is its own, not a clash.
                 val ours =
                     state.placed.values
                         .filter { parentOf(it.path) == to.folder }
                         .map { nameOf(it.path).lowercase() }
-                Names(there.toMutableSet(), ours.toMutableSet())
+                Names(found.keys.toMutableSet(), ours.toMutableSet(), found)
             } catch (e: FileSystemException) {
                 // The folder they were going to is gone or closed: none of them can go there.
                 state.picks.filter { it.path !in done }.forEach { fail(it, reasonOf(e)) }
@@ -277,7 +295,12 @@ internal class JobRun(
                 pick.name
             }
         names.ours += name.lowercase()
-        val placement = Placement(join(folder, name), replace = choice == Clash.Replace)
+        // The file there as the user chose to replace it: one that's changed since is kept.
+        val replacing =
+            names.found[name.lowercase()]
+                ?.takeIf { choice == Clash.Replace && !it.isFolder }
+                ?.let { Stamp(it.size, it.modified) }
+        val placement = Placement(join(folder, name), choice == Clash.Replace, replacing)
         state = state.copy(placed = state.placed + (pick.path to placement))
         return stepsFor(pick, placement, sameDrawer, walked)
     }
@@ -316,7 +339,10 @@ internal class JobRun(
                 if (pick.isLink && state.kind == Job.Kind.Move) walked += pick
                 walk(pick, placement.path, placement.replace, keep = pick.isLink, walked)
             }
-            else -> listOf(CopyFile(pick, placement.path, placement.replace, keep = false))
+            else ->
+                listOf(
+                    CopyFile(pick, placement.path, placement.replace, false, placement.replacing)
+                )
         }
 
     /**
@@ -489,16 +515,14 @@ internal class JobRun(
     /**
      * Fails a move's file unless its copy at [path] is fit to replace [original]. An original that
      * changed since it was copied, or that is the copy itself reached another way, stays, and so
-     * does the copy. A copy that doesn't match is no use: it goes, and a retry copies afresh.
+     * does the copy; so does a copy that doesn't match. A retry copies the file afresh beside it.
      */
     private suspend fun checkCopy(from: Entry, original: Entry, path: String, target: Side) {
         val copiedAt = state.asCopied[from.path]
         val changed = copiedAt != null && original.modified != copiedAt
         val short = !changed && retrying { target.files.stat(path) }?.size != original.size
-        if (short) {
-            tryOrNull { target.files.delete(path) }
-            notes.unmarkWritten(path)
-        }
+        // Nothing's deleted on a guess: a copy that's not as written may be one changed on the
+        // server since, by someone who meant it.
         if (changed || short) {
             state = state.copy(copied = state.copied - from.path)
             throw FileFailed(Failure.Reason.Mismatch)
@@ -616,7 +640,12 @@ internal class JobRun(
         // The very file a move is moving, reached another way (a link, or two drawers on one
         // disk): then what this job just wrote beside it shows up beside the original too.
         val itself = state.kind == Job.Kind.Move && there != null && besideOriginal(step, hidden)
-        val replace = there != null && step.path.lowercase() !in written && !itself
+        // A file that changed after the user chose to replace it, as a job brought back days
+        // later may find, is kept: both stay.
+        val asChosen =
+            step.replacing?.let { chosen -> there?.let { Stamp(it.size, it.modified) } == chosen }
+        val kept = itself || asChosen == false || step.path.lowercase() in written
+        val replace = there != null && !kept
         return try {
             state = state.copy(landing = step.path)
             target.files.rename(hidden, step.path, replace)
@@ -689,11 +718,18 @@ internal class JobRun(
     private suspend fun delete() {
         val order = mutableListOf<Entry>()
         val within = mutableMapOf<String, List<Entry>>()
+        val list: suspend (String) -> List<Entry> = { retrying { source.files.list(it) } }
+        val unlisted = { folder: Entry, e: FileSystemException ->
+            fail(folder, reasonOf(e), atSource = true)
+        }
         for (pick in state.picks) {
             // A link goes on its own: what it points to isn't the user's to lose here.
             val going =
-                if (pick.isFolder && !pick.isLink && pick.path !in done) inside(pick)
-                else listOf(pick)
+                if (pick.isFolder && !pick.isLink && pick.path !in done) {
+                    inside(pick, list, unlisted)
+                } else {
+                    listOf(pick)
+                }
             if (pick.isFolder) within[pick.path] = going.filterNot { it.isFolder }
             order += going
         }
@@ -726,25 +762,6 @@ internal class JobRun(
                 }
             }
         }
-    }
-
-    /** Everything in [folder], files before the folders that hold them. Links aren't gone into. */
-    private suspend fun inside(folder: Entry): List<Entry> {
-        val children =
-            try {
-                retrying { source.files.list(folder.path) }
-            } catch (_: FileSystemException.NotFound) {
-                // Gone already, with all it held.
-                return listOf(folder)
-            } catch (e: FileSystemException) {
-                fail(folder, reasonOf(e), atSource = true)
-                return emptyList()
-            }
-        val all = mutableListOf<Entry>()
-        for (child in children) {
-            all += if (child.isFolder && !child.isLink) inside(child) else listOf(child)
-        }
-        return all + folder
     }
 
     // Shared
@@ -874,6 +891,31 @@ internal fun freeName(name: String, isFolder: Boolean, taken: Set<String>): Stri
     return generateSequence(1) { it + 1 }
         .map { "$base ($it)$extension" }
         .first { it.lowercase() !in taken }
+}
+
+/**
+ * Everything in [folder], files before the folders that hold them, by [list]. Links aren't gone
+ * into. A folder gone already counts, with all it held; one that can't be listed is [unlisted].
+ */
+private suspend fun inside(
+    folder: Entry,
+    list: suspend (String) -> List<Entry>,
+    unlisted: (Entry, FileSystemException) -> Unit,
+): List<Entry> {
+    val children =
+        try {
+            list(folder.path)
+        } catch (_: FileSystemException.NotFound) {
+            return listOf(folder)
+        } catch (e: FileSystemException) {
+            unlisted(folder, e)
+            return emptyList()
+        }
+    val all = mutableListOf<Entry>()
+    for (child in children) {
+        all += if (child.isFolder && !child.isLink) inside(child, list, unlisted) else listOf(child)
+    }
+    return all + folder
 }
 
 /** A free place in [path] for a folder whose name another beside it has but for case. */
