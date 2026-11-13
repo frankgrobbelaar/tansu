@@ -42,6 +42,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectIndexed
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -193,7 +194,8 @@ class BrowseViewModel(
     private val notice = MutableStateFlow<BrowseUiState.Notice?>(null)
     private val fetching = MutableStateFlow<BrowseUiState.Fetching?>(null)
     private val fetched = MutableStateFlow<BrowseUiState.Fetched?>(null)
-    private val search = MutableStateFlow<String?>(null)
+    /** What the folder is searched for: one source for the search bar and the listing, kept. */
+    private val search = savedState.getMutableStateFlow<String?>(SEARCH, null)
     private var loading: kotlinx.coroutines.Job? = null
 
     /** A listing asked for while another ran, to make once it's through. */
@@ -321,11 +323,11 @@ class BrowseViewModel(
 
     init {
         viewModelScope.launch {
-            here.collect {
+            here.collectIndexed { index, folder ->
                 picked.value = emptySet()
-                // A search is of one folder: moving on ends it.
-                search.value = null
-                load(it, fresh = true)
+                // A search is of one folder: moving on ends it, but one brought back stays.
+                if (index > 0) search.value = null
+                load(folder, fresh = true)
             }
         }
         // Nothing stays picked that can't be seen.
@@ -705,6 +707,7 @@ class BrowseViewModel(
     companion object {
         private const val DRAWER = "drawer"
         private const val PATHS = "paths"
+        private const val SEARCH = "search"
         private const val STOP_AFTER_MILLIS = 5_000L
         private const val SLOW_AFTER_MILLIS = 3_000L
         private const val LANDING_EVERY_MILLIS = 2_000L

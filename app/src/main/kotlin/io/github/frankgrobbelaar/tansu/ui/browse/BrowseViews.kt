@@ -61,10 +61,12 @@ import io.github.frankgrobbelaar.tansu.ui.viewer.DrawerThumbnail
 @Composable
 internal fun SearchTopBar(
     folder: String,
+    query: String,
     onSearch: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val text = rememberTextFieldState()
+    // Starts from what Browse is searching for, which it keeps, so the two never disagree.
+    val text = rememberTextFieldState(initialText = query)
     val focus = remember { FocusRequester() }
     val search by rememberUpdatedState(onSearch)
     LaunchedEffect(text) { snapshotFlow { text.text.toString() }.collect { search(it) } }

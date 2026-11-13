@@ -434,8 +434,13 @@ internal fun BrowseScreen(
                 onSelectAll = actions.onSelectAll,
             )
         } else {
-            if (state.searching) SearchTopBar(folder = state.title, onSearch = actions.onSearch)
-            else BrowseTopBar(state, actions)
+            if (state.searching) {
+                SearchTopBar(
+                    folder = state.title,
+                    query = state.search.orEmpty(),
+                    onSearch = actions.onSearch,
+                )
+            } else BrowseTopBar(state, actions)
             DrawerChips(
                 drawers = state.drawers,
                 selected = state.drawer.id,

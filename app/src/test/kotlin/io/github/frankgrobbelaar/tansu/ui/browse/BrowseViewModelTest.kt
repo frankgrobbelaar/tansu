@@ -616,6 +616,18 @@ class BrowseViewModelTest {
     }
 
     @Test
+    fun `a search is kept when Android closes tansu and brings it back`() = runTest {
+        val saved = SavedStateHandle()
+        viewModel(saved).search("pdf")
+
+        viewModel(saved).state.test {
+            var back = awaitItem()
+            while (!back.searching) back = awaitItem()
+            assertEquals("pdf", back.search)
+        }
+    }
+
+    @Test
     fun `a listing given up on can't land on the drawer you moved to`() = runTest {
         // smbj and sshj can't be stopped: the old listing still ends, here with a failure.
         val gate = CompletableDeferred<Unit>()
