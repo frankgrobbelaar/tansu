@@ -1,8 +1,10 @@
 package io.github.frankgrobbelaar.tansu.ui.viewer
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
+import android.util.Size
 import androidx.exifinterface.media.ExifInterface
 import coil3.disk.DiskCache
 import java.io.ByteArrayInputStream
@@ -12,6 +14,7 @@ import java.io.DataOutputStream
 import java.io.EOFException
 import java.io.File
 import java.io.FilterInputStream
+import java.io.IOException
 import java.io.InputStream
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -23,10 +26,22 @@ import kotlin.math.roundToInt
 internal const val THUMBNAIL_SIDE = 384
 
 /**
+ * The longest side a thumbnail can have, as Coil allows its own pictures: a very long picture, as a
+ * scrolling screenshot is, is made smaller still, since too big a bitmap can't be drawn.
+ */
+internal const val THUMBNAIL_LONGEST = 4096
+
+/**
  * The shorter side a camera's own thumbnail needs to stand in for its photo. A phone's fills a
  * tile: Samsung's are 512 × 384, or 512 × 288 for 16:9. A DSLR's 160 × 120 would be a blur.
  */
 private const val CAMERA_THUMBNAIL_SIDE = 288
+
+/**
+ * The longest side a camera's own thumbnail can have and still be one. A thumbnail that claims more
+ * is passed over unread, so a broken or booby-trapped photo can't make a bitmap too big.
+ */
+private const val CAMERA_THUMBNAIL_LONGEST = 2048
 
 /**
  * The thumbnail a camera put in a JPEG's EXIF data, turned the way the photo is meant to be seen.
@@ -36,12 +51,20 @@ private const val CAMERA_THUMBNAIL_SIDE = 288
  */
 internal fun exifThumbnail(stream: InputStream): Bitmap? {
     val exif = jpegHead(stream)?.let { ExifInterface(ByteArrayInputStream(it)) } ?: return null
-    val thumbnail = exif.thumbnailBitmap ?: return null
-    val width = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0)
-    val height = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0)
-    val fits = minOf(thumbnail.width, thumbnail.height) >= CAMERA_THUMBNAIL_SIDE
-    if (!fits || !thumbnail.shaped(width, height)) return null
-    return thumbnail.turned(exif.rotationDegrees, exif.isFlipped)
+    val jpeg = exif.thumbnailBytes?.takeIf { exif.isThumbnailCompressed } ?: return null
+    // Its size from its header alone, so one that claims to be huge is never decoded.
+    val size = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size, size)
+    val width = size.outWidth
+    val height = size.outHeight
+    val fits =
+        minOf(width, height) >= CAMERA_THUMBNAIL_SIDE &&
+            maxOf(width, height) <= CAMERA_THUMBNAIL_LONGEST
+    val photoWidth = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0)
+    val photoHeight = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0)
+    if (!fits || !shaped(width, height, photoWidth, photoHeight)) return null
+    return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
+        ?.turned(exif.rotationDegrees, exif.isFlipped)
 }
 
 /**
@@ -52,22 +75,49 @@ internal fun smallPicture(file: File): Bitmap =
     ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
         // In software, so it can be written to the cache.
         decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-        val width = info.size.width
-        val height = info.size.height
-        val scale = minOf(1f, THUMBNAIL_SIDE.toFloat() / minOf(width, height))
-        decoder.setTargetSize((width * scale).roundToInt(), (height * scale).roundToInt())
+        val size = thumbnailSize(info.size.width, info.size.height)
+        decoder.setTargetSize(size.width, size.height)
     }
 
-/** Keeps [thumbnail] under [key] as a small JPEG: whole, or not at all. */
+/**
+ * The size a [width] × [height] picture is made small to: a shorter side of [THUMBNAIL_SIDE], or
+ * its own if that's less, and a longer side of no more than [THUMBNAIL_LONGEST].
+ */
+internal fun thumbnailSize(width: Int, height: Int): Size {
+    val scale =
+        minOf(
+            1f,
+            THUMBNAIL_SIDE.toFloat() / minOf(width, height),
+            THUMBNAIL_LONGEST.toFloat() / maxOf(width, height),
+        )
+    // A sliver of a picture is still a pixel wide.
+    return Size(
+        (width * scale).roundToInt().coerceAtLeast(1),
+        (height * scale).roundToInt().coerceAtLeast(1),
+    )
+}
+
+/**
+ * Keeps [thumbnail] under [key], small: whole, or not at all, as when the phone has no room. It's a
+ * JPEG, or a WebP if it can be seen through, since a JPEG can't.
+ */
 internal fun DiskCache.keep(key: String, thumbnail: Bitmap) {
+    try {
+        write(key, thumbnail)
+    } catch (_: IOException) {
+        // The phone has no room for it: it's shown all the same, and made again next time.
+    }
+}
+
+private fun DiskCache.write(key: String, thumbnail: Bitmap) {
     // Null while the same thumbnail is in use elsewhere, as when another request has just made it.
     val editor = openEditor(key) ?: return
+    val format =
+        if (thumbnail.hasAlpha()) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.JPEG
     var kept = false
     try {
         val written =
-            fileSystem.write(editor.data) {
-                thumbnail.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, outputStream())
-            }
+            fileSystem.write(editor.data) { thumbnail.compress(format, QUALITY, outputStream()) }
         if (written) {
             editor.commit()
             kept = true
@@ -123,11 +173,14 @@ private class InPieces(stream: InputStream) : FilterInputStream(stream) {
         super.read(b, off, minOf(len, HEAD_PIECE))
 }
 
-/** Whether this has the shape of a [width] × [height] photo, give or take rounding. */
-private fun Bitmap.shaped(width: Int, height: Int): Boolean =
-    width > 0 &&
-        height > 0 &&
-        abs(this.width.toFloat() / this.height * height / width - 1) <= SHAPE_TOLERANCE
+/**
+ * Whether a [width] × [height] thumbnail has the shape of a [photoWidth] × [photoHeight] photo,
+ * give or take rounding.
+ */
+private fun shaped(width: Int, height: Int, photoWidth: Int, photoHeight: Int): Boolean =
+    photoWidth > 0 &&
+        photoHeight > 0 &&
+        abs(width.toFloat() / height * photoHeight / photoWidth - 1) <= SHAPE_TOLERANCE
 
 /**
  * This, flipped and turned clockwise by [rotation] degrees, in that order, as a photo's EXIF data
@@ -151,7 +204,7 @@ private const val HEAD_PIECE = 8 * 1024
 /** How much a thumbnail's shape can differ from its photo's before it's taken to be padded. */
 private const val SHAPE_TOLERANCE = 0.02f
 
-private const val JPEG_QUALITY = 85
+private const val QUALITY = 85
 
 // JPEG's markers: the file's start and end, the picture data's start, and what every marker
 // starts with.

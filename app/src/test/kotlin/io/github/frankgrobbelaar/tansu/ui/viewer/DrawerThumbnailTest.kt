@@ -12,6 +12,7 @@ import coil3.request.Options
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
@@ -26,6 +27,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -128,6 +130,27 @@ class DrawerThumbnailTest {
         assertEquals(512 to THUMBNAIL_SIDE, bitmap.width to bitmap.height)
         assertEquals(1, nasFiles.opened.get())
     }
+
+    @Test
+    fun `a thumbnail is shown, though the server's gone by the time the picture's closed`() =
+        runBlocking {
+            val entry = nasFiles.put("/Photos/a.jpg", photo)
+            nasFiles.closing = IOException("The server's gone")
+
+            val made = fetch(entry) as ImageFetchResult
+
+            assertEquals(512, (made.image as BitmapImage).bitmap.width)
+        }
+
+    @Test
+    fun `a server's picture Android can't read comes down once, not on every visit`() =
+        runBlocking {
+            val entry = nasFiles.put("/Photos/broken.png", ByteArray(100_000) { 7 })
+
+            repeat(2) { assertThrows(IOException::class.java) { runBlocking { fetch(entry) } } }
+
+            assertEquals(1, nasFiles.opened.get())
+        }
 
     @Test
     fun `a thumbnail no longer wanted stops reading, and leaves nothing behind`() = runBlocking {

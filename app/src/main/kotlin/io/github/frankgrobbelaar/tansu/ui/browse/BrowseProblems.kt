@@ -123,6 +123,14 @@ private fun ServerProblem(
                 body = stringResource(R.string.share_missing_body),
                 main = editServer,
             )
+        is BrowseUiState.Problem.ShareUnavailable ->
+            Problem(
+                icon = TansuIcons.MissingFolder,
+                title = stringResource(R.string.share_unavailable_title, problem.share, name),
+                body = stringResource(R.string.share_unavailable_body, name),
+                main = tryAgain,
+                other = editServer,
+            )
         is BrowseUiState.Problem.KeyChanged -> KeyChanged(problem, name, actions)
         else -> Unit
     }

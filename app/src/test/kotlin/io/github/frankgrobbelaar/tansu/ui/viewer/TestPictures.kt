@@ -10,6 +10,7 @@ import io.github.frankgrobbelaar.tansu.files.MemoryFileSystem
 import io.github.frankgrobbelaar.tansu.files.nameOf
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
@@ -80,6 +81,19 @@ private fun ByteBuffer.entry(tag: Int, type: Short, value: Int): ByteBuffer {
 private const val SHORT: Short = 3
 private const val LONG: Short = 4
 
+/** This JPEG, its frame header saying it's [width] × [height], whatever its picture data holds. */
+fun ByteArray.claimingSize(width: Int, height: Int): ByteArray {
+    val claiming = copyOf()
+    // Past each segment to the frame header: its marker, length and precision, then the size.
+    var at = 2
+    while (this[at + 1] != FRAME) at +=
+        2 + ByteBuffer.wrap(this, at + 2, 2).short.toUShort().toInt()
+    ByteBuffer.wrap(claiming, at + 5, 4).putShort(height.toShort()).putShort(width.toShort())
+    return claiming
+}
+
+private const val FRAME = 0xC0.toByte()
+
 /**
  * This picture with [bytes] more after its end, as a big photo would be: decoders stop at its end.
  */
@@ -115,6 +129,9 @@ class Pictures : FileSystem by MemoryFileSystem() {
     val most = AtomicInteger()
 
     @Volatile var gate: CompletableDeferred<Unit>? = null
+
+    /** What closing a stream throws, as when the server has gone by then. */
+    @Volatile var closing: IOException? = null
     @Volatile var hold: CountDownLatch? = null
     val holding = CountDownLatch(1)
 
@@ -152,6 +169,7 @@ class Pictures : FileSystem by MemoryFileSystem() {
         override fun close() {
             reading.decrementAndGet()
             closed.incrementAndGet()
+            closing?.let { throw it }
         }
     }
 }

@@ -1,6 +1,7 @@
 package io.github.frankgrobbelaar.tansu.files
 
 import java.io.ByteArrayOutputStream
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -55,14 +56,76 @@ class SrvsvcTest {
         val first = response(stub.copyOfRange(0, split), FIRST_FRAG)
         val last = response(stub.copyOfRange(split, stub.size), LAST_FRAG)
 
-        assertFalse(Srvsvc.isWhole(ByteArray(0)))
-        assertFalse(Srvsvc.isWhole(first))
-        assertFalse(Srvsvc.isWhole(first + last.copyOf(HALF_A_HEADER)))
-        assertFalse(Srvsvc.isWhole(first + last.copyOf(last.size - 1)))
-        assertTrue(Srvsvc.isWhole(first + last))
-
-        // IPC$, C$ and the printer are left out; the share with no remark stays.
+        // IPC$, C$ and the printer are left out; the cluster's share and the one with no remark
+        // stay.
         assertEquals(listOf("archive", "Backups", "Media 2026"), Srvsvc.shares(first + last))
+    }
+
+    @Test
+    fun `an answer is read a piece at a time, to its last fragment and no further`() {
+        val stub = shareList()
+        val split = stub.size / 2 + 1
+        val first = response(stub.copyOfRange(0, split), FIRST_FRAG)
+        val whole = first + response(stub.copyOfRange(split, stub.size), LAST_FRAG)
+        // The call brings the first fragment and half the next one's header. The rest comes a few
+        // bytes at a time, with more after it that isn't the answer's.
+        val brought = first.size + HALF_A_HEADER
+        val pipe = Pipe(whole.copyOfRange(brought, whole.size) + ByteArray(AFTER), piece = PIECE)
+
+        val answer = Srvsvc.answer(whole.copyOf(brought), pipe::read)
+
+        assertArrayEquals(whole, answer)
+        assertTrue("${pipe.left} left", pipe.left > AFTER - PIECE)
+    }
+
+    @Test(timeout = 10_000)
+    fun `an answer that never ends fails, once it's longer than any list of shares`() {
+        val endless = response(ByteArray(4000), FIRST_FRAG)
+        var given = 0
+
+        val failed =
+            assertThrows(ShareEnumFailed::class.java) {
+                Srvsvc.answer(
+                    endless,
+                    more = { into ->
+                        endless.copyInto(into)
+                        given += endless.size
+                        endless.size
+                    },
+                )
+            }
+
+        assertFalse(failed.denied)
+        assertTrue("Given $given", given <= Srvsvc.MAX_ANSWER + endless.size)
+    }
+
+    @Test
+    fun `an answer still coming after half a minute fails`() {
+        val answer = response(shareList(), WHOLE)
+        val pipe = Pipe(answer.copyOfRange(HEADER, answer.size), piece = 1)
+        var now = 0L
+
+        assertThrows(ShareEnumFailed::class.java) {
+            Srvsvc.answer(
+                answer.copyOf(HEADER),
+                more = { into ->
+                    now += SECOND
+                    pipe.read(into)
+                },
+                clock = { now },
+            )
+        }
+
+        assertTrue("${pipe.reads} reads", pipe.reads in 30..31)
+    }
+
+    @Test
+    fun `an answer that stops part-way fails`() {
+        val answer = response(shareList(), WHOLE)
+
+        assertThrows(ShareEnumFailed::class.java) {
+            Srvsvc.answer(answer.copyOf(answer.size / 2), more = { -1 })
+        }
     }
 
     @Test
@@ -105,7 +168,7 @@ class SrvsvcTest {
             .u32(SHARES)
             .u32(REF + 1) // holding six shares,
             .u32(SHARES) // in an array of six:
-            .share(name = true, type = DISK, remark = true) // Media 2026
+            .share(name = true, type = CLUSTER or DISK, remark = true) // Media 2026
             .share(name = true, type = SPECIAL or IPC, remark = true) // IPC$
             .share(name = true, type = DISK, remark = false) // Backups
             .share(name = true, type = SPECIAL or DISK, remark = true) // C$
@@ -127,6 +190,25 @@ class SrvsvcTest {
             .u32(0)
             .u32(0) // ...and done.
             .bytes()
+
+    /** [bytes] as a pipe gives them out, [piece] at a time at most, counting its reads. */
+    private class Pipe(private val bytes: ByteArray, private val piece: Int) {
+        private var at = 0
+        var reads = 0
+            private set
+
+        val left: Int
+            get() = bytes.size - at
+
+        fun read(into: ByteArray): Int {
+            reads++
+            if (left == 0) return -1
+            val count = minOf(piece, left, into.size)
+            bytes.copyInto(into, 0, at, at + count)
+            at += count
+            return count
+        }
+    }
 
     private fun Ndr.share(name: Boolean, type: Int, remark: Boolean) =
         u32(if (name) REF else 0).u32(type).u32(if (remark) REF else 0)
@@ -213,6 +295,10 @@ class SrvsvcTest {
         const val PRINTER = 1
         const val IPC = 3
         const val TEMPORARY = 0x40000000
+        const val CLUSTER = 0x02000000
+        const val AFTER = 1000
+        const val PIECE = 64
+        const val SECOND = 1_000_000_000L
         const val SPECIAL = 1 shl 31
         const val DENIED = 5
         const val BILLION = 1_000_000_000

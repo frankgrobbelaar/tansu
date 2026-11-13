@@ -422,6 +422,65 @@ class BrowseViewModelTest {
         }
 
     @Test
+    fun `a share the server has but won't open says so, rather than offering it`() = runTest {
+        val unopened =
+            object : FileSystem by nasFiles, ListsShares {
+                override suspend fun list(path: String): List<Entry> =
+                    throw FileSystemException.ShareMissing("Media")
+
+                // Samba says a share isn't there when it can't open its folder.
+                override suspend fun shares() = listOf("Backups", "media")
+            }
+        drawers.value = listOf(phone, nas.copy(fileSystem = unopened))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("nas")
+            val state = expectMostRecentItem()
+            assertEquals(BrowseUiState.Problem.ShareUnavailable("Media"), state.problem)
+            assertTrue(state.drawers.single { it.id == "nas" }.troubled)
+        }
+    }
+
+    @Test
+    fun `a share picked is listed from its top`() = runTest {
+        val media =
+            FakeFileSystem(
+                mapOf(
+                    "/" to listOf(folder("", "Films")),
+                    "/Films" to listOf(file("/Films", "a.mkv")),
+                )
+            )
+        val going =
+            object : FileSystem by media, ListsShares {
+                override suspend fun shares() = listOf("Music")
+            }
+        drawers.value = listOf(phone, nas.copy(fileSystem = going))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("nas")
+            browse.open(folder("", "Films"))
+            assertEquals(listOf("a.mkv"), expectMostRecentItem().entries.map { it.name })
+
+            // The share goes, and another is picked, without a Films folder.
+            media.failures["/Films"] = FileSystemException.ShareMissing("Media")
+            browse.refresh()
+            assertEquals(
+                BrowseUiState.Problem.ShareMissing("Media", listOf("Music")),
+                expectMostRecentItem().problem,
+            )
+            browse.useShare("Music")
+            val music = FakeFileSystem(mapOf("/" to listOf(folder("", "Albums"))))
+            val moved = nasServer.copy(share = "Music")
+            drawers.value = listOf(phone, nas.copy(fileSystem = music, server = moved))
+
+            val listed = expectMostRecentItem()
+            assertNull(listed.problem)
+            assertTrue(listed.atRoot)
+            assertEquals(listOf("Albums"), listed.entries.map { it.name })
+        }
+    }
+
+    @Test
     fun `a missing share on a server that can't list its shares is just missing`() = runTest {
         val refusing =
             object : FileSystem by nasFiles, ListsShares {

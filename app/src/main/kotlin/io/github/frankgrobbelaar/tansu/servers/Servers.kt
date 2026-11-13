@@ -22,7 +22,10 @@ interface SavedServers {
     /** Pins a new host key after the user chose to trust it. */
     suspend fun trustKey(serverId: String, fingerprint: String)
 
-    /** Points an SMB server at [share], one it has, in place of a share that's gone. */
+    /**
+     * Points an SMB server at [share], one it has, in place of a share that's gone, from its top: a
+     * folder in the share that's gone may not be in this one.
+     */
     suspend fun useShare(serverId: String, share: String)
 
     /** Forgets the server and its secret. */
@@ -55,7 +58,7 @@ class Servers(private val store: ServerStore, private val secrets: Secrets) : Sa
     }
 
     override suspend fun useShare(serverId: String, share: String) {
-        store.update(serverId) { it.copy(share = share) }
+        store.update(serverId) { it.copy(share = share, folder = "") }
     }
 
     override suspend fun remove(serverId: String) {

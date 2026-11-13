@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -108,7 +111,13 @@ internal fun ConnectBar(
                 }
                 val missing = state.failure as? ServerFormUiState.Failure.ShareMissing
                 if (missing != null && missing.shares.isNotEmpty()) {
-                    ShareChoices(shares = missing.shares, onPick = onUseShare)
+                    // A server with many shares scrolls them, so Connect stays in reach.
+                    ShareChoices(
+                        shares = missing.shares,
+                        onPick = onUseShare,
+                        modifier =
+                            Modifier.heightIn(max = 136.dp).verticalScroll(rememberScrollState()),
+                    )
                 }
                 Button(
                     onClick = onConnect,
@@ -191,18 +200,30 @@ private fun failureText(
             else stringResource(R.string.fail_refused, host, stringResource(serviceOf(state.kind)))
         ServerFormUiState.Failure.LoginRefused -> stringResource(R.string.fail_login, host)
         ServerFormUiState.Failure.BadKey -> stringResource(R.string.fail_bad_key)
-        is ServerFormUiState.Failure.ShareMissing ->
-            stringResource(
-                if (failure.shares.isEmpty()) R.string.fail_share else R.string.fail_share_choose,
-                state.shareName,
-                host,
-            )
+        is ServerFormUiState.Failure.ShareMissing,
+        ServerFormUiState.Failure.ShareUnavailable -> shareFailureText(failure, state)
         ServerFormUiState.Failure.Locked -> stringResource(R.string.fail_locked, host)
         ServerFormUiState.Failure.FolderMissing ->
             stringResource(R.string.fail_folder, state.draft.folder.trim().ifEmpty { "/" }, host)
         ServerFormUiState.Failure.Unreadable -> stringResource(R.string.fail_unreadable, host)
         ServerFormUiState.Failure.NotAKey -> stringResource(R.string.fail_not_a_key)
     }
+}
+
+/** Why the share wouldn't open: it isn't there, with or without others to pick, or won't open. */
+@Composable
+private fun shareFailureText(
+    failure: ServerFormUiState.Failure,
+    state: ServerFormUiState,
+): String {
+    val text =
+        when {
+            failure is ServerFormUiState.Failure.ShareMissing && failure.shares.isNotEmpty() ->
+                R.string.fail_share_choose
+            failure is ServerFormUiState.Failure.ShareMissing -> R.string.fail_share
+            else -> R.string.fail_share_unavailable
+        }
+    return stringResource(text, state.shareName, state.hostName)
 }
 
 /**

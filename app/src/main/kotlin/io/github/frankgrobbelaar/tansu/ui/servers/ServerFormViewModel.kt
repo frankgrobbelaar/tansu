@@ -100,6 +100,9 @@ data class ServerFormUiState(
         /** There's no share by that name; [shares] are the ones the server has, if it said. */
         data class ShareMissing(val shares: List<String> = emptyList()) : Failure
 
+        /** The server has the share, but won't open it, as when the disk it's on is gone. */
+        data object ShareUnavailable : Failure
+
         data object Locked : Failure
 
         data object FolderMissing : Failure
@@ -378,6 +381,17 @@ private fun looksLikePrivateKey(text: String): Boolean {
 
 private const val KEY_HEADER_CHARS = 64
 
+/**
+ * Why [share] wouldn't open, by the [shares] the server has: it isn't one of them, or it is, but
+ * the server can't open it. Samba says a share isn't there when it can't open its folder.
+ */
+private fun shareFailure(share: String, shares: List<String>): ServerFormUiState.Failure =
+    if (shares.any { it.equals(share, ignoreCase = true) }) {
+        ServerFormUiState.Failure.ShareUnavailable
+    } else {
+        ServerFormUiState.Failure.ShareMissing(shares)
+    }
+
 /** The form after [e] turned [server] down; a missing share comes with the server's [shares]. */
 private fun ServerFormUiState.withRefusal(
     e: FileSystemException,
@@ -409,7 +423,7 @@ private fun ServerFormUiState.withRefusal(
             filling.copy(failure = ServerFormUiState.Failure.LoginRefused)
         is FileSystemException.BadKey -> filling.copy(failure = ServerFormUiState.Failure.BadKey)
         is FileSystemException.ShareMissing ->
-            filling.copy(failure = ServerFormUiState.Failure.ShareMissing(shares))
+            filling.copy(failure = shareFailure(server.share, shares))
         is FileSystemException.AccessDenied ->
             filling.copy(failure = ServerFormUiState.Failure.Locked)
         is FileSystemException.NotFound ->

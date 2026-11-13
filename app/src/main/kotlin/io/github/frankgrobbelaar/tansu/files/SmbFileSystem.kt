@@ -45,18 +45,7 @@ class SmbFileSystem(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : FileSystem, ListsShares, Closeable {
 
-    // No socket timeout: smbj treats one as a dead connection, so an idle minute would end it.
-    // Each request still has its own, and connecting has its own too, longer than smbj's five
-    // seconds, which a server reached through Tailscale can take to answer while it wakes up.
-    private val client =
-        SMBClient(
-            SmbConfig.builder()
-                .withSecurityProvider(BCSecurityProvider())
-                .withSocketFactory(ProxySocketFactory(CONNECT_TIMEOUT_MILLIS))
-                .withTimeout(ANSWER_TIMEOUT_MILLIS.toLong(), TimeUnit.MILLISECONDS)
-                .withReadBufferSize(READ_CHUNK)
-                .build()
-        )
+    private val client = newClient()
 
     /** A connection signed in to the server, with the share open. */
     private class Session(val connection: Connection, val share: DiskShare)
@@ -177,11 +166,15 @@ class SmbFileSystem(
      */
     override suspend fun shares(): List<String> =
         withContext(io) {
-            val session = signIn()
-            try {
-                askForShares(session)
-            } finally {
-                quietly { session.connection.close(true) }
+            // A client of its own: a client lends its open connection to everyone who connects to
+            // the same server, and hanging up here would end the drawer's too.
+            newClient().use { own ->
+                val session = signIn(own)
+                try {
+                    askForShares(session)
+                } finally {
+                    quietly { session.connection.close(true) }
+                }
             }
         }
 
@@ -197,8 +190,21 @@ class SmbFileSystem(
             sessions.use(retry) { session -> mapErrors(path) { block(session.share) } }
         }
 
+    // No socket timeout: smbj treats one as a dead connection, so an idle minute would end it.
+    // Each request still has its own, and connecting has its own too, longer than smbj's five
+    // seconds, which a server reached through Tailscale can take to answer while it wakes up.
+    private fun newClient() =
+        SMBClient(
+            SmbConfig.builder()
+                .withSecurityProvider(BCSecurityProvider())
+                .withSocketFactory(ProxySocketFactory(CONNECT_TIMEOUT_MILLIS))
+                .withTimeout(ANSWER_TIMEOUT_MILLIS.toLong(), TimeUnit.MILLISECONDS)
+                .withReadBufferSize(READ_CHUNK)
+                .build()
+        )
+
     private suspend fun connect(): Session {
-        val session = signIn()
+        val session = signIn(client)
         var connected = false
         try {
             val share = mapErrors("") { openShare(session) }
@@ -209,8 +215,8 @@ class SmbFileSystem(
         }
     }
 
-    /** A new connection to the server, signed in. It's ended again if signing in fails. */
-    private suspend fun signIn(): SmbSession {
+    /** A connection to the server from [client], signed in. It's ended if signing in fails. */
+    private suspend fun signIn(client: SMBClient): SmbSession {
         val secret = secretOf(secrets, server)
         val connection = mapErrors("") { client.connect(server.host, server.port) }
         var signedIn = false
@@ -437,16 +443,8 @@ private class SmbOutput(private val file: File, private val path: String, start:
  * Sends [pdu] down the pipe and reads the answer, to its last fragment: a long list of shares can
  * come in several, and the first read may not hold them all.
  */
-private fun NamedPipe.call(pdu: ByteArray): ByteArray {
-    var answer = transact(pdu)
-    val chunk = ByteArray(Srvsvc.MAX_FRAGMENT)
-    while (!Srvsvc.isWhole(answer)) {
-        val read = read(chunk)
-        if (read <= 0) throw ShareEnumFailed("The answer stopped part-way")
-        answer += chunk.copyOf(read)
-    }
-    return answer
-}
+private fun NamedPipe.call(pdu: ByteArray): ByteArray =
+    Srvsvc.answer(transact(pdu), more = { read(it) })
 
 /** Ends a connection without waiting on the server; one that's already gone is ended enough. */
 private inline fun quietly(block: () -> Unit) {

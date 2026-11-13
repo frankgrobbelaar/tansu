@@ -15,6 +15,7 @@ import coil3.request.Options
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,8 @@ internal class DrawerThumbnailFetcher(
     private val turns: Semaphore,
     /** Where a server's picture comes down to the phone while it's made small. */
     private val scratch: Lazy<File>,
+    /** Servers' pictures, by key, that turned out not to be pictures Android can read. */
+    private val unreadable: MutableSet<String>,
 ) : Fetcher {
     private val path = thumbnail.picture.path
 
@@ -67,13 +70,16 @@ internal class DrawerThumbnailFetcher(
                         diskCacheKey = thumbnail.key,
                         closeable = snapshot,
                     ),
-                mimeType = "image/jpeg",
+                // A JPEG, or a WebP: it's told by what's in it.
+                mimeType = null,
                 dataSource = DataSource.DISK,
             )
         }
 
     /** A thumbnail made now, and kept for next time. It's shown as made, not read back. */
     private suspend fun made(): FetchResult {
+        // One that couldn't be read isn't brought down whole again while tansu runs.
+        if (thumbnail.key in unreadable) throw IOException("$path can't be read as a picture")
         val bitmap = turns.withPermit { camerasOwn() ?: wholeMadeSmall() }
         cache?.keep(thumbnail.key, bitmap)
         return ImageFetchResult(
@@ -85,12 +91,15 @@ internal class DrawerThumbnailFetcher(
     }
 
     /** The camera's own thumbnail, which only a JPEG has. */
-    private suspend fun camerasOwn(): Bitmap? =
-        if (path.substringAfterLast('.', "").lowercase() in JPEG) {
-            drawer.fileSystem.read(path).use(::exifThumbnail)
-        } else {
-            null
+    private suspend fun camerasOwn(): Bitmap? {
+        if (path.substringAfterLast('.', "").lowercase() !in JPEG) return null
+        val stream = drawer.fileSystem.read(path)
+        return try {
+            exifThumbnail(stream)
+        } finally {
+            closeAfterReading(stream)
         }
+    }
 
     /** The whole picture, made small: in place on the phone, and from a copy for a server's. */
     private suspend fun wholeMadeSmall(): Bitmap =
@@ -100,10 +109,19 @@ internal class DrawerThumbnailFetcher(
             val copy = File.createTempFile("picture", null, scratch.value)
             try {
                 drawer.fileSystem.read(path).use { it.saveTo(copy) }
-                smallPicture(copy)
+                copyMadeSmall(copy)
             } finally {
                 copy.delete()
             }
+        }
+
+    /** A server's picture, come down to [copy], made small; or remembered as one Android can't. */
+    private fun copyMadeSmall(copy: File): Bitmap =
+        try {
+            smallPicture(copy)
+        } catch (e: IOException) {
+            unreadable += thumbnail.key
+            throw e
         }
 
     /**
@@ -115,6 +133,7 @@ internal class DrawerThumbnailFetcher(
     class Factory(private val drawers: StateFlow<List<Drawer>>, folder: File) :
         Fetcher.Factory<DrawerThumbnail> {
         private val turns = ConcurrentHashMap<String, Semaphore>()
+        private val unreadable = ConcurrentHashMap.newKeySet<String>()
 
         /** Emptied, before it's first used, of any copies a process that ended mid-way left. */
         private val scratch = lazy {
@@ -138,6 +157,7 @@ internal class DrawerThumbnailFetcher(
                 cache = imageLoader.diskCache.takeIf { drawer.kind != Drawer.Kind.Phone },
                 turns = turns.computeIfAbsent(drawer.id) { Semaphore(AT_ONCE) },
                 scratch = scratch,
+                unreadable = unreadable,
             )
         }
     }
@@ -151,6 +171,15 @@ internal class DrawerThumbnailFetcher(
 /** Remembered by drawer, path, size and date, so a changed picture's thumbnail is made again. */
 internal object DrawerThumbnailKeyer : Keyer<DrawerThumbnail> {
     override fun key(data: DrawerThumbnail, options: Options) = data.key
+}
+
+/** Closes [stream] once what's wanted is read from it: a server gone since can't take that back. */
+private fun closeAfterReading(stream: InputStream) {
+    try {
+        stream.close()
+    } catch (_: IOException) {
+        // Closing only says goodbye; what was read stands.
+    }
 }
 
 /** Saves the rest of this stream to [file], stopping as soon as nobody wants it. */

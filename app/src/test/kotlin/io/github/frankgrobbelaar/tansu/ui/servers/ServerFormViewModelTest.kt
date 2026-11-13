@@ -130,6 +130,19 @@ class ServerFormViewModelTest {
         }
 
     @Test
+    fun `a share the server has but won't open says so, offering none`() = runTest {
+        answer = { server -> throw FileSystemException.ShareMissing(server.share) }
+        // Samba says a share isn't there when it can't open its folder.
+        found = { listOf("Backups", "media") }
+        val form = form(Server.Kind.Smb)
+        form.fillSmb()
+
+        form.connect()
+
+        assertEquals(ServerFormUiState.Failure.ShareUnavailable, form.state.value.failure)
+    }
+
+    @Test
     fun `a missing share on a server that can't list its shares is just missing`() = runTest {
         answer = { server -> throw FileSystemException.ShareMissing(server.share) }
         found = { throw FileSystemException.AccessDenied("IPC$") }

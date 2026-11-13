@@ -85,7 +85,8 @@ A host is a tailnet name, a local name or an IP. Tailscale runs on its own; tans
 - A server that's slow to wake up is waited for, and Browse says so, rather than giving up at
   once.
 - A wrong password, a missing share and a folder you can't open each get their own message. A
-  missing share lists the shares the server does have, and tapping one uses it instead.
+  missing share lists the shares the server does have, and tapping one uses it instead, from its
+  top. A share the server has but can't open, as when its disk isn't mounted, says so.
 - A changed SFTP key blocks the connection until you keep it blocked or trust the new key.
 - The drawer shows a quiet dot while its server has a problem.
 

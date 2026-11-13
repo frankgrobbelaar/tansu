@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /**
  * Just enough DCE/RPC to ask an SMB server which shares it has: MS-SRVS NetrShareEnum (opnum 15) at
@@ -13,6 +14,9 @@ import java.util.UUID
 internal object Srvsvc {
     /** The most tansu sends or takes in one fragment: what Windows asks for too. */
     const val MAX_FRAGMENT = 4280
+
+    /** The most an answer can be: a thousand shares with long remarks make a few hundred KB. */
+    const val MAX_ANSWER = 1024 * 1024
 
     /** Asks to speak SRVSVC 3.0, in NDR, on the pipe. */
     fun bind(): ByteArray =
@@ -57,13 +61,46 @@ internal object Srvsvc {
         )
     }
 
-    /** Whether [answer] holds a whole answer, to its last fragment. */
-    fun isWhole(answer: ByteArray): Boolean = fragmentsOf(answer) != null
+    /**
+     * The answer to a call: [first], as the call brought it, then as much more as [more] reads into
+     * the array it's given, to the answer's last fragment and no further. No list of shares comes
+     * near [MAX_ANSWER] bytes, or takes [ANSWER_TIMEOUT_MILLIS] by [clock] to come, so an answer
+     * that does fails: the server is broken, or means harm, and mustn't hold on to a connection and
+     * memory without end.
+     */
+    fun answer(
+        first: ByteArray,
+        more: (ByteArray) -> Int,
+        clock: () -> Long = System::nanoTime,
+    ): ByteArray {
+        val started = clock()
+        var answer = first
+        var size = first.size
+        val piece = ByteArray(MAX_FRAGMENT)
+        var fragments = fragmentsOf(answer, size)
+        while (fragments == null) {
+            val read = more(piece)
+            val trouble =
+                when {
+                    read <= 0 -> "The answer stopped part-way"
+                    read > MAX_ANSWER - size -> "The answer never ended"
+                    clock() - started > ANSWER_NANOS -> "The answer took too long"
+                    else -> null
+                }
+            if (trouble != null) throw ShareEnumFailed(trouble)
+            // Doubled when it's full, so a long answer is copied only a few times.
+            if (size + read > answer.size) answer = answer.copyOf(maxOf(size + read, size * 2))
+            piece.copyInto(answer, size, 0, read)
+            size += read
+            fragments = fragmentsOf(answer, size)
+        }
+        return answer.copyOf(fragments.last().last + 1)
+    }
 
     /** Fails unless [answer] accepts the bind: the server speaks SRVSVC on this pipe. */
     fun checkBound(answer: ByteArray) {
         val ack = fragmentsOf(answer)?.first() ?: throw garbled()
-        if (!accepts(ack)) throw ShareEnumFailed("The bind was turned down")
+        if (!accepts(answer.sliceArray(ack))) throw ShareEnumFailed("The bind was turned down")
     }
 
     /**
@@ -71,7 +108,7 @@ internal object Srvsvc {
      * shares Windows makes for itself, such as C$, are left out.
      */
     fun shares(answer: ByteArray): List<String> {
-        val read = Reader(stubOf(fragmentsOf(answer) ?: throw garbled()))
+        val read = Reader(stubOf(answer, fragmentsOf(answer) ?: throw garbled()))
         read.u32() // InfoStruct's level...
         read.u32() // ...and its union's arm.
         val shares = if (read.u32() == NULL) emptyList() else containerOf(read)
@@ -115,32 +152,31 @@ internal object Srvsvc {
     }
 
     /**
-     * The fragments in [answer], to the last; null while that's still to come. A bind's answer or a
-     * fault comes whole, in one.
+     * Where each fragment in the first [size] bytes of [answer] lies, to the last; null while
+     * that's still to come. A bind's answer or a fault comes whole, in one.
      */
-    private fun fragmentsOf(answer: ByteArray): List<ByteArray>? {
+    private fun fragmentsOf(answer: ByteArray, size: Int = answer.size): List<IntRange>? {
         val numbers = ByteBuffer.wrap(answer).order(ByteOrder.LITTLE_ENDIAN)
-        val fragments = mutableListOf<ByteArray>()
+        val fragments = mutableListOf<IntRange>()
         var at = 0
         var whole = false
-        while (!whole && answer.size - at >= HEADER_SIZE) {
+        while (!whole && size - at >= HEADER_SIZE) {
             val length = numbers.getShort(at + FRAG_LENGTH_AT).toUShort().toInt()
             if (length < HEADER_SIZE) throw garbled()
-            if (answer.size - at < length) break
-            val fragment = answer.copyOfRange(at, at + length)
-            fragments += fragment
-            at += length
+            if (size - at < length) break
+            fragments += at until at + length
             whole =
-                (fragment[FLAGS_AT].toInt() and LAST_FRAG) != 0 ||
-                    fragment[TYPE_AT].toInt() != RESPONSE
+                (answer[at + FLAGS_AT].toInt() and LAST_FRAG) != 0 ||
+                    answer[at + TYPE_AT].toInt() != RESPONSE
+            at += length
         }
         return fragments.takeIf { whole }
     }
 
-    /** The stub the answer's fragments carry between them; a fault fails with its status. */
-    private fun stubOf(fragments: List<ByteArray>): ByteArray {
+    /** The stub [answer]'s [fragments] carry between them; a fault fails with its status. */
+    private fun stubOf(answer: ByteArray, fragments: List<IntRange>): ByteArray {
         val stub = ByteArrayOutputStream()
-        for (fragment in fragments) {
+        for (fragment in fragments.map(answer::sliceArray)) {
             when (fragment[TYPE_AT].toInt()) {
                 RESPONSE -> stub.write(Reader(fragment, at = STUB_AT).rest())
                 FAULT -> {
@@ -182,6 +218,7 @@ internal object Srvsvc {
     private const val TYPE_AT = 2
     private const val FLAGS_AT = 3
     private const val FRAG_LENGTH_AT = 8
+    private val ANSWER_NANOS = TimeUnit.MILLISECONDS.toNanos(ANSWER_TIMEOUT_MILLIS.toLong())
     private const val STUB_AT = 24
     private const val FAULT_STATUS_AT = 24
     private const val SECONDARY_ADDRESS_AT = 24
@@ -200,7 +237,8 @@ internal object Srvsvc {
     private const val MAX_PREFERRED_LENGTH = -1
     private const val SHARE_INFO_1_SIZE = 3 * Int.SIZE_BYTES
     private const val STYPE_DISKTREE = 0
-    private const val STYPE_MASK = 0x0FFFFFFF
+    /** The bits that say a share's type; the rest are flags, such as for a cluster's shares. */
+    private const val STYPE_MASK = 0xFF
     private const val STYPE_SPECIAL = 1 shl 31
 }
 

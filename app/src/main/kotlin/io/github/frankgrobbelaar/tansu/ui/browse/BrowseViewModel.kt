@@ -164,6 +164,9 @@ data class BrowseUiState(
         /** The drawer's SMB share isn't on the server; [shares] are the ones it has, if it said. */
         data class ShareMissing(val share: String, val shares: List<String> = emptyList()) : Problem
 
+        /** The server has the drawer's SMB share, but won't open it, as when its disk is gone. */
+        data class ShareUnavailable(val share: String) : Problem
+
         /**
          * The SFTP server sent a key other than the one trusted; [trusted] is empty if none was.
          */
@@ -395,10 +398,12 @@ class BrowseViewModel(
 
     /**
      * Uses [share], one the server has, for this drawer in place of the share that's gone. The
-     * drawer comes back with the server changed, and is listed.
+     * drawer comes back with the server changed, and is listed from the share's top: a folder in
+     * the share that's gone may not be in this one.
      */
     fun useShare(share: String) {
         val serverId = here.value.drawer.id
+        paths.update { it - serverId }
         viewModelScope.launch { servers.useShare(serverId, share) }
     }
 
@@ -772,9 +777,19 @@ private fun problemOf(e: FileSystemException): BrowseUiState.Problem =
         is FileSystemException.HostKeyUnknown -> BrowseUiState.Problem.KeyChanged("", e.key)
     }
 
-/** A share that's gone comes with the ones the server does have, to pick from. */
-private suspend fun BrowseUiState.Problem.withShares(files: FileSystem): BrowseUiState.Problem =
-    if (this is BrowseUiState.Problem.ShareMissing) copy(shares = sharesOn(files)) else this
+/**
+ * A share that's gone comes with the ones the server does have, to pick from. One the server does
+ * have is there, but won't open: Samba says a share isn't there when it can't open its folder.
+ */
+private suspend fun BrowseUiState.Problem.withShares(files: FileSystem): BrowseUiState.Problem {
+    if (this !is BrowseUiState.Problem.ShareMissing) return this
+    val shares = sharesOn(files)
+    return if (shares.any { it.equals(share, ignoreCase = true) }) {
+        BrowseUiState.Problem.ShareUnavailable(share)
+    } else {
+        copy(shares = shares)
+    }
+}
 
 /** The shares on [files]' server, or none when it can't say: Browse then offers Edit server. */
 private suspend fun sharesOn(files: FileSystem): List<String> =
@@ -789,6 +804,7 @@ private fun BrowseUiState.Problem?.isServerWide() =
     this is BrowseUiState.Problem.Unreachable ||
         this is BrowseUiState.Problem.LoginRefused ||
         this is BrowseUiState.Problem.ShareMissing ||
+        this is BrowseUiState.Problem.ShareUnavailable ||
         this is BrowseUiState.Problem.KeyChanged
 
 /** A folder as the grid setting names it: its drawer and path. */

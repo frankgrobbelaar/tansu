@@ -151,6 +151,24 @@ class SmbFileSystemTest {
     }
 
     @Test
+    fun `listing the shares leaves a file that's being read open`() {
+        val bytes = ByteArray(BIG) { (it % PRIME).toByte() }
+        smb().use { files ->
+            runBlocking { files.write("/shared.bin").use { it.write(bytes) } }
+            val read = runBlocking {
+                files.read("/shared.bin").use { input ->
+                    val start = input.readNBytes(PART.toInt())
+                    // Asked of the drawer's own file system, as Browse asks.
+                    files.shares()
+                    start + input.readBytes()
+                }
+            }
+
+            assertArrayEquals(bytes, read)
+        }
+    }
+
+    @Test
     fun `carries on writing a file part-way, keeping what's before`() {
         val bytes = ByteArray(BIG) { (it % PRIME).toByte() }
         smb().use { files ->

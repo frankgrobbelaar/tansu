@@ -56,7 +56,13 @@ could act on what had changed meanwhile: a delete could take files that arrived 
 could delete a copy edited on the server, and Replace could replace a newer file. A delete now
 comes back cancelled, a move never deletes a copy on a guess, and Replace replaces only the file
 it was chosen for; long logs are rewritten, a spoiled one is dropped, and a cancel clears its
-half before its log goes. All are tested.
+half before its log goes. All are tested. A tenth review, of listing a NAS's shares and of grid
+thumbnails, found that a camera's thumbnail or a very long picture could make a bitmap too big to
+draw, that a share the NAS lists but can't open was offered back to no effect, that a share list
+had no end, and that listing shares could hang up the drawer's own connection; with smaller
+things (a picked share kept the old folder, see-through thumbnails turned black, a full phone
+lost a thumbnail, a broken picture came down on every visit, clustered shares were left out and
+many shares ran off the screen), each is fixed and tested.
 
 ## Left for later
 

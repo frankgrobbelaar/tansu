@@ -1,13 +1,24 @@
 package io.github.frankgrobbelaar.tansu.ui.viewer
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.util.Size
 import androidx.exifinterface.media.ExifInterface
+import coil3.disk.DiskCache
+import java.io.IOException
+import okio.FileSystem
+import okio.ForwardingFileSystem
+import okio.Path
+import okio.Path.Companion.toOkioPath
+import okio.Sink
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
@@ -15,6 +26,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ThumbnailsTest {
+    @get:Rule val folder = TemporaryFolder()
+
     /** A camera's thumbnail, red in its top-left quarter and blue elsewhere. */
     private val marked =
         picture(512, 384) { x, y -> if (x < 256 && y < 192) Color.RED else Color.BLUE }.jpeg()
@@ -85,6 +98,56 @@ class ThumbnailsTest {
 
         assertNull(exifThumbnail(stream))
         assertEquals(2, stream.consumed)
+    }
+
+    @Test
+    fun `a camera's thumbnail that claims to be huge is passed over, never decoded`() {
+        // Decoded, this one would be a 48 MB bitmap: a few that size at once and tansu runs out.
+        val huge = marked.claimingSize(4096, 3072)
+
+        assertNull(exifThumbnail(Counting(photo.withThumbnail(huge))))
+    }
+
+    @Test
+    fun `a picture is made small to a shorter side of 384, and a very long one smaller still`() {
+        assertEquals(Size(512, 384), thumbnailSize(4000, 3000))
+        assertEquals(Size(384, 683), thumbnailSize(2250, 4000))
+        assertEquals(Size(300, 200), thumbnailSize(300, 200))
+        // A scrolling screenshot, and a sliver: too big a bitmap can't be drawn.
+        assertEquals(Size(221, 4096), thumbnailSize(1080, 20_000))
+        assertEquals(Size(1, 4096), thumbnailSize(1, 100_000))
+    }
+
+    @Test
+    fun `a thumbnail that can be seen through is kept so`() {
+        val cache = DiskCache.Builder().directory(folder.newFolder().toOkioPath()).build()
+        val half = picture(512, 384) { x, _ -> if (x < 256) Color.TRANSPARENT else Color.BLUE }
+
+        cache.keep("half", half)
+
+        val bytes = checkNotNull(cache.openSnapshot("half")).use { it.data.toFile().readBytes() }
+        val kept = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        assertEquals(0, Color.alpha(kept.getPixel(64, 192)))
+        assertEquals(255, Color.alpha(kept.getPixel(448, 192)))
+        cache.shutdown()
+    }
+
+    @Test
+    fun `a thumbnail the phone has no room for isn't kept, and that's all`() {
+        val full =
+            object : ForwardingFileSystem(FileSystem.SYSTEM) {
+                // The cache's own records still fit, but not a thumbnail.
+                override fun sink(file: Path, mustCreate: Boolean): Sink =
+                    if (file.name.startsWith("journal")) super.sink(file, mustCreate)
+                    else throw IOException("No space left on device")
+            }
+        val cache =
+            DiskCache.Builder().directory(folder.newFolder().toOkioPath()).fileSystem(full).build()
+
+        cache.keep("photo", picture(512, 384))
+
+        assertNull(cache.openSnapshot("photo"))
+        cache.shutdown()
     }
 
     @Test

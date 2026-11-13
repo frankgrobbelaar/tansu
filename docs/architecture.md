@@ -54,11 +54,17 @@ turns down for the end of the file, so tansu reads with its own. SFTP reads keep
 flight.
 
 An SMB share that isn't there comes with the shares the server does have: Browse offers them in
-place of the missing one, and saves the one tapped as the drawer's share; the server form puts it
-in the Share field. smbj can't list shares, so `files/Srvsvc.kt` writes the one call needed by
-hand, as plain bytes: MS-SRVS NetrShareEnum at level 1, in DCE/RPC over the srvsvc pipe on IPC$.
-`SmbFileSystem.shares()` signs in on a connection of its own, binds to the pipe, asks, reads the
-answer to its last fragment, and hangs up. Only disk shares are offered, not IPC$, printers or
+place of the missing one, and saves the one tapped as the drawer's share, opening it at its top,
+since a folder in the old share may not be in the new one; the server form puts it in the Share
+field. A share the server does list is there, but won't open: Samba says a share isn't there when
+it can't open the share's folder, as when its disk isn't mounted. Tansu says so, with Try again,
+rather than offering the same share. smbj can't list shares, so `files/Srvsvc.kt` writes the one
+call needed by hand, as plain bytes: MS-SRVS NetrShareEnum at level 1, in DCE/RPC over the srvsvc
+pipe on IPC$. `SmbFileSystem.shares()` signs in with an `SMBClient` of its own, since a client
+lends its open connection to everyone who connects to the same server and hanging up would end the
+drawer's too. It binds to the pipe, asks, reads the answer to its last fragment, and hangs up. An
+answer over 1 MiB, or still coming after 30 seconds, fails: no list of shares comes near either,
+so the server is broken, or means harm. Only disk shares are offered, not IPC$, printers or
 special shares like C$. When the server can't say, the message stands alone, with Edit server.
 
 BouncyCastle is registered in full at start-up, in place of Android's cut-down copy, because
@@ -188,15 +194,21 @@ The viewers are screens of their own (`ui/viewer`), pushed on the place's histor
 Grid tiles show thumbnails through the same Coil loader, with a fetcher of their own
 (`DrawerThumbnail`); the viewer still loads the whole picture. A JPEG's thumbnail is the one the
 camera put in its EXIF data, if it's big enough for a tile (a shorter side of 288 pixels or more;
-Samsung's are 512 × 384) and has the photo's shape. Only the start of the file is read, up to the
-frame header that gives the photo's size and never past 256 KiB, so a 10 MB photo costs tens of
-kilobytes. It's read 8 KiB at a time, since SFTP reads ahead by the size of each read, and
-AndroidX's `ExifInterface` (which Coil brings anyway) finds the thumbnail in it. Any other picture
-is read whole and decoded straight to a shorter side of 384 pixels by `ImageDecoder` (HEIC, PNG
-and WebP too): on the phone from the file itself, for a server's from a copy in the cache, deleted
-once it's decoded. A server's thumbnails are kept as small JPEGs in Coil's disk cache (`thumbnails`
-in the cache folder, 256 MiB) by drawer, path, size and date, so a folder seen once shows at once
-after, even after tansu restarts. The phone's aren't kept: they're about as quick to make again.
+Samsung's are 512 × 384) and has the photo's shape. Only the start of the file is needed, up to
+the frame header that gives the photo's size and never past 256 KiB. It's read 8 KiB at a time,
+since SFTP reads ahead by the size of each read; SMB still brings its first 256 KiB down in one go,
+so a 10 MB photo costs a few hundred kilobytes at most. AndroidX's `ExifInterface` (which Coil
+brings anyway) finds the thumbnail in it. The thumbnail's size comes from its header before it's
+decoded, and one over 2048 pixels is passed over, so a broken or booby-trapped photo can't make a
+bitmap too big to draw. Any other picture is read whole and decoded straight to a shorter side of
+384 pixels by `ImageDecoder` (HEIC, PNG and WebP too), and a longer side of 4096 at most, as Coil
+makes its own, so a long screenshot can still be drawn: on the phone from the file itself, for a
+server's from a copy in the cache, deleted once it's decoded. A server's picture Android can't read
+isn't brought down again until tansu restarts. A server's thumbnails are kept as small JPEGs, or
+WebPs if they can be seen through, in Coil's disk cache (`thumbnails` in the cache folder, 256 MiB)
+by drawer, path, size and date, so a folder seen once shows at once after, even after tansu
+restarts; one the phone has no room for is shown all the same. The phone's aren't kept: they're
+about as quick to make again.
 Each drawer makes four at a time, since every read from an SMB server shares its one connection; a
 tile scrolled away before its turn reads nothing, and one cancelled while its picture comes down
 closes the stream and keeps nothing.
