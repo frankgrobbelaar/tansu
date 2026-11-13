@@ -129,6 +129,21 @@ class SmbFileSystemTest {
         }
     }
 
+    @Test
+    fun `carries on writing a file part-way, keeping what's before`() {
+        val bytes = ByteArray(BIG) { (it % PRIME).toByte() }
+        smb().use { files ->
+            runBlocking {
+                files.write("/film.part").use { it.write(bytes, 0, PART.toInt()) }
+                files.writeAt("/film.part", PART).use {
+                    it.write(bytes, PART.toInt(), BIG - PART.toInt())
+                }
+            }
+            val all = runBlocking { files.read("/film.part").use { it.readBytes() } }
+            assertArrayEquals(bytes, all)
+        }
+    }
+
     companion object {
         private const val SMB_PORT = 445
         private const val BIG = 700 * 1024

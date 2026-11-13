@@ -100,7 +100,12 @@ class Jobs(
         val waiting = jobs.value.find { it.id == id && it.active && running?.id != id }
         stop(id, Stop.Cancel) {
             if (it.active) {
-                it.copy(status = Job.Status.Cancelled, finishedAt = clock(), partial = null)
+                it.copy(
+                    status = Job.Status.Cancelled,
+                    finishedAt = clock(),
+                    partial = null,
+                    partialAs = null,
+                )
             } else {
                 it
             }
@@ -198,7 +203,14 @@ class Jobs(
         if (stop == Stop.Cancel) {
             val partial = run.job.partial
             if (partial != null && target != null) removeHalfWritten(target, partial)
-            put(run.job.copy(status = Job.Status.Cancelled, finishedAt = clock(), partial = null))
+            put(
+                run.job.copy(
+                    status = Job.Status.Cancelled,
+                    finishedAt = clock(),
+                    partial = null,
+                    partialAs = null,
+                )
+            )
         } else {
             put(run.job.copy(status = Job.Status.Paused()))
         }

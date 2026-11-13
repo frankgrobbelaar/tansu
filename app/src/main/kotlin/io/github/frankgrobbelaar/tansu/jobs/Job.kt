@@ -45,6 +45,11 @@ data class Job(
     val partial: String? = null,
     /** The source path of the file in [partial], so a resumed job knows whose it is. */
     val partialOf: String? = null,
+    /**
+     * When the file in [partial] last changed, as its source said when the job began writing it:
+     * the job carries on with what it wrote only while the source still says so.
+     */
+    val partialAs: Long? = null,
     /** Where the hidden file was being renamed to, when it stopped as it was named. */
     val landing: String? = null,
     /** Every file this job named, by its path in lower case: never one it replaces. */

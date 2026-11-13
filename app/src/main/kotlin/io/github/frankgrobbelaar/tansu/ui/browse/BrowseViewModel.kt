@@ -42,8 +42,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -323,6 +325,7 @@ class BrowseViewModel(
             }
         }
         viewModelScope.launch { watchJobs() }
+        viewModelScope.launch { watchLanding() }
     }
 
     /**
@@ -525,6 +528,34 @@ class BrowseViewModel(
         }
     }
 
+    /**
+     * Lists the folder on show again as a running job puts files in it or takes them away, at most
+     * every couple of seconds, so pasted files show up as they land rather than when the job ends.
+     */
+    private suspend fun watchLanding() {
+        jobs.all
+            .map { all ->
+                all.firstOrNull { it.status == Job.Status.Running && touchesHere(it) }
+                    ?.let { it.id to it.progress.itemsDone }
+            }
+            .distinctUntilChanged()
+            .collect { landed ->
+                if (landed != null && landed.second > 0) {
+                    refresh()
+                    // A slow collector skips to the latest: at most one listing in this while.
+                    delay(LANDING_EVERY_MILLIS)
+                }
+            }
+    }
+
+    /** Whether [job] puts files in the folder on show, or takes them from it. */
+    private fun touchesHere(job: Job): Boolean {
+        val here = here.value
+        return listOfNotNull(job.from, job.to).any {
+            it.drawerId == here.drawer.id && here.path.isWithin(it.folder)
+        }
+    }
+
     fun dismissServerOffer() {
         viewModelScope.launch { settings.dismissServerOffer() }
     }
@@ -638,6 +669,7 @@ class BrowseViewModel(
         private const val PATHS = "paths"
         private const val STOP_AFTER_MILLIS = 5_000L
         private const val SLOW_AFTER_MILLIS = 3_000L
+        private const val LANDING_EVERY_MILLIS = 2_000L
 
         val Factory = viewModelFactory {
             initializer {

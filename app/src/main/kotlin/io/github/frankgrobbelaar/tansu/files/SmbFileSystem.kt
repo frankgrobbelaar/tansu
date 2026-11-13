@@ -116,6 +116,21 @@ class SmbFileSystem(
         }
     }
 
+    override suspend fun writeAt(path: String, offset: Long): OutputStream = openedFor { opened ->
+        onShare(path) { share ->
+            val file =
+                share.openFile(
+                    smbPath(path),
+                    EnumSet.of(AccessMask.GENERIC_WRITE),
+                    EnumSet.of(FileAttributes.FILE_ATTRIBUTE_NORMAL),
+                    SMB2ShareAccess.ALL,
+                    SMB2CreateDisposition.FILE_OPEN,
+                    null,
+                )
+            opened(SmbOutput(file, path, start = offset))
+        }
+    }
+
     override suspend fun createFolder(path: String) =
         madeOnce(path) { onShare(path, retry = false) { share -> share.mkdir(smbPath(path)) } }
 
@@ -320,8 +335,9 @@ private const val BYTE = 0xFF
  * A file on the share written from its start, as a stream. smbj's failures become I/O ones; a full
  * share or a refusal is said as one, so it isn't waited out like a dropped connection.
  */
-private class SmbOutput(private val file: File, private val path: String) : OutputStream() {
-    private var position = 0L
+private class SmbOutput(private val file: File, private val path: String, start: Long = 0) :
+    OutputStream() {
+    private var position = start
 
     override fun write(byte: Int) = write(byteArrayOf(byte.toByte()), 0, 1)
 

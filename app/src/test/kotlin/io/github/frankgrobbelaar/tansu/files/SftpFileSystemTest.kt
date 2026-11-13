@@ -172,6 +172,20 @@ class SftpFileSystemTest {
     }
 
     @Test
+    fun `carries on writing a file part-way, keeping what's before`() {
+        val bytes = ByteArray(1_000_000) { it.toByte() }
+        sftp().use { files ->
+            runBlocking {
+                files.write("/photos/film.part").use { it.write(bytes, 0, HALF) }
+                files.writeAt("/photos/film.part", HALF.toLong()).use {
+                    it.write(bytes, HALF, bytes.size - HALF)
+                }
+            }
+        }
+        assertTrue(File(folder.root, "photos/film.part").readBytes().contentEquals(bytes))
+    }
+
+    @Test
     fun `a new file never writes over one that's there, unless told to replace it`() {
         sftp().use { files ->
             assertThrows(FileSystemException.Exists::class.java) {
@@ -240,6 +254,8 @@ class SftpFileSystemTest {
     }
 
     private companion object {
+        private const val HALF = 400_000
+
         /** The most data OpenSSH's sftp-server takes in one write, near enough. */
         const val OPENSSH_MAX_WRITE = 256 * 1024 - 1024
 

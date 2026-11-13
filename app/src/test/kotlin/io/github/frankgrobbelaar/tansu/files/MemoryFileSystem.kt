@@ -31,6 +31,10 @@ class MemoryFileSystem(
     /** Every write's size, in the order they came. */
     val writes = mutableListOf<Int>()
 
+    /** Where each carried-on write began, and where each read began. */
+    val writeOffsets = mutableListOf<Long>()
+    val readOffsets = mutableListOf<Long>()
+
     /** Makes every write say the disk is full, until set back to false. */
     var full = false
 
@@ -86,6 +90,7 @@ class MemoryFileSystem(
     override suspend fun read(path: String, offset: Long): InputStream {
         check(path)
         gates.remove(path)?.await()
+        readOffsets += offset
         val bytes = held(real(path))?.let { files[it] } ?: throw FileSystemException.NotFound(path)
         growing.remove(path)?.let { more -> files[held(real(path))!!] = bytes + more.toByteArray() }
         return object : ByteArrayInputStream(bytes) {
@@ -114,6 +119,24 @@ class MemoryFileSystem(
         val name = there ?: at
         files[name] = ByteArray(0)
         writeGates.remove(parentOf(path))?.await()
+        return object : OutputStream() {
+            override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
+
+            override fun write(b: ByteArray, off: Int, len: Int) {
+                if (full) throw StreamRefused(FileSystemException.NoSpace(path))
+                writes += len
+                files[name] = files.getValue(name) + b.copyOfRange(off, off + len)
+            }
+        }
+    }
+
+    override suspend fun writeAt(path: String, offset: Long): OutputStream {
+        check(path)
+        val name =
+            held(real(path))?.takeIf { it in files } ?: throw FileSystemException.NotFound(path)
+        // What was written from the offset on is written again.
+        files[name] = files.getValue(name).copyOf(offset.toInt())
+        writeOffsets += offset
         return object : OutputStream() {
             override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
 

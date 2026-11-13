@@ -38,6 +38,12 @@ interface FileSystem {
      */
     suspend fun write(path: String, replace: Boolean = false): OutputStream
 
+    /**
+     * Writes into the file at [path] from [offset] on, keeping what's before it: for carrying on
+     * with a file whose writing broke off. Fails with NotFound if there's no file there.
+     */
+    suspend fun writeAt(path: String, offset: Long): OutputStream
+
     suspend fun createFolder(path: String)
 
     /**

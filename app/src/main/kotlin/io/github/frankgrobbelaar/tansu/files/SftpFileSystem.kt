@@ -110,6 +110,13 @@ class SftpFileSystem(
         }
     }
 
+    override suspend fun writeAt(path: String, offset: Long): OutputStream = openedFor { opened ->
+        onServer(path) { sftp ->
+            val file = sftp.open(path, EnumSet.of(OpenMode.WRITE))
+            opened(SftpOutput(file.RemoteFileOutputStream(offset, UNCONFIRMED_WRITES), file, path))
+        }
+    }
+
     override suspend fun createFolder(path: String) =
         madeOnce(path) {
             onServer(path, retry = false) { sftp ->

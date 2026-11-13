@@ -4,6 +4,8 @@ import java.io.FilterOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.channels.Channels
+import java.nio.channels.FileChannel
 import java.nio.file.AccessDeniedException
 import java.nio.file.DirectoryIteratorException
 import java.nio.file.DirectoryNotEmptyException
@@ -59,6 +61,15 @@ class LocalFileSystem(private val io: CoroutineDispatcher = Dispatchers.IO) : Fi
                         arrayOf(StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
                     else arrayOf(StandardOpenOption.CREATE_NEW)
                 opened(LocalOutput(Files.newOutputStream(Paths.get(path), *options), path))
+            }
+        }
+    }
+
+    override suspend fun writeAt(path: String, offset: Long): OutputStream = openedFor { opened ->
+        withContext(io) {
+            mapErrors(path) {
+                val channel = FileChannel.open(Paths.get(path), StandardOpenOption.WRITE)
+                opened(LocalOutput(Channels.newOutputStream(channel.position(offset)), path))
             }
         }
     }

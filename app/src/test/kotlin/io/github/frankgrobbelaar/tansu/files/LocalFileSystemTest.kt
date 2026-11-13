@@ -37,6 +37,15 @@ class LocalFileSystemTest {
     }
 
     @Test
+    fun `carries on writing a file part-way, keeping what's before`() = runTest {
+        val path = folder.newFile("film.part").apply { writeText("0123xxxx") }.path
+
+        files.writeAt(path, offset = 4).use { it.write("4567".toByteArray()) }
+
+        assertEquals("01234567", File(path).readText())
+    }
+
+    @Test
     fun `marks names that start with a dot as hidden`() = runTest {
         folder.newFile(".nomedia")
 

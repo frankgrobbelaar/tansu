@@ -19,7 +19,9 @@ import io.github.frankgrobbelaar.tansu.files.Sort
 import io.github.frankgrobbelaar.tansu.files.SortBy
 import io.github.frankgrobbelaar.tansu.jobs.Clipboard
 import io.github.frankgrobbelaar.tansu.jobs.Job
+import io.github.frankgrobbelaar.tansu.jobs.JobRun
 import io.github.frankgrobbelaar.tansu.jobs.Jobs
+import io.github.frankgrobbelaar.tansu.jobs.Where
 import io.github.frankgrobbelaar.tansu.servers.SavedServers
 import io.github.frankgrobbelaar.tansu.servers.Server
 import kotlinx.coroutines.CompletableDeferred
@@ -31,6 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
@@ -92,7 +95,7 @@ class BrowseViewModelTest {
     private val clipboard = Clipboard()
     private var granted = true
 
-    private fun viewModel(saved: SavedStateHandle = SavedStateHandle()) =
+    private fun viewModel(saved: SavedStateHandle = SavedStateHandle(), jobs: Jobs = this.jobs) =
         BrowseViewModel(
             drawers = drawers,
             access = { granted },
@@ -466,6 +469,44 @@ class BrowseViewModelTest {
             assertEquals(Job.Kind.Move, job.kind)
             assertEquals(download, job.to?.folder)
             assertNull(expectMostRecentItem().held)
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pasted files show up as they land, not only when the job ends`() = runTest {
+        val shelf = MemoryFileSystem().file("/a.mkv", "a").file("/b.mkv", "b").folderAt("/Films")
+        drawers.value = listOf(phone, nas.copy(fileSystem = shelf))
+        val held = CompletableDeferred<Unit>()
+        shelf.gates["/b.mkv"] = held
+        // A job says how far it got every so often: here, every time.
+        var now = 0L
+        val jobs =
+            Jobs(
+                drawers,
+                CoroutineScope(SupervisorJob() + main.dispatcher),
+                io = main.dispatcher,
+                clock = { now.also { now += JobRun.REPORT_EVERY_MILLIS } },
+            )
+        val browse = viewModel(jobs = jobs)
+        browse.state.test {
+            browse.select("nas")
+            browse.open(folder("", "Films"))
+            val nasHere = Where("nas", "/", "NAS", "NAS")
+            val films = Where("nas", "/Films", "NAS", "NAS › Films")
+            val picks = listOf("/a.mkv", "/b.mkv").map { checkNotNull(shelf.stat(it)) }
+
+            jobs.copy(picks, nasHere, films, emptyMap())
+            advanceTimeBy(1_000)
+
+            // The first is there while the second is still on its way.
+            assertTrue(jobs.all.value.single().active)
+            assertEquals(listOf("a.mkv"), browse.state.value.entries.map { it.name })
+
+            held.complete(Unit)
+            advanceUntilIdle()
+            assertEquals(listOf("a.mkv", "b.mkv"), browse.state.value.entries.map { it.name })
+            cancelAndIgnoreRemainingEvents()
         }
     }
 

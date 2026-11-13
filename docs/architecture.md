@@ -70,7 +70,14 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   wait for a network, which a copy on the phone alone doesn't need.
 - A copy streams 256 KB chunks from one `FileSystem` to another, reporting progress as it goes. A
   move within a drawer is a rename; across drawers it copies, checks the size, then deletes the
-  original. Folders are walked first, so the job knows how much there is.
+  original. Folders are walked first, so the job knows how much there is. A file whose copy breaks off,
+  as when Tailscale moves from Wi-Fi to mobile data, carries on from where it was rather than
+  starting again, whether the job tried again by itself or was paused and resumed: its hidden
+  half stays, and the job writes on from its end, less the last MiB, which a broken connection
+  may have left with gaps (SFTP keeps 16 writes of 32 KiB in flight). It does so only if the
+  source still says it last changed when the half was begun; otherwise the file starts again. A
+  job has one hidden half at a time: another file's, left when it stopped, goes as soon as a
+  different file begins.
 - Name clashes are settled before the job starts (Keep both, Replace or Skip, per name), telling
   names apart without case, as the phone and SMB do. A job remembers where each pick went and
   which files are done, so a paused, resumed or retried job carries on without asking again or
@@ -115,7 +122,8 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   up to tell the two apart, and a write that fails isn't waited out.
 - Saving shared files can't be retried: the other app only lends them while it shares them.
 - Progress is a `StateFlow` read by the Browse card, the Transfers tab and the notification (which
-  updates at most once a second).
+  updates at most once a second). Browse lists the folder on show again as a running job puts
+  files in it or takes them away, at most every 2 seconds, so pasted files show up as they land.
 
 ## Sharing in
 

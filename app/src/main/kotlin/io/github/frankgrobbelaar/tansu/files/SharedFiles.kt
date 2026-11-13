@@ -43,6 +43,8 @@ class SharedFiles(
 
     override suspend fun write(path: String, replace: Boolean): OutputStream = throw readOnly(path)
 
+    override suspend fun writeAt(path: String, offset: Long): OutputStream = throw readOnly(path)
+
     override suspend fun createFolder(path: String) = throw readOnly(path)
 
     override suspend fun rename(from: String, to: String, replace: Boolean) = throw readOnly(from)

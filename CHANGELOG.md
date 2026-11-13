@@ -5,6 +5,10 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- A big file whose copy breaks off, as when the phone moves from Wi-Fi to mobile data, carries on
+  from where it was, rather than starting again; so does one paused part-way and resumed.
+- Pasted files show up in the folder as they land, rather than when the whole job ends.
+
 ## 0.4.4 - 2026-11-13
 
 Servers that are slow to answer, as over Tailscale, are waited for, and say why when they can't

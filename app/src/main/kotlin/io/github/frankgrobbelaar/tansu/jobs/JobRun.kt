@@ -146,14 +146,14 @@ internal class JobRun(
 
     /**
      * What the last run left half done, settled before another file can take its place: a file it
-     * was naming when it stopped counts as copied if the naming went through, and anything else it
-     * half wrote goes.
+     * was naming when it stopped counts as copied if the naming went through, and goes if it
+     * didn't. A file it was still writing stays, for that file to carry on with.
      */
     private suspend fun settleLeftover(target: Side) {
         val hidden = state.partial ?: return
         val from = state.partialOf
-        val landing = state.landing
-        if (from != null && landing != null && wasNamed(hidden, landing, target)) {
+        val landing = state.landing ?: return
+        if (from != null && wasNamed(hidden, landing, target)) {
             written += landing.lowercase()
             state = state.copy(copied = state.copied + (from to landing))
         } else {
@@ -166,7 +166,7 @@ internal class JobRun(
                 // Gone already, or left as a hidden file nobody sees.
             }
         }
-        state = state.copy(partial = null, partialOf = null, landing = null)
+        state = state.copy(partial = null, partialOf = null, partialAs = null, landing = null)
     }
 
     /**
@@ -467,7 +467,7 @@ internal class JobRun(
         // Not being named any more before it goes, so a stop as it goes can't pass for a naming.
         state = state.copy(landing = null)
         partial?.let { tryOrNull { target.files.delete(it) } }
-        state = state.copy(partial = null, partialOf = null)
+        state = state.copy(partial = null, partialOf = null, partialAs = null)
     }
 
     /** Runs [block] against where the files come from; a refusal there is said as such. */
@@ -501,9 +501,17 @@ internal class JobRun(
             return if (target.files.stat(hidden) == null) landed(landing)
             else name(step, hidden, target)
         }
+        val start = carryOnFrom(step, hidden, target)
         // Known before it's opened, so a stop while it opens still knows what to remove.
-        state = state.copy(partial = hidden, partialOf = step.from.path, landing = null)
-        val wrote = stream(step.from, hidden, target)
+        state =
+            state.copy(
+                partial = hidden,
+                partialOf = step.from.path,
+                partialAs = step.from.modified,
+                landing = null,
+            )
+        if (start > 0) progress { it.copy(bytesDone = it.bytesDone + start) }
+        val wrote = stream(step.from, hidden, target, start)
         // Whole, as far as where it came from says now: a file still being written isn't. Another
         // app's shared file may not say its size, which it gives as 0.
         val now =
@@ -513,6 +521,30 @@ internal class JobRun(
         if (!unsized && now.size != wrote) throw FileFailed(Failure.Reason.Mismatch)
         state = state.copy(asCopied = state.asCopied + (step.from.path to now.modified))
         return name(step, hidden, target)
+    }
+
+    /**
+     * Where to carry on writing [step]'s file: part-way into what an earlier go wrote, if its
+     * source hasn't changed since, less the last stretch, which a broken connection may have left
+     * with gaps; otherwise from the start. Another file's hidden half, left by a run that stopped
+     * before it was through, goes, and that file starts again when its turn comes.
+     */
+    private suspend fun carryOnFrom(step: CopyFile, hidden: String, target: Side): Long {
+        val partial = state.partial
+        if (partial != null && partial != hidden) {
+            // Removed before it's forgotten, so a stop in between can't leave it behind.
+            tryOrNull { retrying { target.files.delete(partial) } }
+            state = state.copy(partial = null, partialOf = null, partialAs = null)
+            return 0
+        }
+        if (partial == null) return 0
+        val written = target.files.stat(hidden)?.size ?: return 0
+        // Too little to be worth asking the source about.
+        if (written <= WRITTEN_AGAIN) return 0
+        // The file as it is now, not as the job found it: it may have changed while it was paused.
+        val now = atSource { source.files.stat(step.from.path) } ?: return 0
+        val same = now.modified == state.partialAs && written <= now.size
+        return if (same) written - WRITTEN_AGAIN else 0
     }
 
     /**
@@ -564,16 +596,22 @@ internal class JobRun(
     /** The file has its name at [path]: one this job wrote, so never one it replaces. */
     private fun landed(path: String): String {
         written += path.lowercase()
-        state = state.copy(partial = null, partialOf = null, landing = null)
+        state = state.copy(partial = null, partialOf = null, partialAs = null, landing = null)
         return path
     }
 
-    /** Streams [from] into [path], this job's own hidden file, from its start. Says how much. */
-    private suspend fun stream(from: Entry, path: String, target: Side): Long {
-        var wrote = 0L
-        atSource { source.files.read(from.path) }
+    /**
+     * Streams [from] into [path], this job's own hidden file, from [start] on. Says how much the
+     * hidden file holds now.
+     */
+    private suspend fun stream(from: Entry, path: String, target: Side, start: Long): Long {
+        var wrote = start
+        atSource { source.files.read(from.path, start) }
             .use { input ->
-                target.files.write(path, replace = true).use { output ->
+                val out =
+                    if (start > 0) target.files.writeAt(path, start)
+                    else target.files.write(path, replace = true)
+                out.use { output ->
                     val buffer = ByteArray(CHUNK)
                     while (true) {
                         currentCoroutineContext().ensureActive()
@@ -735,6 +773,11 @@ internal class JobRun(
 
     companion object {
         const val CHUNK = 256 * 1024
+        /**
+         * How much of a file whose writing broke off is written again when the job carries on: more
+         * than SFTP's 16 writes of 32 KiB in flight, which a broken connection may leave with gaps.
+         */
+        const val WRITTEN_AGAIN = 1024 * 1024L
         private const val RADIX = 36
         const val RETRY_FOR_MILLIS = 30_000L
         const val RETRY_EVERY_MILLIS = 3_000L
