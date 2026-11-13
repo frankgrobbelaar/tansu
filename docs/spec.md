@@ -79,7 +79,10 @@ A host is a tailnet name, a local name or an IP. Tailscale runs on its own; tans
 ### 8. A server that can't be reached
 
 - Browse says what went wrong and what to try, such as "Can't reach NAS. Is Tailscale on?", with
-  Retry and Edit server.
+  Retry and Edit server. It tells a server that didn't answer from a name that isn't known and a
+  server that turned the connection away.
+- A server that's slow to wake up is waited for, and Browse says so, rather than giving up at
+  once.
 - A wrong password, a missing share and a folder you can't open each get their own message. A
   missing share lists the shares the server does have.
 - A changed SFTP key blocks the connection until you keep it blocked or trust the new key.
@@ -96,7 +99,7 @@ Every copy, move, delete and share-in is a job.
   half-copied file; finished files stay.
 - Jobs run one at a time, in order. Each ends with a summary ("Copied 128 files to NAS, 2
   skipped"); failures list every file and why, with Retry.
-- A dropped connection is retried for 30 seconds, then the job pauses and says why. Resume picks
+- A dropped connection is retried for at least 30 seconds, then the job pauses and says why. Resume picks
   up from the file it was on.
 
 ## Settings

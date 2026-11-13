@@ -176,10 +176,14 @@ private fun failureText(
         ServerFormUiState.Failure.Unreachable ->
             if (localNetworkBlocked) stringResource(R.string.fail_local_network, host)
             else stringResource(R.string.fail_unreachable, host)
+        ServerFormUiState.Failure.UnknownName -> stringResource(R.string.fail_unknown_name, host)
+        ServerFormUiState.Failure.Refused ->
+            if (localNetworkBlocked) stringResource(R.string.fail_local_network, host)
+            else stringResource(R.string.fail_refused, host, stringResource(serviceOf(state.kind)))
         ServerFormUiState.Failure.LoginRefused -> stringResource(R.string.fail_login, host)
         ServerFormUiState.Failure.BadKey -> stringResource(R.string.fail_bad_key)
         ServerFormUiState.Failure.ShareMissing ->
-            stringResource(R.string.fail_share, state.draft.share.trim(), host)
+            stringResource(R.string.fail_share, state.shareName, host)
         ServerFormUiState.Failure.Locked -> stringResource(R.string.fail_locked, host)
         ServerFormUiState.Failure.FolderMissing ->
             stringResource(R.string.fail_folder, state.draft.folder.trim().ifEmpty { "/" }, host)
@@ -247,3 +251,7 @@ internal fun TrustDialog(
         },
     )
 }
+
+/** What a server must have switched on for tansu to connect to it. */
+private fun serviceOf(kind: Server.Kind): Int =
+    if (kind == Server.Kind.Sftp) R.string.service_ssh else R.string.service_smb

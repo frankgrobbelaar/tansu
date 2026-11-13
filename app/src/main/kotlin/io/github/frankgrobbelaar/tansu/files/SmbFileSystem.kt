@@ -7,6 +7,7 @@ import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2ShareAccess
 import com.hierynomus.mssmb2.SMBApiException
 import com.hierynomus.protocol.commons.EnumWithValue.EnumUtils
+import com.hierynomus.protocol.commons.socket.ProxySocketFactory
 import com.hierynomus.security.bc.BCSecurityProvider
 import com.hierynomus.smbj.SMBClient
 import com.hierynomus.smbj.SmbConfig
@@ -35,12 +36,15 @@ class SmbFileSystem(
 ) : FileSystem, Closeable {
 
     // No socket timeout: smbj treats one as a dead connection, so an idle minute would end it.
-    // Each request still has its own.
+    // Each request still has its own, and connecting has its own too, longer than smbj's five
+    // seconds, which a server reached through Tailscale can take to answer while it wakes up.
     private val client =
         SMBClient(
             SmbConfig.builder()
                 .withSecurityProvider(BCSecurityProvider())
-                .withTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .withSocketFactory(ProxySocketFactory(CONNECT_TIMEOUT_MILLIS))
+                .withTimeout(ANSWER_TIMEOUT_MILLIS.toLong(), TimeUnit.MILLISECONDS)
+                .withReadBufferSize(READ_CHUNK)
                 .build()
         )
 
@@ -112,9 +116,8 @@ class SmbFileSystem(
         }
     }
 
-    override suspend fun createFolder(path: String) {
-        onShare(path) { share -> share.mkdir(smbPath(path)) }
-    }
+    override suspend fun createFolder(path: String) =
+        madeOnce(path) { onShare(path, retry = false) { share -> share.mkdir(smbPath(path)) } }
 
     override suspend fun rename(from: String, to: String, replace: Boolean) {
         // Tried once: done twice, its second go would find nothing to rename.
@@ -233,7 +236,6 @@ class SmbFileSystem(
     private companion object {
         const val REPARSE_SYMLINK = 0xA000000CL
         const val REPARSE_MOUNT_POINT = 0xA0000003L
-        const val TIMEOUT_SECONDS = 15L
         val LOGIN_REFUSED =
             setOf(
                 "STATUS_LOGON_FAILURE",
@@ -263,21 +265,56 @@ class SmbFileSystem(
     }
 }
 
-/** A file on the share read from [position] on, as a stream; smbj's failures become I/O ones. */
+/**
+ * What a read asks the server for at a time: big enough that a server across Tailscale isn't a
+ * round trip per few kilobytes, small enough that a slow link answers each in time.
+ */
+private const val READ_CHUNK = 256 * 1024
+
+/**
+ * A file on the share read from [position] on, a chunk at a time, and the next chunk only once the
+ * last is used up, so a stream closed early leaves nothing on its way. smbj's failures become I/O
+ * ones: a read the server turns down fails, rather than ending the file early as smbj's own stream
+ * does.
+ */
 private class SmbInput(private val file: File, private var position: Long) : InputStream() {
-    override fun read(): Int {
-        val one = ByteArray(1)
-        return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and BYTE
+    private val chunk = ByteArray(READ_CHUNK)
+    private var next = 0
+    private var held = 0
+    private var ended = false
+
+    override fun read(): Int = if (fill()) chunk[next++].toInt() and BYTE else -1
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        if (length == 0) return 0
+        if (!fill()) return -1
+        val count = minOf(length, held - next)
+        chunk.copyInto(buffer, offset, next, next + count)
+        next += count
+        return count
     }
 
-    override fun read(buffer: ByteArray, offset: Int, length: Int): Int = smbIo {
-        val read = file.read(buffer, position, offset, length)
-        if (read > 0) position += read
-        if (read <= 0) -1 else read
-    }
+    override fun available(): Int = held - next
 
     override fun close() = smbIo { file.close() }
+
+    /** Whether there's more to read, asking the server for the next chunk if need be. */
+    private fun fill(): Boolean {
+        if (next < held) return true
+        if (ended) return false
+        val read = smbIo { file.read(chunk, position, 0, chunk.size) }
+        if (read <= 0) {
+            ended = true
+            return false
+        }
+        position += read
+        next = 0
+        held = read
+        return true
+    }
 }
+
+private const val BYTE = 0xFF
 
 /**
  * A file on the share written from its start, as a stream. smbj's failures become I/O ones; a full
@@ -308,8 +345,6 @@ private class SmbOutput(private val file: File, private val path: String) : Outp
         }
     }
 }
-
-private const val BYTE = 0xFF
 
 /** Ends a connection without waiting on the server; one that's already gone is ended enough. */
 private inline fun quietly(block: () -> Unit) {

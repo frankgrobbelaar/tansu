@@ -5,6 +5,7 @@ import io.github.frankgrobbelaar.tansu.servers.Secrets
 import io.github.frankgrobbelaar.tansu.servers.Server
 import kotlinx.coroutines.runBlocking
 import org.junit.AfterClass
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -114,8 +115,25 @@ class SmbFileSystemTest {
         }
     }
 
+    @Test
+    fun `reads a file bigger than a chunk, from part-way, whole`() {
+        // Read a chunk at a time with the next asked for ahead, as a server across Tailscale needs.
+        val bytes = ByteArray(BIG) { (it % PRIME).toByte() }
+        smb().use { files ->
+            runBlocking { files.write("/big.bin").use { it.write(bytes) } }
+            val tail = runBlocking { files.read("/big.bin", offset = PART).use { it.readBytes() } }
+            val all = runBlocking { files.read("/big.bin").use { it.readBytes() } }
+
+            assertArrayEquals(bytes.copyOfRange(PART.toInt(), BIG), tail)
+            assertArrayEquals(bytes, all)
+        }
+    }
+
     companion object {
         private const val SMB_PORT = 445
+        private const val BIG = 700 * 1024
+        private const val PART = 300 * 1024L
+        private const val PRIME = 251
         private lateinit var samba: GenericContainer<*>
 
         @BeforeClass

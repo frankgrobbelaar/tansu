@@ -12,6 +12,10 @@ import io.github.frankgrobbelaar.tansu.servers.ServerCheck
 import io.github.frankgrobbelaar.tansu.servers.ServerStore
 import io.github.frankgrobbelaar.tansu.servers.Servers
 import io.github.frankgrobbelaar.tansu.servers.StoredSecrets
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -170,6 +174,61 @@ class ServerFormViewModelTest {
 
         val saved = servers.all.first().single()
         assertEquals("Media" to "Photos/2026", saved.share to saved.folder)
+    }
+
+    @Test
+    fun `a whole SMB address pasted as the share is its share and folder`() = runTest {
+        val typed =
+            mapOf(
+                "\\\\nas\\Media\\Photos" to ("Media" to "Photos"),
+                "smb://nas/Media/Photos/" to ("Media" to "Photos"),
+                "//nas/Media/Photos" to ("Media" to "Photos"),
+                "smb://nas/My%20Photos" to ("My Photos" to ""),
+                "smb://nas/My Photos/2026" to ("My Photos" to "2026"),
+                // No room for a server's name: just the share.
+                "\\\\Media" to ("Media" to ""),
+                "//Media" to ("Media" to ""),
+            )
+        for ((share, expected) in typed) {
+            val form = form(Server.Kind.Smb)
+            form.fillSmb()
+            form.edit { it.copy(share = share) }
+
+            form.connect()
+
+            val saved = checked.last().first
+            assertEquals(share, expected, saved.share to saved.folder)
+        }
+    }
+
+    @Test
+    fun `an address with no share in it can't be connected`() {
+        val form = form(Server.Kind.Smb)
+        form.fillSmb()
+
+        form.edit { it.copy(share = "smb://nas") }
+
+        assertFalse(form.state.value.canConnect)
+    }
+
+    @Test
+    fun `a server that can't be reached says why, as far as the network said`() = runTest {
+        val form = form(Server.Kind.Smb)
+        form.fillSmb()
+        val causes =
+            mapOf(
+                UnknownHostException("nas") to ServerFormUiState.Failure.UnknownName,
+                ConnectException("Connection refused") to ServerFormUiState.Failure.Refused,
+                SocketTimeoutException("connect timed out") to
+                    ServerFormUiState.Failure.Unreachable,
+            )
+
+        for ((cause, failure) in causes) {
+            answer = { throw FileSystemException.Unreachable("nas", IOException(cause)) }
+            form.connect()
+
+            assertEquals(failure, form.state.value.failure)
+        }
     }
 
     @Test

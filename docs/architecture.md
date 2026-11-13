@@ -36,8 +36,25 @@ removed. Library errors become a few typed errors (`FileSystemException`: `Unrea
 `AuthFailed`, `BadKey`, `ShareMissing`, `HostKeyUnknown`, `HostKeyChanged`, `NotFound`,
 `AccessDenied`, `Unreadable`), which the UI puts into words; nothing else escapes a `FileSystem`.
 
-Every call has a 15-second timeout. BouncyCastle is registered in full at start-up, in place of
-Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for NTLM.
+Servers are given time, because a NAS reached through Tailscale is often waking up: Tailscale
+finding its way to it, or its disks spinning up. Connecting has 20 seconds, and each call 30.
+`Reconnecting` tries a connection that fails at once (no name yet, no route yet) again after 1, 2
+and 4 seconds, but not one that waited out its timeout or that the server turned away; calls that
+waited meanwhile share how it went, rather than each trying again. A call that finds the
+connection dead, or gets no answer in time, is tried once more on a new connection, unless it
+mustn't happen twice: a rename isn't, and a new folder whose answer was lost is looked for before
+it's made again. A dead connection is hung up at once, without waiting on the server.
+`Unreachable` says what the network said (no answer, no such name, or turned away), and Browse
+and the server form say what to check for each. Browse says it's waiting for the server once a
+listing has taken 3 seconds.
+
+SMB reads ask for 256 KiB at a time, so a server across Tailscale isn't a round trip per few
+kilobytes. smbj's own stream would ask for the next piece early, but it takes a read the server
+turns down for the end of the file, so tansu reads with its own. SFTP reads keep 16 requests in
+flight.
+
+BouncyCastle is registered in full at start-up, in place of Android's cut-down copy, because
+sshj's key exchanges need it; smbj uses it for NTLM.
 
 ## Jobs
 
@@ -88,7 +105,7 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
   job resumes counts as moved only if the job had begun removing it, which it remembers first.
 - Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.
   A full disk or a refusal fails the file at once; a server that stops answering is retried for
-  30 seconds, then the job pauses and says which server it lost. Cancelling, even a paused job,
+  at least 30 seconds, then the job pauses and says which server it lost. Cancelling, even a paused job,
   deletes the file half written; finished files stay.
 - Links on SFTP are never gone through to delete or move what they point to. A picked link is
   followed for what's in it, and a move removes only the link; links inside a folder are left.

@@ -5,6 +5,15 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- Servers that are slow to answer, as a NAS reached through Tailscale often is while it wakes up,
+  are given more time and tried again before tansu says it can't reach them. Browse says when
+  it's waiting for one.
+- When a server can't be reached, tansu says whether it didn't answer, has a name that isn't
+  known, or turned the connection away, and what to check for each.
+- Pictures, videos and files open from SMB servers much faster over Tailscale: tansu reads them
+  256 KB at a time, where it read 8 KB.
+- The Share field takes a whole address too, such as smb://nas/Media.
+
 ## 0.4.3 - 2026-11-13
 
 One more fix for moving folders.

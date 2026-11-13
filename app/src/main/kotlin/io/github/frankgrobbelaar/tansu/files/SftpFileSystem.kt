@@ -110,17 +110,18 @@ class SftpFileSystem(
         }
     }
 
-    override suspend fun createFolder(path: String) {
-        onServer(path) { sftp ->
-            try {
-                sftp.mkdir(path)
-            } catch (e: SFTPException) {
-                // As with files, OpenSSH says only that it failed when the folder is there.
-                if (sftp.statExistence(path) != null) throw FileSystemException.Exists(path)
-                throw e
+    override suspend fun createFolder(path: String) =
+        madeOnce(path) {
+            onServer(path, retry = false) { sftp ->
+                try {
+                    sftp.mkdir(path)
+                } catch (e: SFTPException) {
+                    // As with files, OpenSSH says only that it failed when the folder is there.
+                    if (sftp.statExistence(path) != null) throw FileSystemException.Exists(path)
+                    throw e
+                }
             }
         }
-    }
 
     override suspend fun rename(from: String, to: String, replace: Boolean) {
         // Tried once: done twice, its second go would find nothing to rename.
@@ -170,11 +171,11 @@ class SftpFileSystem(
         val verifier = PinnedKey(server.hostKey)
         val client =
             SSHClient(DefaultConfig()).apply {
-                connectTimeout = TIMEOUT_MILLIS
-                timeout = TIMEOUT_MILLIS
-                // The key exchange and each request wait this long too, not sshj's 30 seconds.
-                transport.timeoutMs = TIMEOUT_MILLIS
-                connection.timeoutMs = TIMEOUT_MILLIS
+                connectTimeout = CONNECT_TIMEOUT_MILLIS
+                timeout = ANSWER_TIMEOUT_MILLIS
+                // The key exchange and each request wait this long too.
+                transport.timeoutMs = ANSWER_TIMEOUT_MILLIS
+                connection.timeoutMs = ANSWER_TIMEOUT_MILLIS
                 addHostKeyVerifier(verifier)
             }
         var connected = false
@@ -190,7 +191,7 @@ class SftpFileSystem(
             }
             val sftp =
                 mapErrors("") {
-                    client.newSFTPClient().apply { sftpEngine.timeoutMs = TIMEOUT_MILLIS }
+                    client.newSFTPClient().apply { sftpEngine.timeoutMs = ANSWER_TIMEOUT_MILLIS }
                 }
             connected = true
             return Session(client, sftp)
@@ -199,8 +200,11 @@ class SftpFileSystem(
         }
     }
 
+    /**
+     * Hangs up without waiting on the server: the SFTP channel ends with the connection, where
+     * closing it first would wait out a silent server's whole timeout.
+     */
     private fun hangUp(session: Session) {
-        quietly { session.sftp.close() }
         quietly { session.ssh.disconnect() }
     }
 
@@ -272,7 +276,6 @@ class SftpFileSystem(
     }
 
     private companion object {
-        const val TIMEOUT_MILLIS = 15_000
         const val MILLIS_PER_SECOND = 1000L
         /** Requests kept in flight, so a transfer isn't one round trip per chunk. */
         const val READ_AHEAD = 16

@@ -16,6 +16,8 @@ import io.github.frankgrobbelaar.tansu.servers.SecretLost
 import io.github.frankgrobbelaar.tansu.servers.Server
 import io.github.frankgrobbelaar.tansu.servers.ServerCheck
 import io.github.frankgrobbelaar.tansu.servers.Servers
+import java.net.URI
+import java.net.URISyntaxException
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -56,11 +58,15 @@ data class ServerFormUiState(
     val hostName: String
         get() = addressOf(this).first
 
+    /** The SMB share's name, as the Share field gives it. */
+    val shareName: String
+        get() = shareNames(draft).firstOrNull().orEmpty()
+
     val canConnect: Boolean
         get() =
             step == Step.Filling &&
                 draft.host.isNotBlank() &&
-                (kind == Server.Kind.Sftp || draft.share.isNotBlank()) &&
+                (kind == Server.Kind.Sftp || shareName.isNotEmpty()) &&
                 (kind == Server.Kind.Smb || portOf(draft.port) != null) &&
                 (draft.signIn == Server.SignIn.Guest || draft.username.isNotBlank()) &&
                 (draft.signIn != Server.SignIn.Key || hasKey)
@@ -79,6 +85,10 @@ data class ServerFormUiState(
 
     enum class Failure {
         Unreachable,
+        /** No server has the name typed. */
+        UnknownName,
+        /** The server is there, but turned the connection away. */
+        Refused,
         LoginRefused,
         BadKey,
         ShareMissing,
@@ -217,7 +227,7 @@ class ServerFormViewModel(
             kind = form.kind,
             host = host,
             port = port,
-            share = if (form.kind == Server.Kind.Smb) shareOf(draft) else "",
+            share = if (form.kind == Server.Kind.Smb) form.shareName else "",
             folder = folderOf(draft, form.kind),
             username = if (signIn == Server.SignIn.Guest) "" else draft.username.trim(),
             signIn = signIn,
@@ -294,15 +304,36 @@ private fun draftOf(server: Server) =
         keyName = server.keyName,
     )
 
-/** The share's own name: Media/Photos is the Media share, starting in Photos. */
-private fun shareOf(draft: ServerDraft): String =
-    draft.share.trim().trim('/', '\\').split('/', '\\').first()
+/**
+ * The names in the Share field: the share, then any folders in it, so Media/Photos is the Media
+ * share, starting in Photos. A whole address pasted in, such as smb://nas/Media or \\nas\Media as
+ * Windows writes it, is the same without the server's name.
+ */
+private fun shareNames(draft: ServerDraft): List<String> {
+    val typed = draft.share.trim()
+    if (typed.startsWith(SMB_SCHEME, ignoreCase = true)) {
+        // A link names its server first, and may write a space as %20.
+        val path =
+            try {
+                URI(typed).path
+            } catch (_: URISyntaxException) {
+                null
+            }
+        return path?.let(::namesIn) ?: namesIn(typed.drop(SMB_SCHEME.length)).drop(1)
+    }
+    val names = namesIn(typed)
+    // \\nas\Media names its server first; \\Media has no room for one, so it's the share.
+    val withServer = (typed.startsWith("\\\\") || typed.startsWith("//")) && names.size > 1
+    return if (withServer) names.drop(1) else names
+}
+
+private fun namesIn(path: String) = path.split('/', '\\').filter { it.isNotBlank() }
+
+private const val SMB_SCHEME = "smb://"
 
 /** The folder to start in, with anything typed after the share's name in front. */
 private fun folderOf(draft: ServerDraft, kind: Server.Kind): String {
-    val afterShare =
-        if (kind == Server.Kind.Smb) draft.share.trim().trim('/', '\\').split('/', '\\').drop(1)
-        else emptyList()
+    val afterShare = if (kind == Server.Kind.Smb) shareNames(draft).drop(1) else emptyList()
     val folder = draft.folder.trim().trim('/', '\\').replace('\\', '/')
     return (afterShare + listOfNotNull(folder.ifEmpty { null })).joinToString("/")
 }
@@ -329,7 +360,17 @@ private fun ServerFormUiState.withRefusal(
                     ServerFormUiState.Step.Trust(e.presented, e.trusted, server.host, server.port)
             )
         is FileSystemException.Unreachable ->
-            filling.copy(failure = ServerFormUiState.Failure.Unreachable)
+            filling.copy(
+                failure =
+                    when (e.why) {
+                        FileSystemException.Unreachable.Why.NoAnswer ->
+                            ServerFormUiState.Failure.Unreachable
+                        FileSystemException.Unreachable.Why.UnknownName ->
+                            ServerFormUiState.Failure.UnknownName
+                        FileSystemException.Unreachable.Why.Refused ->
+                            ServerFormUiState.Failure.Refused
+                    }
+            )
         is FileSystemException.AuthFailed ->
             filling.copy(failure = ServerFormUiState.Failure.LoginRefused)
         is FileSystemException.BadKey -> filling.copy(failure = ServerFormUiState.Failure.BadKey)

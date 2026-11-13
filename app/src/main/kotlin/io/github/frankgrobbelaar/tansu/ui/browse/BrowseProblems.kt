@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.frankgrobbelaar.tansu.R
+import io.github.frankgrobbelaar.tansu.files.Drawer
+import io.github.frankgrobbelaar.tansu.files.FileSystemException
 import io.github.frankgrobbelaar.tansu.ui.kit.EmptyState
 import io.github.frankgrobbelaar.tansu.ui.kit.HostKeyBox
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
@@ -69,7 +71,7 @@ internal fun ProblemState(
                 body = stringResource(R.string.browse_unreadable_body),
                 main = Choice(stringResource(R.string.try_again), actions.onRetry),
             )
-        else -> ServerProblem(problem, name, actions, localNetworkBlocked)
+        else -> ServerProblem(problem, name, state.drawer.kind, actions, localNetworkBlocked)
     }
 }
 
@@ -78,6 +80,7 @@ internal fun ProblemState(
 private fun ServerProblem(
     problem: BrowseUiState.Problem,
     name: String,
+    kind: Drawer.Kind,
     actions: BrowseActions,
     localNetworkBlocked: Boolean,
 ) {
@@ -97,7 +100,7 @@ private fun ServerProblem(
             Problem(
                 icon = TansuIcons.Offline,
                 title = stringResource(R.string.server_unreachable_title, name),
-                body = stringResource(R.string.server_unreachable_body, problem.host),
+                body = unreachableBody(problem, kind),
                 main = tryAgain,
                 other = editServer,
             )
@@ -120,6 +123,23 @@ private fun ServerProblem(
         else -> Unit
     }
 }
+
+/** Why the server couldn't be reached, as far as the network said, and what to check. */
+@Composable
+private fun unreachableBody(problem: BrowseUiState.Problem.Unreachable, kind: Drawer.Kind): String =
+    when (problem.why) {
+        FileSystemException.Unreachable.Why.NoAnswer ->
+            stringResource(R.string.server_unreachable_body, problem.host)
+        FileSystemException.Unreachable.Why.UnknownName ->
+            stringResource(R.string.server_unknown_name_body, problem.host)
+        FileSystemException.Unreachable.Why.Refused ->
+            stringResource(R.string.server_refused_body, problem.host, serviceOf(kind))
+    }
+
+/** What a server must have switched on for tansu to connect to it. */
+@Composable
+private fun serviceOf(kind: Drawer.Kind): String =
+    stringResource(if (kind == Drawer.Kind.Sftp) R.string.service_ssh else R.string.service_smb)
 
 @Composable
 private fun KeyChanged(

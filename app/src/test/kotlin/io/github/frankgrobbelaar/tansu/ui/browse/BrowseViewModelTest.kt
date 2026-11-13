@@ -24,10 +24,13 @@ import io.github.frankgrobbelaar.tansu.servers.SavedServers
 import io.github.frankgrobbelaar.tansu.servers.Server
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
@@ -309,6 +312,35 @@ class BrowseViewModelTest {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a server slow to answer is said to be waited for`() = runTest {
+        // As a NAS whose disks were asleep, or one reached through Tailscale as it wakes up.
+        val sleepy =
+            object : FileSystem by nasFiles {
+                override suspend fun list(path: String): List<Entry> {
+                    delay(SLEEPY_MILLIS)
+                    return nasFiles.list(path)
+                }
+            }
+        drawers.value = listOf(phone, nas.copy(fileSystem = sleepy))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("nas")
+            advanceTimeBy(1_000)
+            assertFalse(browse.state.value.slow)
+
+            advanceTimeBy(3_000)
+            assertTrue(browse.state.value.loading && browse.state.value.slow)
+
+            advanceTimeBy(SLEEPY_MILLIS)
+            val shown = browse.state.value
+            assertFalse(shown.loading || shown.slow)
+            assertEquals(listOf("Films"), shown.entries.map { it.name })
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     @Test
     fun `a server that doesn't answer says so and gets a dot until it does`() = runTest {
         drawers.value = listOf(phone, nas)
@@ -520,5 +552,9 @@ class BrowseViewModelTest {
             assertNull(renamed.notice)
             assertEquals(listOf("b.mkv"), renamed.entries.map { it.name })
         }
+    }
+
+    private companion object {
+        const val SLEEPY_MILLIS = 5_000L
     }
 }

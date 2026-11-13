@@ -54,6 +54,7 @@ import io.github.frankgrobbelaar.tansu.ui.kit.FileRow
 import io.github.frankgrobbelaar.tansu.ui.kit.PathBar
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuTopBar
+import io.github.frankgrobbelaar.tansu.ui.kit.icon
 import io.github.frankgrobbelaar.tansu.ui.rememberNotificationAsk
 import io.github.frankgrobbelaar.tansu.ui.servers.LocalNetworkAccess
 import io.github.frankgrobbelaar.tansu.ui.servers.rememberLocalNetworkAccess
@@ -497,6 +498,12 @@ private fun FolderBody(state: BrowseUiState, actions: BrowseActions, localNetwor
     val empty = !state.loading && state.entries.isEmpty()
     when {
         state.problem != null -> ProblemState(state, actions, localNetworkBlocked)
+        state.loading && state.slow && state.entries.isEmpty() && state.onServer ->
+            EmptyState(
+                icon = state.drawer.kind.icon,
+                title = stringResource(R.string.browse_waiting_title, state.drawer.name),
+                body = stringResource(R.string.browse_waiting_body),
+            )
         empty && !state.search.isNullOrEmpty() ->
             EmptyState(
                 icon = TansuIcons.Search,

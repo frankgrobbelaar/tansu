@@ -8,6 +8,8 @@ import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.ConnectException
+import java.net.UnknownHostException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -137,7 +139,19 @@ sealed class FileSystemException(message: String, cause: Throwable? = null) :
 
     /** The server didn't answer: wrong name, switched off, or Tailscale is off. */
     class Unreachable(val host: String, cause: Throwable? = null) :
-        FileSystemException("Can't reach $host", cause)
+        FileSystemException("Can't reach $host", cause) {
+        /** What the network said about it, as far as it said anything. */
+        val why: Why = whyOf(cause)
+
+        enum class Why {
+            /** Nothing came back in time: switched off, asleep, or out of reach. */
+            NoAnswer,
+            /** No server has that name: mistyped, or a Tailscale name with Tailscale off. */
+            UnknownName,
+            /** The server is there, but nothing on it takes connections on that port. */
+            Refused,
+        }
+    }
 
     /** The server turned the username, password or key down. */
     class AuthFailed(val host: String, cause: Throwable? = null) :
@@ -155,6 +169,39 @@ sealed class FileSystemException(message: String, cause: Throwable? = null) :
     /** An SFTP server presented a different key from the one pinned when it was added. */
     class HostKeyChanged(val trusted: String, val presented: HostKey) :
         FileSystemException("Key changed from $trusted to ${presented.fingerprint}")
+}
+
+/** How long a server has to take a connection: one reached through Tailscale may be waking up. */
+internal const val CONNECT_TIMEOUT_MILLIS = 20_000
+
+/** How long a server has to answer each call: a NAS whose disks were asleep takes a while. */
+internal const val ANSWER_TIMEOUT_MILLIS = 30_000
+
+/** What [cause], or what's behind it, says about why a server couldn't be reached. */
+private fun whyOf(cause: Throwable?): FileSystemException.Unreachable.Why =
+    generateSequence(cause) { it.cause }
+        .firstNotNullOfOrNull { e ->
+            when {
+                e is UnknownHostException -> FileSystemException.Unreachable.Why.UnknownName
+                // Android and Java both say "Connection refused", Android with ECONNREFUSED.
+                e is ConnectException &&
+                    e.message.orEmpty().contains("refused", ignoreCase = true) ->
+                    FileSystemException.Unreachable.Why.Refused
+                else -> null
+            }
+        } ?: FileSystemException.Unreachable.Why.NoAnswer
+
+/**
+ * Makes the folder at [path] with [make], which mustn't be tried again by itself: made, with only
+ * its answer lost, its second go would say it's there. So when the answer is lost, a folder there
+ * now counts as made, and only otherwise is it made once more.
+ */
+internal suspend fun FileSystem.madeOnce(path: String, make: suspend () -> Unit) {
+    try {
+        make()
+    } catch (_: FileSystemException.Unreachable) {
+        if (stat(path)?.isFolder != true) make()
+    }
 }
 
 /** [parent] and [name] joined with one `/`. */

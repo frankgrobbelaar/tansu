@@ -56,7 +56,13 @@
     <string name="cancel">Cancel</string>
 
     <string name="server_unreachable_title">Can\'t reach %1$s</string>
+    <string name="browse_waiting_title">Waiting for %1$s</string>
+    <string name="browse_waiting_body">A server that\'s been asleep, or that\'s reached through Tailscale, can take a little while to answer.</string>
     <string name="server_unreachable_body">Tansu got no answer from %1$s. If you\'re away from home, check that Tailscale is on.</string>
+    <string name="server_unknown_name_body">Tansu can\'t find a server called %1$s. Check its name, and if it\'s a Tailscale name, that Tailscale is on.</string>
+    <string name="server_refused_body">%1$s is there, but turned the connection away. Check that %2$s is switched on there, and the port.</string>
+    <string name="service_smb">file sharing (SMB)</string>
+    <string name="service_ssh">SSH</string>
     <string name="server_login_title">%1$s didn\'t accept the login</string>
     <string name="server_login_body">The login for %1$s was turned down. It may have been changed on the server.</string>
     <string name="update_login">Update the login</string>
@@ -105,6 +111,8 @@
     <string name="connecting_smb">Checking the login and the share</string>
     <string name="connecting_sftp">Checking the key and the folder</string>
     <string name="fail_unreachable">Can\'t reach %1$s. Check the name, and if you\'re away from home, that Tailscale is on.</string>
+    <string name="fail_unknown_name">Tansu can\'t find a server called %1$s. Check the name, and if it\'s a Tailscale name, that Tailscale is on.</string>
+    <string name="fail_refused">%1$s is there, but turned the connection away. Check that %2$s is switched on there, and the port.</string>
     <string name="fail_login">%1$s didn\'t accept the login. Check the username and password.</string>
     <string name="fail_bad_key">Tansu can\'t open that key. If it has a passphrase, check it.</string>
     <string name="fail_share">There\'s no share called %1$s on %2$s.</string>

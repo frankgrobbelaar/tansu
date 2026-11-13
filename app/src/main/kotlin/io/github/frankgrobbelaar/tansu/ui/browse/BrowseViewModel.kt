@@ -36,6 +36,7 @@ import io.github.frankgrobbelaar.tansu.ui.servers.LocalNetwork
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -53,6 +54,8 @@ data class BrowseUiState(
     val crumbs: List<Crumb>,
     val entries: List<Entry> = emptyList(),
     val loading: Boolean = true,
+    /** The listing is taking a while, as a server waking up does. */
+    val slow: Boolean = false,
     val problem: Problem? = null,
     /** Offer to add a server: there are none yet, and the offer wasn't turned down. */
     val offerServers: Boolean = false,
@@ -142,8 +145,12 @@ data class BrowseUiState(
         /** The phone or server failed to read the folder. */
         data object Unreadable : Problem
 
-        /** The server didn't answer. */
-        data class Unreachable(val host: String) : Problem
+        /** The server didn't answer, for [why]. */
+        data class Unreachable(
+            val host: String,
+            val why: FileSystemException.Unreachable.Why =
+                FileSystemException.Unreachable.Why.NoAnswer,
+        ) : Problem
 
         /** The server turned the login down, or the private key can't be read. */
         data object LoginRefused : Problem
@@ -269,6 +276,7 @@ class BrowseViewModel(
                     crumbs = crumbsOf(here),
                     entries = listing.entries,
                     loading = listing.loading,
+                    slow = listing.slow,
                     problem = listing.problem,
                     offerServers = news.offerServers,
                     added = news.added,
@@ -555,7 +563,13 @@ class BrowseViewModel(
         loading?.cancel()
         loading = viewModelScope.launch {
             listing.update { if (fresh) Listing(loading = true) else it.copy(loading = true) }
+            // A server slow to answer is said to be, rather than left looking like an empty folder.
+            val slow = launch {
+                delay(SLOW_AFTER_MILLIS)
+                listing.update { it.copy(slow = true) }
+            }
             val result = fetch(here)
+            slow.cancel()
             // smbj and sshj can't be stopped part-way: a listing someone moved on from may still
             // finish, or fail. It mustn't land on the folder they're looking at now.
             ensureActive()
@@ -615,6 +629,7 @@ class BrowseViewModel(
     private data class Listing(
         val entries: List<Entry> = emptyList(),
         val loading: Boolean = false,
+        val slow: Boolean = false,
         val problem: BrowseUiState.Problem? = null,
     )
 
@@ -622,6 +637,7 @@ class BrowseViewModel(
         private const val DRAWER = "drawer"
         private const val PATHS = "paths"
         private const val STOP_AFTER_MILLIS = 5_000L
+        private const val SLOW_AFTER_MILLIS = 3_000L
 
         val Factory = viewModelFactory {
             initializer {
@@ -674,7 +690,7 @@ private fun problemOf(e: FileSystemException): BrowseUiState.Problem =
         is FileSystemException.Unreadable,
         is FileSystemException.Exists,
         is FileSystemException.NoSpace -> BrowseUiState.Problem.Unreadable
-        is FileSystemException.Unreachable -> BrowseUiState.Problem.Unreachable(e.host)
+        is FileSystemException.Unreachable -> BrowseUiState.Problem.Unreachable(e.host, e.why)
         is FileSystemException.AuthFailed,
         is FileSystemException.BadKey -> BrowseUiState.Problem.LoginRefused
         is FileSystemException.ShareMissing -> BrowseUiState.Problem.ShareMissing(e.share)
