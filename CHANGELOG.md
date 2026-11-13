@@ -5,6 +5,10 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+## 0.4.2 - 2026-11-13
+
+A few more corners of moving files made safe.
+
 - A move paused at just the wrong moment can no longer take the file it was replacing for its
   own copy, and it leaves an original that changed while the job was paused.
 - A moved folder the server can't yet say is gone no longer fails the rest of the job, and a
