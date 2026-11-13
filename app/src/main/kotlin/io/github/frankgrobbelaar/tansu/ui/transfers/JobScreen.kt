@@ -1,5 +1,6 @@
 package io.github.frankgrobbelaar.tansu.ui.transfers
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,10 +21,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -170,33 +175,26 @@ private fun Place(label: String, where: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** Each thing picked, under the name it went to, and where it stands. */
+/**
+ * Each thing picked, under the name it went to, and where it stands. A picked folder opens to show
+ * the files in it, each with where it stands.
+ */
 @Composable
 private fun Picks(job: Job, modifier: Modifier = Modifier) {
+    var open by rememberSaveable { mutableStateOf(emptySet<String>()) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         job.picks.take(MAX_PICKS).forEach { pick ->
-            val state = stateOf(pick, job)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                FileTile(kind = FileKind.of(pick))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = job.placed[pick.path]?.path?.let(::nameOf) ?: pick.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = pickLine(pick, state),
-                        style = MaterialTheme.typography.bodySmall,
-                        color =
-                            if (state == PickState.Failed) MaterialTheme.colorScheme.error
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            val files = job.inside[pick.path].orEmpty()
+            val opened = pick.path in open
+            PickRow(
+                pick = pick,
+                name = job.placed[pick.path]?.path?.let(::nameOf) ?: pick.name,
+                state = stateOf(pick, job),
+                files = files.size,
+                opened = opened,
+                onOpen = { open = if (opened) open - pick.path else open + pick.path },
+            )
+            if (opened) FilesInside(pick, files, job)
         }
         if (job.picks.size > MAX_PICKS) {
             Text(
@@ -205,6 +203,112 @@ private fun Picks(job: Job, modifier: Modifier = Modifier) {
                         R.plurals.job_more_picks,
                         job.picks.size - MAX_PICKS,
                         job.picks.size - MAX_PICKS,
+                    ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** One picked thing; a folder with files in it says how many, and opens to show them. */
+@Composable
+private fun PickRow(
+    pick: Entry,
+    name: String,
+    state: PickState,
+    files: Int,
+    opened: Boolean,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val opens = files > 0
+    Row(
+        modifier =
+            modifier.then(
+                if (opens)
+                    Modifier.clickable(
+                        onClickLabel = stringResource(R.string.show_files),
+                        onClick = onOpen,
+                    )
+                else Modifier
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        FileTile(kind = FileKind.of(pick))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text =
+                    if (opens) {
+                        stringResource(
+                            R.string.pick_size,
+                            pickLine(pick, state),
+                            pluralStringResource(R.plurals.pick_files, files, files),
+                        )
+                    } else {
+                        pickLine(pick, state)
+                    },
+                style = MaterialTheme.typography.bodySmall,
+                color =
+                    if (state == PickState.Failed) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (opens) {
+            Icon(
+                imageVector = TansuIcons.ChevronRight,
+                contentDescription = null,
+                modifier = Modifier.rotate(if (opened) OPENED_DEGREES else 0f),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The files in [folder], by where they are inside it, each with where it stands. */
+@Composable
+private fun FilesInside(
+    folder: Entry,
+    files: List<Entry>,
+    job: Job,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(start = INDENT),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        files.take(MAX_FILES).forEach { file ->
+            val state = stateOf(file, job)
+            Column {
+                Text(
+                    text = file.path.removePrefix(folder.path).trimStart('/'),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = pickLine(file, state),
+                    style = MaterialTheme.typography.bodySmall,
+                    color =
+                        if (state == PickState.Failed) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (files.size > MAX_FILES) {
+            Text(
+                text =
+                    pluralStringResource(
+                        R.plurals.job_more_files,
+                        files.size - MAX_FILES,
+                        files.size - MAX_FILES,
                     ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -295,3 +399,9 @@ private const val PERCENT = 100
 
 /** A job's picks shown one by one; a bigger selection sums up the rest. */
 private const val MAX_PICKS = 50
+
+/** The files shown inside an opened folder; a fuller folder sums up the rest. */
+private const val MAX_FILES = 200
+
+private const val OPENED_DEGREES = 90f
+private val INDENT = 52.dp

@@ -149,6 +149,15 @@ internal class JobRun(
         val walked = mutableListOf<Entry>()
         val plans = state.picks.map { it to plan(it, to.folder, names, sameDrawer, walked) }
         val moving = plans.flatMap { (_, steps) -> steps }.filter { it is CopyFile || it is Rename }
+        state =
+            state.copy(
+                inside =
+                    plans
+                        .filter { (pick, _) -> pick.isFolder }
+                        .associate { (pick, steps) ->
+                            pick.path to steps.filterIsInstance<CopyFile>().map { it.from }
+                        }
+            )
         progress {
             it.copy(
                 bytesTotal = moving.sumOf { step -> step.from.size },
@@ -679,12 +688,16 @@ internal class JobRun(
 
     private suspend fun delete() {
         val order = mutableListOf<Entry>()
+        val within = mutableMapOf<String, List<Entry>>()
         for (pick in state.picks) {
             // A link goes on its own: what it points to isn't the user's to lose here.
-            order +=
+            val going =
                 if (pick.isFolder && !pick.isLink && pick.path !in done) inside(pick)
                 else listOf(pick)
+            if (pick.isFolder) within[pick.path] = going.filterNot { it.isFolder }
+            order += going
         }
+        state = state.copy(inside = within)
         progress {
             it.copy(
                 bytesTotal = order.sumOf { entry -> entry.size },

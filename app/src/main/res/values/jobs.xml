@@ -119,6 +119,15 @@
     <string name="pick_failed">Didn\'t make it</string>
     <string name="pick_stopped">Stopped</string>
     <string name="pick_size">%1$s · %2$s</string>
+    <string name="show_files">Show the files in it</string>
+    <plurals name="pick_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <plurals name="job_more_files">
+        <item quantity="one">and %d more file</item>
+        <item quantity="other">and %d more files</item>
+    </plurals>
     <plurals name="job_more_picks">
         <item quantity="one">And %1$d more</item>
         <item quantity="other">And %1$d more</item>

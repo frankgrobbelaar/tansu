@@ -68,6 +68,11 @@ data class Job(
     /** Picks kept under a new name because the name was taken. */
     val keptBoth: Int = 0,
     @Transient val skipped: Int = 0,
+    /**
+     * The files in each picked folder, by the folder's path, as this run found them: what the job's
+     * detail shows inside a folder. A folder moved within a drawer goes whole, so it has none.
+     */
+    @Transient val inside: Map<String, List<Entry>> = emptyMap(),
     @Transient val finishedAt: Long? = null,
 ) {
     enum class Kind {

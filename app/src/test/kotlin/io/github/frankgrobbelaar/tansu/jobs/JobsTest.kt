@@ -445,6 +445,21 @@ class JobsTest : JobsFixture() {
     }
 
     @Test
+    fun `a picked folder's files are listed in its job, each done as it goes`() = runTest {
+        phone.file("/DCIM/Camera/Trip/Day 2/IMG_4.jpg", "four")
+        val jobs = jobs()
+
+        val id = jobs.copy(listOf(entry(phone, "/DCIM/Camera/Trip")), camera, photos, emptyMap())
+        advanceUntilIdle()
+
+        val job = jobs.job(id)
+        val inside = job.inside.getValue("/DCIM/Camera/Trip").map { it.path }
+        val expected = listOf("/DCIM/Camera/Trip/Day 2/IMG_4.jpg", "/DCIM/Camera/Trip/IMG_3.jpg")
+        assertEquals(expected, inside.sorted())
+        assertTrue(inside.all { it in job.done })
+    }
+
+    @Test
     fun `a full disk fails the file at once, without waiting it out`() = runTest {
         nas.full = true
         val jobs = jobs()

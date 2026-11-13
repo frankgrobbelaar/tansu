@@ -13,6 +13,7 @@ What changed in each version of tansu, newest first, in plain words. A release m
   from where it was, rather than starting again; so does one paused part-way and resumed. A link
   that drops now and then keeps a job going, as long as each go gets further.
 - Pasted files show up in the folder as they land, rather than when the whole job ends.
+- A job's detail opens each picked folder to show the files in it, and where each stands.
 - When an SMB server has no share by the name given, tansu lists the shares it does have. In
   Browse, tapping one points the drawer at it; in the server form, it goes in the Share field.
 - Pictures in the grid show much sooner from servers, and at once when you come back to a

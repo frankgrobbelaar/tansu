@@ -54,7 +54,7 @@ survive Android ending tansu, tested by ending the process at every step.
 
 ## Left for later
 
-- The job detail lists each pick and where it stands, but not each file inside a picked folder.
+Nothing for now.
 
 ## Decided
 

@@ -135,6 +135,8 @@ sshj's key exchanges need it; smbj uses it for NTLM.
   SFTP 3, which can't say "already there" or "disk full": a folder or file that fails is looked
   up to tell the two apart, and a write that fails isn't waited out.
 - Saving shared files can't be retried: the other app only lends them while it shares them.
+- A job knows the files in each folder picked for it, as its run found them, so its detail can
+  open a folder to show them, each with where it stands; one moved within a drawer goes whole.
 - Progress is a `StateFlow` read by the Browse card, the Transfers tab and the notification (which
   updates at most once a second). While Browse is on screen, it lists the folder on show again as
   a running job puts files in it or takes them away (a copy doesn't change where it copies from),
