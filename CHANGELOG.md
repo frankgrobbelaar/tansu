@@ -5,6 +5,10 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+## 0.4.1 - 2026-11-13
+
+Copying and moving that hold up when a server's answer goes missing, and a handful of fixes.
+
 - Moving with Replace replaces a different file the same size, as asked; only the very file
   being moved, reached another way such as through a second drawer on the same disk, is kept. A
   move leaves the original where it is if it changed after it was copied.
