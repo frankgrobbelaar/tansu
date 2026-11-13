@@ -36,6 +36,11 @@ data class Job(
      * copied: a move removes the original only while it still says so.
      */
     val asCopied: Map<String, Long> = emptyMap(),
+    /**
+     * Moved folders this job has begun removing from where they were: one that's gone when the job
+     * resumes went with the move.
+     */
+    val removing: Set<String> = emptySet(),
     /** This job's hidden file, half written when it stopped: cancelling removes it. */
     val partial: String? = null,
     /** The source path of the file in [partial], so a resumed job knows whose it is. */

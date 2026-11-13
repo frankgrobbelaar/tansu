@@ -84,8 +84,8 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
   A rename whose answer was lost is done if the file is gone from where it was and is where it
   was going, whether the server's second go says Exists (SFTP) or NotFound.
 - A moved folder is done once it's gone from where it was; one that couldn't be removed, or that
-  the server can't yet say is gone, is tried again when the job resumes. A folder gone before
-  the job resumes counts as moved only if the job had moved things out of it.
+  the server can't yet say is gone, is tried again when the job resumes. A folder gone when the
+  job resumes counts as moved only if the job had begun removing it, which it remembers first.
 - Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.
   A full disk or a refusal fails the file at once; a server that stops answering is retried for
   30 seconds, then the job pauses and says which server it lost. Cancelling, even a paused job,

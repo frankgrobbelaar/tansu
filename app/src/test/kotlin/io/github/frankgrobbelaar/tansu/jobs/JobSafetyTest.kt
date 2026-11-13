@@ -651,4 +651,24 @@ class JobSafetyTest : JobsFixture() {
         assertEquals("ONE", phone.text("/DCIM/Camera/IMG_1.jpg"))
         assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
     }
+
+    // What the seventh review found
+
+    @Test
+    fun `an empty moved folder whose delete went through as the job paused ends well`() = runTest {
+        phone.folderAt("/DCIM/Camera/Empty")
+        phone.lostAnswers += "/DCIM/Camera/Empty"
+        val jobs = jobs()
+
+        val id = jobs.move(listOf(entry(phone, "/DCIM/Camera/Empty")), camera, photos, emptyMap())
+        runCurrent()
+        jobs.pause(id)
+        runCurrent()
+        jobs.resume(id)
+        advanceUntilIdle()
+
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertTrue(nas.exists("/Photos/Empty"))
+        assertFalse(phone.exists("/DCIM/Camera/Empty"))
+    }
 }

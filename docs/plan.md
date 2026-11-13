@@ -44,7 +44,9 @@ survive Android closing tansu; each is fixed and tested, and a move now leaves a
 changed after it was copied. A sixth review found that a pause as a refused copy was cleared away
 could pass for its naming, that a folder gone before its move began counted as moved, that a
 server unable to say a folder was gone could end the job, and that the original's state as
-copied didn't survive a pause; all four are fixed and tested.
+copied didn't survive a pause; all four are fixed and tested. A seventh review found one
+regression, an empty moved folder failing as missing after a pause, and nothing that could lose
+a file; it's fixed and tested.
 
 ## Left for later
 

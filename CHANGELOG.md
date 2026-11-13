@@ -5,6 +5,8 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- An empty folder moved as the job was paused no longer fails as missing when it resumes.
+
 ## 0.4.2 - 2026-11-13
 
 A few more corners of moving files made safe.

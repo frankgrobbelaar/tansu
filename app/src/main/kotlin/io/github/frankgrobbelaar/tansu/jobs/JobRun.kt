@@ -132,6 +132,8 @@ internal class JobRun(
         val failedIn = { path: String -> state.failures.any { it.path.isWithin(path) } }
         val moving = state.kind == Job.Kind.Move
         if (moving) {
+            // Remembered first, so a job that stops as it goes knows it went with the move.
+            state = state.copy(removing = state.removing + folder.path)
             walked
                 .filter { it.path.isWithin(folder.path) && !failedIn(it.path) }
                 .sortedByDescending { it.path.length }
@@ -278,7 +280,7 @@ internal class JobRun(
         keep: Boolean,
         walked: MutableList<Entry>,
     ): List<Step> {
-        val children = childrenOf(folder, path) ?: return emptyList()
+        val children = childrenOf(folder) ?: return emptyList()
         if (!keep) walked += folder
         val steps = mutableListOf<Step>(MakeFolder(folder, path))
         // Two names that differ only in case are one name on the phone and SMB: a second folder
@@ -308,29 +310,21 @@ internal class JobRun(
     }
 
     /**
-     * What's in [folder], going to [path]; null if it can't be listed, which fails it, unless this
-     * job moved it there already.
+     * What's in [folder]; null if it can't be listed, which fails it, unless this job moved it
+     * already.
      */
-    private suspend fun childrenOf(folder: Entry, path: String): List<Entry>? =
+    private suspend fun childrenOf(folder: Entry): List<Entry>? =
         try {
             retrying { source.files.list(folder.path) }
         } catch (e: FileSystemException) {
-            if (e is FileSystemException.NotFound && movedAway(folder, path)) {
+            if (e is FileSystemException.NotFound && folder.path in state.removing) {
+                // Its last delete went through as the job stopped: it went with the move.
                 done += folder.path
             } else {
                 fail(folder, reasonOf(e), atSource = true)
             }
             null
         }
-
-    /**
-     * Whether [folder], gone from where it was, was moved to [path] by this job: it had moved
-     * things out of it, and its last delete went through as the job stopped.
-     */
-    private suspend fun movedAway(folder: Entry, path: String): Boolean =
-        state.kind == Job.Kind.Move &&
-            done.any { it.isWithin(folder.path) } &&
-            there(checkNotNull(target).files, path) == true
 
     /** A free place in [path] for a folder whose name another beside it has but for case. */
     private fun apart(name: String, path: String, names: MutableSet<String>): String {
