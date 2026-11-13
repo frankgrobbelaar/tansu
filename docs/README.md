@@ -12,6 +12,7 @@ Short pages, one subject each, for the owner and for coding agents. Decisions li
 | [design.md](design.md) | How tansu looks: Kiri's colours, type, shapes and motion, the rules every screen follows, and best practice for animation, navigation and experience |
 | [design/](design/README.md) | The Tansu Design canvas as pages you can open in a browser: the language and every workflow |
 | [releasing.md](releasing.md) | Versions, the signing key, releases on GitHub, first installs and in-app updates |
+| [screenshots/](screenshots) | The README's screenshots, from the emulator with made-up pictures |
 
 Pages for the architecture, development setup, conventions, the stack and each feature are added
 as they're built, in the same commit as the code they describe.
