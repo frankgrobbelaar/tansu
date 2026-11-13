@@ -54,7 +54,7 @@ import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileKind
 import io.github.frankgrobbelaar.tansu.ui.kit.TansuIcons
 import io.github.frankgrobbelaar.tansu.ui.kit.icon
-import io.github.frankgrobbelaar.tansu.ui.viewer.DrawerImage
+import io.github.frankgrobbelaar.tansu.ui.viewer.DrawerThumbnail
 
 /** The top bar while searching: what to look for, Clear, and back to the folder. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -202,10 +202,11 @@ private fun EntryTile(
                 tint = if (kind == FileKind.Folder) colors.primary else colors.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
-            // Pictures show themselves, on the phone and on servers; the icon waits underneath.
+            // Pictures show their thumbnails, on the phone and on servers; the icon waits
+            // underneath, and stays if there's no thumbnail to be had.
             if (kind == FileKind.Image) {
                 AsyncImage(
-                    model = DrawerImage(drawerId, entry),
+                    model = DrawerThumbnail(drawerId, entry),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),

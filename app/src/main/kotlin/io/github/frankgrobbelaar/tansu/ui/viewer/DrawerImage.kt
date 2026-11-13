@@ -5,6 +5,8 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.decode.DataSource
 import coil3.decode.ImageSource
+import coil3.disk.DiskCache
+import coil3.disk.directory
 import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.SourceFetchResult
@@ -13,6 +15,7 @@ import coil3.request.Options
 import io.github.frankgrobbelaar.tansu.files.Drawer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.FileSystem
+import java.io.File
 import kotlinx.coroutines.flow.StateFlow
 import okio.buffer
 import okio.source
@@ -28,14 +31,34 @@ data class DrawerImage(val drawerId: String, val path: String, val size: Long, v
     ) : this(drawerId, entry.path, entry.size, entry.modified)
 }
 
-/** Coil, able to load [DrawerImage]s from the [drawers]. */
+/**
+ * Coil, able to load [DrawerImage]s and their [DrawerThumbnail]s from the [drawers], keeping the
+ * thumbnails of servers' pictures in the cache folder.
+ */
 fun drawerImageLoader(context: PlatformContext, drawers: StateFlow<List<Drawer>>): ImageLoader =
     ImageLoader.Builder(context)
         .components {
             add(DrawerImageFetcher.Factory(drawers))
             add(DrawerImageKeyer)
+            add(DrawerThumbnailFetcher.Factory(drawers, File(context.cacheDir, THUMBNAIL_SCRATCH)))
+            add(DrawerThumbnailKeyer)
+        }
+        .diskCache {
+            DiskCache.Builder()
+                .directory(File(context.cacheDir, THUMBNAILS))
+                .maxSizeBytes(THUMBNAILS_MAX_BYTES)
+                .build()
         }
         .build()
+
+/** The cache folder thumbnails are kept in. */
+private const val THUMBNAILS = "thumbnails"
+
+/** Room for the thumbnails of some 6,000 photos, at about 40 KB each. */
+private const val THUMBNAILS_MAX_BYTES = 256L * 1024 * 1024
+
+/** The cache folder a server's picture comes down to while its thumbnail is made. */
+internal const val THUMBNAIL_SCRATCH = "thumbnailing"
 
 private class DrawerImageFetcher(
     private val image: DrawerImage,

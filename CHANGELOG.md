@@ -15,6 +15,9 @@ What changed in each version of tansu, newest first, in plain words. A release m
 - Pasted files show up in the folder as they land, rather than when the whole job ends.
 - When an SMB server has no share by the name given, tansu lists the shares it does have. In
   Browse, tapping one points the drawer at it; in the server form, it goes in the Share field.
+- Pictures in the grid show much sooner from servers, and at once when you come back to a
+  folder, even after tansu restarts: for a photo from a camera, tansu reads only the small
+  picture saved inside it, not the whole photo, and it keeps the thumbnails it makes.
 
 ## 0.4.4 - 2026-11-13
 

@@ -173,7 +173,22 @@ what it passes. PDFs open with Android's `PdfRenderer`, from the cache for serve
 open in another app through a `FileProvider` URI, after server files are fetched to the cache.
 
 The viewers are screens of their own (`ui/viewer`), pushed on the place's history like any task.
-Grid tiles show pictures' thumbnails through the same Coil loader.
+
+Grid tiles show thumbnails through the same Coil loader, with a fetcher of their own
+(`DrawerThumbnail`); the viewer still loads the whole picture. A JPEG's thumbnail is the one the
+camera put in its EXIF data, if it's big enough for a tile (a shorter side of 288 pixels or more;
+Samsung's are 512 × 384) and has the photo's shape. Only the start of the file is read, up to the
+frame header that gives the photo's size and never past 256 KiB, so a 10 MB photo costs tens of
+kilobytes. It's read 8 KiB at a time, since SFTP reads ahead by the size of each read, and
+AndroidX's `ExifInterface` (which Coil brings anyway) finds the thumbnail in it. Any other picture
+is read whole and decoded straight to a shorter side of 384 pixels by `ImageDecoder` (HEIC, PNG
+and WebP too): on the phone from the file itself, for a server's from a copy in the cache, deleted
+once it's decoded. A server's thumbnails are kept as small JPEGs in Coil's disk cache (`thumbnails`
+in the cache folder, 256 MiB) by drawer, path, size and date, so a folder seen once shows at once
+after, even after tansu restarts. The phone's aren't kept: they're about as quick to make again.
+Each drawer makes four at a time, since every read from an SMB server shares its one connection; a
+tile scrolled away before its turn reads nothing, and one cancelled while its picture comes down
+closes the stream and keeps nothing.
 
 ## Updates
 
