@@ -117,6 +117,7 @@
     <string name="pick_done">Done</string>
     <string name="pick_skipped">Skipped</string>
     <string name="pick_failed">Didn\'t make it</string>
+    <string name="pick_stopped">Stopped</string>
     <string name="pick_size">%1$s · %2$s</string>
     <plurals name="job_more_picks">
         <item quantity="one">And %1$d more</item>

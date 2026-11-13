@@ -123,7 +123,8 @@ class SftpFileSystem(
     }
 
     override suspend fun rename(from: String, to: String, replace: Boolean) {
-        onServer(to) { sftp ->
+        // Tried once: done twice, its second go would find nothing to rename.
+        onServer(to, retry = false) { sftp ->
             if (replace) {
                 replaceWith(sftp, from, to)
             } else {
@@ -156,8 +157,14 @@ class SftpFileSystem(
     override fun close() = sessions.close()
 
     /** Runs [block] on the server, off the main thread, connecting first if need be. */
-    private suspend fun <T> onServer(path: String, block: (SFTPClient) -> T): T =
-        withContext(io) { sessions.use { session -> mapErrors(path) { block(session.sftp) } } }
+    private suspend fun <T> onServer(
+        path: String,
+        retry: Boolean = true,
+        block: (SFTPClient) -> T,
+    ): T =
+        withContext(io) {
+            sessions.use(retry) { session -> mapErrors(path) { block(session.sftp) } }
+        }
 
     private fun connect(secret: Secret): Session {
         val verifier = PinnedKey(server.hostKey)

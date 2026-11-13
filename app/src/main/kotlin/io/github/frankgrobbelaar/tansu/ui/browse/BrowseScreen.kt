@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.frankgrobbelaar.tansu.R
+import io.github.frankgrobbelaar.tansu.appContainer
 import io.github.frankgrobbelaar.tansu.files.Entry
 import io.github.frankgrobbelaar.tansu.files.Sort
 import io.github.frankgrobbelaar.tansu.jobs.Clash
@@ -66,6 +67,19 @@ import kotlinx.coroutines.launch
  * Browse, wired to its ViewModel: folders open in place; pictures, videos and PDFs in tansu's
  * viewers; anything else in another app.
  */
+/** Goes to a folder asked for from outside, such as where a finished job's files went, once. */
+@Composable
+private fun ShowRequestedFolder(onShow: (drawerId: String, folder: String) -> Unit) {
+    val requests = appContainer().folderRequests
+    val request by requests.collectAsStateWithLifecycle()
+    val show by rememberUpdatedState(onShow)
+    LaunchedEffect(request) {
+        val asked = request ?: return@LaunchedEffect
+        show(asked.drawerId, asked.folder)
+        requests.compareAndSet(asked, null)
+    }
+}
+
 @Composable
 fun BrowseRoute(
     onAddServer: () -> Unit,
@@ -92,6 +106,7 @@ fun BrowseRoute(
         onAnnounce = viewModel::addedShown,
         onClearNotice = viewModel::noticeShown,
     )
+    ShowRequestedFolder(onShow = viewModel::showFolder)
     val places = Places(onAddServer, { onEditServer(state.drawer) }, onOpenTransfers, onView)
     FetchedEffect(
         fetched = state.fetched,

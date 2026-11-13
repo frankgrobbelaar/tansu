@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.net.toUri
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import kotlinx.coroutines.CoroutineDispatcher
@@ -26,23 +27,15 @@ class SharedFiles(
 
     // The stream is the caller's to close, as FileSystem.read says.
     @SuppressLint("Recycle")
-    override suspend fun read(path: String, offset: Long): InputStream =
+    override suspend fun read(path: String, offset: Long): InputStream = openedFor { opened ->
         withContext(io) {
-            try {
-                resolver.openInputStream(path.toUri())?.apply { skipNBytes(offset) }
-                    ?: throw FileSystemException.NotFound(path)
-            } catch (_: FileNotFoundException) {
-                throw FileSystemException.NotFound(path)
-            } catch (_: SecurityException) {
-                // The app that shared it took its permission back.
-                throw FileSystemException.AccessDenied(path)
-            } catch (e: IllegalArgumentException) {
-                // Another app's provider answers in its own ways.
-                throw FileSystemException.Unreadable(path, e)
-            } catch (e: IllegalStateException) {
-                throw FileSystemException.Unreadable(path, e)
+            asked(path) {
+                val input =
+                    resolver.openInputStream(path.toUri()) ?: throw FileNotFoundException(path)
+                opened(input).from(offset)
             }
         }
+    }
 
     override suspend fun stat(path: String): Entry = withContext(io) { entryOf(path.toUri()) }
 
@@ -57,6 +50,24 @@ class SharedFiles(
     override suspend fun delete(path: String) = throw readOnly(path)
 
     private fun readOnly(path: String) = FileSystemException.AccessDenied(path)
+
+    /** Runs [block] against the app that shared [path], its failures put in tansu's terms. */
+    private fun <T> asked(path: String, block: () -> T): T =
+        try {
+            block()
+        } catch (_: FileNotFoundException) {
+            throw FileSystemException.NotFound(path)
+        } catch (_: SecurityException) {
+            // The app that shared it took its permission back.
+            throw FileSystemException.AccessDenied(path)
+        } catch (e: IOException) {
+            throw FileSystemException.Unreadable(path, e)
+        } catch (e: IllegalArgumentException) {
+            // Another app's provider answers in its own ways.
+            throw FileSystemException.Unreadable(path, e)
+        } catch (e: IllegalStateException) {
+            throw FileSystemException.Unreadable(path, e)
+        }
 
     private fun entryOf(uri: Uri): Entry {
         var name: String? = null
@@ -78,6 +89,10 @@ class SharedFiles(
                 }
         } catch (_: SecurityException) {
             // Its name and size are the app's to give; the copy will say if it can't be read.
+        } catch (_: IllegalArgumentException) {
+            // Another app's provider answers in its own ways: a URI or a column it won't take.
+        } catch (_: IllegalStateException) {
+            // Or a cursor it can't fill.
         }
         // A name is a file name, never a path.
         val fileName = (name ?: uri.lastPathSegment ?: "shared").substringAfterLast('/')

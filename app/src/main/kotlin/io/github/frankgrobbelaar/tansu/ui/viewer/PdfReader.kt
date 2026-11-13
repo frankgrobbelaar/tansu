@@ -79,13 +79,16 @@ class PdfViewModel(
 
     init {
         viewModelScope.launch {
-            val opened = withContext(io + NonCancellable) { open() }
-            drawing.withLock {
-                // Gone before it opened: it's closed rather than kept.
-                if (cleared) opened?.close() else pdf = opened
-            }
-            _state.value =
-                PdfUiState(pages = opened?.pageCount ?: 0, loading = false, failed = opened == null)
+            // Kept even if the screen goes as it opens, so that it's closed with the rest.
+            val pages =
+                withContext(io + NonCancellable) {
+                    val opened = open()
+                    withPdf {
+                        pdf = opened
+                        opened?.pageCount
+                    }
+                }
+            _state.value = PdfUiState(pages = pages ?: 0, loading = false, failed = pages == null)
         }
     }
 
@@ -101,14 +104,17 @@ class PdfViewModel(
 
     /** Page [index], drawn [width] pixels wide on white, no bigger than a phone can hold. */
     suspend fun page(index: Int, width: Int): ImageBitmap? =
-        withContext(io) {
-            drawing.withLock {
-                try {
-                    if (cleared || width <= 0) null else draw(index, width)
-                } finally {
-                    if (cleared) close()
-                }
-            }
+        withContext(io) { withPdf { if (cleared || width <= 0) null else draw(index, width) } }
+
+    /**
+     * Runs [block] with the renderer to itself. If the screen went meanwhile, whoever lets go of it
+     * last closes it.
+     */
+    private suspend fun <T> withPdf(block: () -> T): T =
+        try {
+            drawing.withLock { block() }
+        } finally {
+            if (cleared) closeIfFree()
         }
 
     private fun draw(index: Int, width: Int): ImageBitmap? =
@@ -127,7 +133,11 @@ class PdfViewModel(
 
     override fun onCleared() {
         cleared = true
-        // Closing while a page is drawn throws: then the drawing closes it when it's done.
+        closeIfFree()
+    }
+
+    /** Closes the renderer, unless a page is being drawn: closing then throws, so it waits. */
+    private fun closeIfFree() {
         if (drawing.tryLock()) {
             try {
                 close()

@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -95,13 +94,11 @@ fun FileRow(
 @Composable
 private fun SelectMark(selected: Boolean, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    val description =
-        stringResource(if (selected) R.string.row_selected else R.string.row_not_selected)
+    // What it says, the row says to TalkBack itself.
     Box(
         modifier =
             modifier
                 .size(22.dp)
-                .semantics { contentDescription = description }
                 .then(
                     if (selected) Modifier.background(colors.primary, CircleShape)
                     else Modifier.border(1.6.dp, colors.outline, CircleShape)

@@ -2,7 +2,6 @@ package io.github.frankgrobbelaar.tansu.ui.browse
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
-import io.github.frankgrobbelaar.tansu.FolderRequest
 import io.github.frankgrobbelaar.tansu.MainDispatcherRule
 import io.github.frankgrobbelaar.tansu.MemoryStore
 import io.github.frankgrobbelaar.tansu.TansuSettings
@@ -90,8 +89,6 @@ class BrowseViewModelTest {
     private val clipboard = Clipboard()
     private var granted = true
 
-    private val requests = MutableStateFlow<FolderRequest?>(null)
-
     private fun viewModel(saved: SavedStateHandle = SavedStateHandle()) =
         BrowseViewModel(
             drawers = drawers,
@@ -103,7 +100,6 @@ class BrowseViewModelTest {
             fetcher = Fetcher(folder.root, io = main.dispatcher),
             savedState = saved,
             compute = main.dispatcher,
-            requests = requests,
         )
 
     @Test
@@ -179,17 +175,16 @@ class BrowseViewModelTest {
     }
 
     @Test
-    fun `a folder asked for from outside opens, once`() = runTest {
-        val saved = SavedStateHandle()
-        val browse = viewModel(saved)
+    fun `a folder asked for from outside opens, in a drawer that's there`() = runTest {
+        val browse = viewModel()
         browse.state.test {
-            requests.value = FolderRequest(1, "phone", download)
+            browse.showFolder("gone", "/somewhere")
+            assertTrue(expectMostRecentItem().atRoot)
+            browse.showFolder("phone", download)
             assertEquals(listOf("Phone", "Download"), expectMostRecentItem().crumbs.map { it.name })
             browse.up()
             assertTrue(expectMostRecentItem().atRoot)
         }
-        // Made again, as when the phone turns: that request was shown already.
-        viewModel(saved).state.test { assertTrue(expectMostRecentItem().atRoot) }
     }
 
     @Test

@@ -171,6 +171,18 @@ class UpdatesTest {
     }
 
     @Test
+    fun `a version on offer stays when GitHub doesn't answer as tansu starts`() = runTest {
+        updates().check()
+        latest = null
+
+        // What was on offer is read back as tansu starts, and a check can get in first.
+        val later = updates(dispatcher = StandardTestDispatcher(testScheduler))
+        later.check()
+        advanceUntilIdle()
+        assertTrue(later.update.value is Update.Available)
+    }
+
+    @Test
     fun `a cancelled download that fails later keeps quiet`() = runBlocking {
         val stalled = CountDownLatch(1)
         val firstTry = AtomicBoolean(true)

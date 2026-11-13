@@ -117,7 +117,8 @@ class SmbFileSystem(
     }
 
     override suspend fun rename(from: String, to: String, replace: Boolean) {
-        onShare(to) { share ->
+        // Tried once: done twice, its second go would find nothing to rename.
+        onShare(to, retry = false) { share ->
             share
                 .open(
                     smbPath(from),
@@ -145,8 +146,14 @@ class SmbFileSystem(
     override fun close() = sessions.close()
 
     /** Runs [block] on the share, off the main thread, connecting first if need be. */
-    private suspend fun <T> onShare(path: String, block: (DiskShare) -> T): T =
-        withContext(io) { sessions.use { session -> mapErrors(path) { block(session.share) } } }
+    private suspend fun <T> onShare(
+        path: String,
+        retry: Boolean = true,
+        block: (DiskShare) -> T,
+    ): T =
+        withContext(io) {
+            sessions.use(retry) { session -> mapErrors(path) { block(session.share) } }
+        }
 
     private suspend fun connect(): Session {
         val secret = secretOf(secrets, server)

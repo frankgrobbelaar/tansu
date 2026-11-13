@@ -24,7 +24,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -147,20 +146,14 @@ fun TansuApp(modifier: Modifier = Modifier) {
 }
 
 /**
- * Goes to Browse for a folder asked for from outside, such as where a finished job's files went.
+ * Brings Browse to the front for a folder asked for from outside, such as where a finished job's
+ * files went. Browse goes to it, and lets it go.
  */
 @Composable
 private fun ShowRequestedFolders(onShow: () -> Unit) {
     val request by appContainer().folderRequests.collectAsStateWithLifecycle()
-    var shown by rememberSaveable { mutableLongStateOf(0L) }
     val show by rememberUpdatedState(onShow)
-    LaunchedEffect(request) {
-        val asked = request ?: return@LaunchedEffect
-        if (asked.id != shown) {
-            shown = asked.id
-            show()
-        }
-    }
+    LaunchedEffect(request) { if (request != null) show() }
 }
 
 /** Each place's history of screens. */

@@ -111,14 +111,20 @@ class TransferService : Service() {
             .build()
     }
 
-    /** How the last job ended; tapping it opens the folder its files went to. */
+    /**
+     * How the last job ended. Tapping it opens the folder its files went to; one that was cancelled
+     * just opens tansu.
+     */
     private fun endingNotification(job: Job): Notification {
-        val landed = job.to ?: job.from
-        val show = MainActivity.showFolder(this, landed.drawerId, landed.folder)
-        return base()
-            .setContentTitle(JobWords.title(job, resources))
-            .setContentText(JobWords.detail(job, resources))
-            .setContentIntent(
+        val builder =
+            base()
+                .setContentTitle(JobWords.title(job, resources))
+                .setContentText(JobWords.detail(job, resources))
+                .setAutoCancel(true)
+        if (job.status == Job.Status.Done) {
+            val landed = job.to ?: job.from
+            val show = MainActivity.showFolder(this, landed.drawerId, landed.folder)
+            builder.setContentIntent(
                 PendingIntent.getActivity(
                     this,
                     1,
@@ -126,8 +132,8 @@ class TransferService : Service() {
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 )
             )
-            .setAutoCancel(true)
-            .build()
+        }
+        return builder.build()
     }
 
     private fun quietNotification(): Notification =

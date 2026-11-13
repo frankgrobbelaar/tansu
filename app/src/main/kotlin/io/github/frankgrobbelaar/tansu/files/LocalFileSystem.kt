@@ -46,9 +46,7 @@ class LocalFileSystem(private val io: CoroutineDispatcher = Dispatchers.IO) : Fi
     override suspend fun read(path: String, offset: Long): InputStream = openedFor { opened ->
         withContext(io) {
             mapErrors(path) {
-                opened(Files.newInputStream(Paths.get(path))).apply {
-                    if (offset > 0) skipNBytes(offset)
-                }
+                opened(Files.newInputStream(Paths.get(path))).from(offset)
             }
         }
     }

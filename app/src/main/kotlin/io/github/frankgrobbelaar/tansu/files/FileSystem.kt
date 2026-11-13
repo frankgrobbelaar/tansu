@@ -90,6 +90,20 @@ internal suspend fun <T : Closeable> openedFor(open: suspend (opened: (T) -> T) 
     }
 }
 
+/**
+ * This stream, [offset] bytes in. One that can't get there, as a file that shrank meanwhile can't,
+ * is closed before the failure goes on.
+ */
+internal fun InputStream.from(offset: Long): InputStream {
+    try {
+        if (offset > 0) skipNBytes(offset)
+    } catch (e: IOException) {
+        close()
+        throw e
+    }
+    return this
+}
+
 /** Closes what nobody will read: its failing to close has no one to tell. */
 private fun closeQuietly(stream: Closeable) {
     try {

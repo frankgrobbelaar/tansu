@@ -33,12 +33,17 @@ takes its real name once it's whole, never over anything the user didn't choose 
 A third review, of those and the viewers, found a few more corners (a retried merge into a
 case-blind folder, a move onto the very file it moves, lost answers from a server, very tall PDF
 pages, streams left open by a cancelled thumbnail); each is fixed and tested where it can be.
+A fourth review found that a move with Replace judged "the very file it moves" by size alone,
+that a lost answer could still double a file kept beside another or a rename on a dropped
+connection, that shared files without a size failed, and a few smaller leaks and races (a PDF
+closed as it opened, a folder request shown twice, an update offer lost to a slow start). They're
+fixed and tested.
 
 ## Left for later
 
 - Jobs live in memory: a job queued or paused when Android ends tansu's process is lost. The
   architecture plans for saving them. What a stopped job half wrote is only ever a hidden
-  `.name.<job>.tansu` file, so nothing broken shows under a real name.
+  `.tansu-<token>-<hash>` file, so nothing broken shows under a real name.
 - Fetching a server file to open in another app, or to share, runs in Browse with its progress
   and Cancel, but not as a job with a notification.
 - One timed-out listing drops the server's connection, so a transfer running on it starts its

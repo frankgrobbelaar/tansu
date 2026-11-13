@@ -5,6 +5,20 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+- Moving with Replace replaces a different file the same size, as asked; only the very file
+  being moved, reached another way such as through a second drawer on the same disk, is kept.
+- A server's lost answer as a file is renamed or kept beside another no longer leaves a second
+  copy, even when the job stops right then; a dropped connection never makes a rename twice.
+- Files shared from apps that don't say how big they are save rather than fail.
+- A job's detail marks a folder done as soon as everything in it is, and a cancelled job's
+  picks that never went as stopped. Two folders whose names differ only in case keep their
+  places when a job is resumed.
+- A cancelled job's notification opens tansu rather than a folder, and tansu's notifications are
+  the only way to open a folder from outside. Choosing where to save a share no longer hides how
+  other jobs ended.
+- A version on offer stays on offer when GitHub doesn't answer as tansu starts.
+- Videos keep the screen on only while they play. A PDF closed as it opens is let go of.
+
 ## 0.4.0 - 2026-11-13
 
 A safer copy again, steadier viewers, and the small things.

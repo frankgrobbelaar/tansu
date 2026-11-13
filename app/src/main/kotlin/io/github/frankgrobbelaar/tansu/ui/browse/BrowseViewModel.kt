@@ -7,7 +7,6 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import io.github.frankgrobbelaar.tansu.FolderRequest
 import io.github.frankgrobbelaar.tansu.StorageAccess
 import io.github.frankgrobbelaar.tansu.TansuApplication
 import io.github.frankgrobbelaar.tansu.TansuSettings
@@ -43,7 +42,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -171,13 +169,11 @@ class BrowseViewModel(
     private val fetcher: Fetcher,
     savedState: SavedStateHandle,
     private val compute: CoroutineDispatcher = Dispatchers.Default,
-    requests: StateFlow<FolderRequest?> = MutableStateFlow(null),
 ) : ViewModel() {
 
     private val phone = drawers.value.first()
     private val drawerId = savedState.getMutableStateFlow(DRAWER, phone.id)
     private val paths = savedState.getMutableStateFlow(PATHS, emptyMap<String, String>())
-    private val shownRequest = savedState.getMutableStateFlow(SHOWN, 0L)
     private val troubled = MutableStateFlow(emptySet<String>())
     private val listing = MutableStateFlow(Listing(loading = true))
     private val added = MutableStateFlow<String?>(null)
@@ -319,19 +315,15 @@ class BrowseViewModel(
             }
         }
         viewModelScope.launch { watchJobs() }
-        viewModelScope.launch { showRequested(requests) }
     }
 
-    /** Goes to each folder asked for from outside, such as where a finished job's files went. */
-    private suspend fun showRequested(requests: StateFlow<FolderRequest?>) {
-        requests.filterNotNull().collect { request ->
-            // Each once, even when the screen is made again.
-            if (request.id == shownRequest.value) return@collect
-            shownRequest.value = request.id
-            if (drawers.value.none { it.id == request.drawerId }) return@collect
-            paths.update { it + (request.drawerId to request.folder) }
-            drawerId.value = request.drawerId
-        }
+    /**
+     * Goes to [folder] in the drawer [drawerId], as asked from outside: where a job's files went.
+     */
+    fun showFolder(drawerId: String, folder: String) {
+        if (drawers.value.none { it.id == drawerId }) return
+        paths.update { it + (drawerId to folder) }
+        this.drawerId.value = drawerId
     }
 
     fun select(drawerId: String) {
@@ -611,7 +603,6 @@ class BrowseViewModel(
     companion object {
         private const val DRAWER = "drawer"
         private const val PATHS = "paths"
-        private const val SHOWN = "shown"
         private const val STOP_AFTER_MILLIS = 5_000L
 
         val Factory = viewModelFactory {
@@ -626,7 +617,6 @@ class BrowseViewModel(
                     clipboard = container.clipboard,
                     fetcher = container.fetcher,
                     savedState = createSavedStateHandle(),
-                    requests = container.folderRequests,
                 )
             }
         }

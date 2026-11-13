@@ -1,7 +1,6 @@
 package io.github.frankgrobbelaar.tansu.ui.viewer
 
 import android.net.Uri
-import android.util.Pair
 import android.view.View
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.OptIn
@@ -13,12 +12,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -31,6 +32,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSource
@@ -102,17 +104,17 @@ fun VideoRoute(
     LifecycleStartEffect(player) {
         onStopOrDispose { if (activity?.isChangingConfigurations != true) player.pause() }
     }
+    KeepScreenOnWhilePlaying(player)
     var chrome by remember { mutableStateOf(true) }
     Box(modifier = modifier.fillMaxSize().background(Backdrop)) {
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
                     this.player = player
-                    keepScreenOn = true
                     setShowNextButton(false)
                     setShowPreviousButton(false)
                     setErrorMessageProvider {
-                        Pair.create(0, context.getString(R.string.video_unplayable))
+                        android.util.Pair.create(0, context.getString(R.string.video_unplayable))
                     }
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { chrome = it == View.VISIBLE }
@@ -130,6 +132,26 @@ fun VideoRoute(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             ViewerTopBar(name = key.name, label = key.label, onBack = onBack)
+        }
+    }
+}
+
+/** The screen stays on while [player] plays, and sleeps as it would once it's paused. */
+@Composable
+private fun KeepScreenOnWhilePlaying(player: Player) {
+    val view = LocalView.current
+    DisposableEffect(player, view) {
+        val listener =
+            object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    view.keepScreenOn = isPlaying
+                }
+            }
+        player.addListener(listener)
+        view.keepScreenOn = player.isPlaying
+        onDispose {
+            player.removeListener(listener)
+            view.keepScreenOn = false
         }
     }
 }
@@ -154,10 +176,6 @@ internal class DrawerDataSource(private val drawers: StateFlow<List<Drawer>>) :
         val (input, size) =
             runBlocking { files?.let { openAt(it, path, dataSpec.position) } }
                 ?: throw DataSourceException(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND)
-        if (dataSpec.position > size) {
-            input.close()
-            throw DataSourceException(PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE)
-        }
         stream = input
         left =
             if (dataSpec.length != C.LENGTH_UNSET.toLong()) dataSpec.length
@@ -167,12 +185,24 @@ internal class DrawerDataSource(private val drawers: StateFlow<List<Drawer>>) :
     }
 
     /** The file read from [position], and its size; null if it isn't there. */
-    private suspend fun openAt(files: FileSystem, path: String, position: Long) =
+    private suspend fun openAt(
+        files: FileSystem,
+        path: String,
+        position: Long,
+    ): Pair<InputStream, Long>? {
         try {
-            files.stat(path)?.let { entry -> files.read(path, position) to entry.size }
+            val size = files.stat(path)?.size ?: return null
+            // Asked first, so no stream is opened past the end.
+            if (position > size) {
+                throw DataSourceException(
+                    PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
+                )
+            }
+            return files.read(path, position) to size
         } catch (e: FileSystemException) {
             throw DataSourceException(e, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED)
         }
+    }
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
         if (length == 0) return 0

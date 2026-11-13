@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.frankgrobbelaar.tansu.ui.ChosenTheme
 import io.github.frankgrobbelaar.tansu.ui.TansuRoot
+import java.util.UUID
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -25,7 +26,8 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) { updates.checkIfDue() }
         }
         setContent { ChosenTheme { TansuRoot() } }
-        showAsked(intent)
+        // Asked as it's first opened; one made again, as after turning the phone, was asked then.
+        if (savedInstanceState == null) showAsked(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -36,17 +38,21 @@ class MainActivity : ComponentActivity() {
     /** A finished job's notification opens the folder its files went to. */
     private fun showAsked(intent: Intent) {
         if (intent.action != ACTION_SHOW_FOLDER) return
+        // Only tansu's own notifications say this, not another app that knows the action's name.
+        if (intent.getStringExtra(EXTRA_TOKEN) != TOKEN) return
         val drawer = intent.getStringExtra(EXTRA_DRAWER) ?: return
         val folder = intent.getStringExtra(EXTRA_FOLDER) ?: return
         (application as TansuApplication).container.showFolder(drawer, folder)
-        // Handled once: turning the phone mustn't show it again.
-        setIntent(Intent(this, MainActivity::class.java))
     }
 
     companion object {
         private const val ACTION_SHOW_FOLDER = "io.github.frankgrobbelaar.tansu.SHOW_FOLDER"
         private const val EXTRA_DRAWER = "drawer"
         private const val EXTRA_FOLDER = "folder"
+        private const val EXTRA_TOKEN = "token"
+
+        /** New each time tansu starts, so only what it handed out carries it. */
+        private val TOKEN = UUID.randomUUID().toString()
 
         /** Opens tansu on [folder] of the drawer [drawerId]. */
         fun showFolder(context: Context, drawerId: String, folder: String): Intent =
@@ -54,5 +60,6 @@ class MainActivity : ComponentActivity() {
                 .setAction(ACTION_SHOW_FOLDER)
                 .putExtra(EXTRA_DRAWER, drawerId)
                 .putExtra(EXTRA_FOLDER, folder)
+                .putExtra(EXTRA_TOKEN, TOKEN)
     }
 }

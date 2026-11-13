@@ -3,7 +3,6 @@
 <resources>
     <string name="select">Select</string>
     <string name="row_selected">Selected</string>
-    <string name="row_not_selected">Not selected</string>
     <plurals name="selection_count">
         <item quantity="one">%1$d selected</item>
         <item quantity="other">%1$d selected</item>

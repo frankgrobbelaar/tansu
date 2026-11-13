@@ -53,4 +53,11 @@ class PickStateTest {
             )
         assertEquals(PickState.Failed, stateOf(trip, failed))
     }
+
+    @Test
+    fun `a cancelled job's picks that never went are stopped`() {
+        val cancelled = job.copy(status = Job.Status.Cancelled, done = setOf(photo.path))
+        assertEquals(PickState.Done, stateOf(photo, cancelled))
+        assertEquals(PickState.Stopped, stateOf(trip, cancelled))
+    }
 }

@@ -86,12 +86,7 @@ class Updates(
 
     init {
         // A version found before tansu last closed is still on offer, without asking again.
-        scope.launch {
-            val offered = settings.offer.first()?.let(::releaseOf)
-            if (offered != null && isNewer(offered.version, installed)) {
-                state.compareAndSet(Update.Unknown, Update.Available(offered))
-            }
-        }
+        scope.launch { kept()?.let { state.compareAndSet(Update.Unknown, it) } }
     }
 
     /** Asks GitHub if a day has gone by since it was last asked, unless that's turned off. */
@@ -102,8 +97,7 @@ class Updates(
 
     /** Asks GitHub for the newest release, unless an update is already on its way or here. */
     fun check() {
-        val before = state.value
-        when (before) {
+        when (state.value) {
             Update.Checking,
             is Update.Downloading,
             is Update.Ready -> return
@@ -130,10 +124,17 @@ class Updates(
                 else -> Unit
             }
             // GitHub not answering doesn't take back a version already on offer.
-            state.value =
-                if (found == Update.CheckFailed && before is Update.Available) before else found
+            state.value = if (found == Update.CheckFailed) kept() ?: found else found
         }
     }
+
+    /** The version on offer when GitHub last answered, if it's still newer than this one. */
+    private suspend fun kept(): Update.Available? =
+        settings.offer
+            .first()
+            ?.let(::releaseOf)
+            ?.takeIf { isNewer(it.version, installed) }
+            ?.let { Update.Available(it) }
 
     /** Downloads the release on offer, and checks it's the file the release says it is. */
     fun download() {

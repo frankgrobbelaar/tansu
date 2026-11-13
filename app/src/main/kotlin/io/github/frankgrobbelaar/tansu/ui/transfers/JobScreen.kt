@@ -223,6 +223,7 @@ private fun pickLine(pick: Entry, state: PickState): String {
                 PickState.Done -> R.string.pick_done
                 PickState.Skipped -> R.string.pick_skipped
                 PickState.Failed -> R.string.pick_failed
+                PickState.Stopped -> R.string.pick_stopped
             }
         )
     return if (pick.isFolder) said

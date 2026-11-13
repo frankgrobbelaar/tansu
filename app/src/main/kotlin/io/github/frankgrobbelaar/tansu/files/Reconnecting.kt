@@ -5,8 +5,8 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * One live connection to a server, opened on first use and reused. When a reused connection turns
- * out to be dead, as servers drop idle ones, it's replaced and the call tried once more; a server
- * that's really gone still fails, once.
+ * out to be dead, as servers drop idle ones, it's replaced and the call tried once more, unless it
+ * mustn't be; a server that's really gone still fails, once.
  */
 internal class Reconnecting<S : Any>(
     private val open: suspend () -> S,
@@ -16,14 +16,18 @@ internal class Reconnecting<S : Any>(
     private val lock = Mutex()
     @Volatile private var current: S? = null
 
-    /** Runs [block] on the connection. It throws [FileSystemException.Unreachable] if it's dead. */
-    suspend fun <T> use(block: (S) -> T): T {
+    /**
+     * Runs [block] on the connection. It throws [FileSystemException.Unreachable] if it's dead. A
+     * call that mustn't happen twice, such as a rename, isn't tried again unless [retry]: the
+     * connection may have died after it went through, with only its answer lost.
+     */
+    suspend fun <T> use(retry: Boolean = true, block: (S) -> T): T {
         val (session, fresh) = acquire()
         return try {
             block(session)
         } catch (e: FileSystemException.Unreachable) {
             drop(session)
-            if (fresh) throw e
+            if (fresh || !retry) throw e
             val (again, _) = acquire()
             try {
                 block(again)

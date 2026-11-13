@@ -33,7 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** A folder to show, asked for from outside Browse, such as by a job's finished notification. */
-data class FolderRequest(val id: Long, val drawerId: String, val folder: String)
+data class FolderRequest(val drawerId: String, val folder: String)
 
 /** Counts tansu's screens that are started, on the main thread. */
 class Front : DefaultLifecycleObserver {
@@ -96,11 +96,11 @@ class AppContainer(
      */
     val front = Front()
 
-    /** The last folder asked for from outside Browse; each is shown once. */
+    /** A folder asked for from outside Browse, until Browse has gone to it and let it go. */
     val folderRequests = MutableStateFlow<FolderRequest?>(null)
 
     fun showFolder(drawerId: String, folder: String) {
-        folderRequests.value = FolderRequest(System.nanoTime(), drawerId, folder)
+        folderRequests.value = FolderRequest(drawerId, folder)
     }
 
     val fetcher = Fetcher(context.cacheDir)

@@ -11,6 +11,7 @@ enum class PickState {
     Done,
     Skipped,
     Failed,
+    Stopped,
 }
 
 /** Where [pick] stands in [job]: a folder by everything in it. */
@@ -25,6 +26,7 @@ internal fun stateOf(pick: Entry, job: Job): PickState {
         // Skipped picks are the ones a copy or move never placed.
         finished && job.to != null && pick.path !in job.placed -> PickState.Skipped
         finished -> PickState.Done
+        job.status == Job.Status.Cancelled -> PickState.Stopped
         else -> PickState.Waiting
     }
 }
