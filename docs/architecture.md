@@ -46,7 +46,9 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
   cancel and retry. `JobRun` carries one out.
 - While anything is queued or running, `TransferService` (a data sync foreground service) keeps
   tansu alive and shows the running job in a notification, with Pause and Cancel. It stops when
-  the queue is empty. User-initiated data transfer jobs were the first plan, but Android makes them
+  the queue is empty. Unless tansu is in front saying so itself, the last job's ending stays in the
+  shade; tapping it opens the folder its files went to, through `ShowFolder`, an activity alias
+  that isn't exported, so no other app can steer tansu that way. User-initiated data transfer jobs were the first plan, but Android makes them
   wait for a network, which a copy on the phone alone doesn't need.
 - A copy streams 256 KB chunks from one `FileSystem` to another, reporting progress as it goes. A
   move within a drawer is a rename; across drawers it copies, checks the size, then deletes the
@@ -70,7 +72,15 @@ Android's cut-down copy, because sshj's key exchanges need it; smbj uses it for 
   twice; for the same reason a dropped connection never retries a rename by itself.
 - A folder is done once everything in it is, so a resumed or retried job passes it over.
 - A move remembers each copy it has made until it has checked it and removed the original, so a
-  move that stops in between checks that copy rather than making another.
+  move that stops in between checks that copy rather than making another. The original goes only
+  as it was when copied: one that has changed since, or that turns out to be the copy itself,
+  stays, and so does the copy.
+- A job that stops as a file is being named remembers which file it was; resumed, it settles that
+  file before any other, so another file can't take its place and the file is never copied twice.
+  A rename whose answer was lost is done if the file is gone from where it was and is where it
+  was going, whether the server's second go says Exists (SFTP) or NotFound.
+- A moved folder is done once it's gone from where it was; one that couldn't be removed is tried
+  again when the job resumes.
 - Whatever goes wrong with one file or folder is put against it, and the job and the queue go on.
   A full disk or a refusal fails the file at once; a server that stops answering is retried for
   30 seconds, then the job pauses and says which server it lost. Cancelling, even a paused job,

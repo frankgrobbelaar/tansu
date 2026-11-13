@@ -11,7 +11,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.frankgrobbelaar.tansu.ui.ChosenTheme
 import io.github.frankgrobbelaar.tansu.ui.TansuRoot
-import java.util.UUID
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -37,29 +36,24 @@ class MainActivity : ComponentActivity() {
 
     /** A finished job's notification opens the folder its files went to. */
     private fun showAsked(intent: Intent) {
-        if (intent.action != ACTION_SHOW_FOLDER) return
-        // Only tansu's own notifications say this, not another app that knows the action's name.
-        if (intent.getStringExtra(EXTRA_TOKEN) != TOKEN) return
+        // Only through tansu's own way in, which no other app can use.
+        if (intent.component?.className != SHOW_FOLDER) return
         val drawer = intent.getStringExtra(EXTRA_DRAWER) ?: return
         val folder = intent.getStringExtra(EXTRA_FOLDER) ?: return
         (application as TansuApplication).container.showFolder(drawer, folder)
     }
 
     companion object {
-        private const val ACTION_SHOW_FOLDER = "io.github.frankgrobbelaar.tansu.SHOW_FOLDER"
+        /** The manifest's way in to this screen for showing a folder, not exported. */
+        private const val SHOW_FOLDER = "io.github.frankgrobbelaar.tansu.ShowFolder"
         private const val EXTRA_DRAWER = "drawer"
         private const val EXTRA_FOLDER = "folder"
-        private const val EXTRA_TOKEN = "token"
-
-        /** New each time tansu starts, so only what it handed out carries it. */
-        private val TOKEN = UUID.randomUUID().toString()
 
         /** Opens tansu on [folder] of the drawer [drawerId]. */
         fun showFolder(context: Context, drawerId: String, folder: String): Intent =
-            Intent(context, MainActivity::class.java)
-                .setAction(ACTION_SHOW_FOLDER)
+            Intent()
+                .setClassName(context, SHOW_FOLDER)
                 .putExtra(EXTRA_DRAWER, drawerId)
                 .putExtra(EXTRA_FOLDER, folder)
-                .putExtra(EXTRA_TOKEN, TOKEN)
     }
 }

@@ -37,7 +37,11 @@ A fourth review found that a move with Replace judged "the very file it moves" b
 that a lost answer could still double a file kept beside another or a rename on a dropped
 connection, that shared files without a size failed, and a few smaller leaks and races (a PDF
 closed as it opened, a folder request shown twice, an update offer lost to a slow start). They're
-fixed and tested.
+fixed and tested. A fifth review of those fixes found that a job resumed after stopping mid-name
+could still copy that file twice if another went first, that SFTP answers a re-run rename with
+Exists, that share-ins had lost their size check, and that the notification's way in didn't
+survive Android closing tansu; each is fixed and tested, and a move now leaves an original that
+changed after it was copied.
 
 ## Left for later
 

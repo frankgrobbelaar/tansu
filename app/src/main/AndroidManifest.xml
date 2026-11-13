@@ -44,6 +44,13 @@
             </intent-filter>
         </activity>
 
+        <!-- A finished job's notification opens the folder its files went to. Not exported, so no
+             other app can open tansu this way. -->
+        <activity-alias
+            android:name=".ShowFolder"
+            android:exported="false"
+            android:targetActivity=".MainActivity" />
+
         <!-- Save to, from any app's share sheet. Its own task, out of Recents: after Save here it
              steps back to the app you shared from, and lives until the save is done, since that's
              as long as Android lets tansu read what was shared. -->

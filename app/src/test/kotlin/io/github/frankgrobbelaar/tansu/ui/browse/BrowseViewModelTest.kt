@@ -480,4 +480,45 @@ class BrowseViewModelTest {
             assertNull(expectMostRecentItem().fetched)
         }
     }
+
+    @Test
+    fun `a rename whose answer was lost renames once and says nothing`() = runTest {
+        val films = MemoryFileSystem().file("/a.mkv", "a")
+        films.lostAnswers += "/b.mkv"
+        drawers.value = listOf(phone, Drawer("films", "Films", Drawer.Kind.Sftp, "/", films))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("films")
+            browse.rename(expectMostRecentItem().entries.single(), "b.mkv")
+            val renamed = expectMostRecentItem()
+            assertNull(renamed.notice)
+            assertEquals(listOf("b.mkv"), renamed.entries.map { it.name })
+        }
+    }
+
+    @Test
+    fun `a rename on a connection that had died is tried again`() = runTest {
+        val films = MemoryFileSystem().file("/a.mkv", "a")
+        val dropsOnce =
+            object : FileSystem by films {
+                var dead = true
+
+                override suspend fun rename(from: String, to: String, replace: Boolean) {
+                    if (dead) {
+                        dead = false
+                        throw FileSystemException.Unreachable("films")
+                    }
+                    films.rename(from, to, replace)
+                }
+            }
+        drawers.value = listOf(phone, Drawer("films", "Films", Drawer.Kind.Sftp, "/", dropsOnce))
+        val browse = viewModel()
+        browse.state.test {
+            browse.select("films")
+            browse.rename(expectMostRecentItem().entries.single(), "b.mkv")
+            val renamed = expectMostRecentItem()
+            assertNull(renamed.notice)
+            assertEquals(listOf("b.mkv"), renamed.entries.map { it.name })
+        }
+    }
 }

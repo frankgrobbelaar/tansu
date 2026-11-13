@@ -358,6 +358,7 @@ class JobSafetyTest : JobsFixture() {
         advanceUntilIdle()
 
         assertTrue(jobs.job(id).failures.isEmpty())
+        assertEquals(1, jobs.job(id).keptBoth)
         assertEquals(
             setOf("/Media", "/Media/Pair", "/Media/Pair/a.jpg", "/Media/Pair/A (1).jpg"),
             share.paths(),
@@ -406,5 +407,132 @@ class JobSafetyTest : JobsFixture() {
         // Remembered both, so a resumed job that lists them the other way round agrees.
         val placed = jobs.job(id).placed
         assertTrue("/Photos/Pair/Sub" in placed && "/Photos/Pair/sub" in placed)
+    }
+
+    // What the fifth review found
+
+    @Test
+    fun `a file named as the job paused isn't copied twice when another file goes first`() =
+        runTest {
+            val picks = listOf("IMG_1.jpg", "IMG_2.jpg").map { entry(phone, "/DCIM/Camera/$it") }
+            phone.failures["/DCIM/Camera/IMG_1.jpg"] = FileSystemException.AccessDenied("1")
+            nas.lostAnswers += "/Photos/IMG_2.jpg"
+            val jobs = jobs()
+
+            val id = jobs.move(picks, camera, photos, emptyMap())
+            runCurrent()
+            // Paused while it waits to hear how IMG_2's naming went; IMG_1 goes first on resume.
+            jobs.pause(id)
+            runCurrent()
+            phone.failures.clear()
+            jobs.resume(id)
+            advanceUntilIdle()
+
+            assertTrue(jobs.job(id).failures.isEmpty())
+            assertEquals(setOf("/Photos", "/Photos/IMG_1.jpg", "/Photos/IMG_2.jpg"), nas.paths())
+            assertEquals("two!", nas.text("/Photos/IMG_2.jpg"))
+            assertFalse(phone.exists("/DCIM/Camera/IMG_2.jpg"))
+        }
+
+    @Test
+    fun `a move within a drawer that checks names first still ends well after a lost answer`() =
+        runTest {
+            nas.file("/Library/film.mkv", "film").folderAt("/Photos")
+            nas.lostAnswers += "/Photos/film.mkv"
+            // As SFTP does: a taken name is refused before the server looks for the file.
+            val sftp =
+                object : FileSystem by nas {
+                    override suspend fun rename(from: String, to: String, replace: Boolean) {
+                        if (!replace && nas.stat(to) != null) throw FileSystemException.Exists(to)
+                        nas.rename(from, to, replace)
+                    }
+                }
+            drawers.value += Drawer("sftp", "SFTP", Drawer.Kind.Sftp, "/", sftp)
+            val jobs = jobs()
+            val library = Where("sftp", "/Library", "SFTP", "SFTP › Library")
+            val inPhotos = Where("sftp", "/Photos", "SFTP", "SFTP › Photos")
+
+            val id =
+                jobs.move(listOf(entry(nas, "/Library/film.mkv")), library, inPhotos, emptyMap())
+            advanceUntilIdle()
+
+            assertTrue(jobs.job(id).failures.isEmpty())
+            assertEquals("film", nas.text("/Photos/film.mkv"))
+        }
+
+    @Test
+    fun `a shared file that arrives short fails as not matching`() = runTest {
+        val lent = MemoryFileSystem().file("/IMG_9.jpg", "nine")
+        val saysMore =
+            object : FileSystem by lent {
+                override suspend fun stat(path: String) = lent.stat(path)?.copy(size = 9)
+            }
+        val jobs = jobs()
+        val from = Where("shared-1", "", "Gallery", "Gallery")
+        val pick = Entry("IMG_9.jpg", "/IMG_9.jpg", isFolder = false, size = 9, modified = 0)
+
+        val id = jobs.copyIn(saysMore, listOf(pick), from, photos)
+        advanceUntilIdle()
+
+        assertEquals(Failure.Reason.Mismatch, jobs.job(id).failures.single().reason)
+        assertEquals(setOf("/Photos"), nas.paths())
+    }
+
+    @Test
+    fun `a moved file that changed since it was copied stays, and so does its copy`() = runTest {
+        // Each look finds it changed, as a file someone's editing would be.
+        var looks = 0L
+        val busy =
+            object : FileSystem by phone {
+                override suspend fun stat(path: String) = phone.stat(path)?.copy(modified = ++looks)
+            }
+        drawers.value += Drawer("busy", "Busy", Drawer.Kind.Phone, "/", busy)
+        val jobs = jobs()
+        val busyCamera = Where("busy", "/DCIM/Camera", "Busy", "Busy › DCIM › Camera")
+
+        val id =
+            jobs.move(
+                listOf(entry(phone, "/DCIM/Camera/IMG_1.jpg")),
+                busyCamera,
+                photos,
+                emptyMap(),
+            )
+        advanceUntilIdle()
+
+        assertEquals(Failure.Reason.Mismatch, jobs.job(id).failures.single().reason)
+        assertEquals("one", phone.text("/DCIM/Camera/IMG_1.jpg"))
+        assertEquals("one", nas.text("/Photos/IMG_1.jpg"))
+    }
+
+    @Test
+    fun `a moved folder that can't be removed isn't done, so a resumed job tries again`() =
+        runTest {
+            phone.deleteFailures["/DCIM/Camera/Trip"] = FileSystemException.AccessDenied("Trip")
+            val jobs = jobs()
+
+            val id =
+                jobs.move(listOf(entry(phone, "/DCIM/Camera/Trip")), camera, photos, emptyMap())
+            advanceUntilIdle()
+
+            assertEquals("three", nas.text("/Photos/Trip/IMG_3.jpg"))
+            assertTrue(phone.exists("/DCIM/Camera/Trip"))
+            assertFalse("/DCIM/Camera/Trip" in jobs.job(id).done)
+        }
+
+    @Test
+    fun `a moved folder whose last delete went through as the job paused ends well`() = runTest {
+        phone.lostAnswers += "/DCIM/Camera/Trip"
+        val jobs = jobs()
+
+        val id = jobs.move(listOf(entry(phone, "/DCIM/Camera/Trip")), camera, photos, emptyMap())
+        runCurrent()
+        jobs.pause(id)
+        runCurrent()
+        jobs.resume(id)
+        advanceUntilIdle()
+
+        assertTrue(jobs.job(id).failures.isEmpty())
+        assertEquals("three", nas.text("/Photos/Trip/IMG_3.jpg"))
+        assertFalse(phone.exists("/DCIM/Camera/Trip"))
     }
 }

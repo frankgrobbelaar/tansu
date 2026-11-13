@@ -6,16 +6,21 @@ What changed in each version of tansu, newest first, in plain words. A release m
 ## Unreleased
 
 - Moving with Replace replaces a different file the same size, as asked; only the very file
-  being moved, reached another way such as through a second drawer on the same disk, is kept.
-- A server's lost answer as a file is renamed or kept beside another no longer leaves a second
-  copy, even when the job stops right then; a dropped connection never makes a rename twice.
-- Files shared from apps that don't say how big they are save rather than fail.
+  being moved, reached another way such as through a second drawer on the same disk, is kept. A
+  move leaves the original where it is if it changed after it was copied.
+- A server's lost answer as a file is named no longer leaves a second copy, even when the job
+  stops right then and another file goes first when it resumes. A dropped connection never makes
+  a rename twice, and a move within an SFTP drawer whose answer was lost no longer says the file
+  is already there.
+- Files shared from apps that don't say how big they are save rather than fail; one that does
+  and arrives short still fails.
 - A job's detail marks a folder done as soon as everything in it is, and a cancelled job's
-  picks that never went as stopped. Two folders whose names differ only in case keep their
-  places when a job is resumed.
-- A cancelled job's notification opens tansu rather than a folder, and tansu's notifications are
-  the only way to open a folder from outside. Choosing where to save a share no longer hides how
-  other jobs ended.
+  picks that never went as stopped. A moved folder that couldn't be removed is tried again when
+  the job resumes, and two folders whose names differ only in case keep their places.
+- Renaming on a server whose connection had quietly dropped works the first time.
+- Only tansu's own notifications can open a folder in it, and a finished job's notification
+  still does after Android has closed tansu; a cancelled job's opens tansu. Choosing where to
+  save a share no longer hides how other jobs ended.
 - A version on offer stays on offer when GitHub doesn't answer as tansu starts.
 - Videos keep the screen on only while they play. A PDF closed as it opens is let go of.
 

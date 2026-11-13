@@ -419,7 +419,25 @@ class BrowseViewModel(
     /** Renames [entry] to [name] in its folder. The extension is the caller's to keep. */
     fun rename(entry: Entry, name: String) {
         clearSelection()
-        change { files -> files.rename(entry.path, join(here.value.path, name)) }
+        change { files -> renameOnce(files, entry.path, join(here.value.path, name)) }
+    }
+
+    /**
+     * Renames [from] to [to]. When the connection drops, whether it went through is looked up: it's
+     * done if it did, and tried once more if it plainly didn't, as on a connection that had died.
+     */
+    private suspend fun renameOnce(files: FileSystem, from: String, to: String) {
+        try {
+            files.rename(from, to)
+        } catch (e: FileSystemException.Unreachable) {
+            val left = files.stat(from) != null
+            val there = files.stat(to) != null
+            when {
+                there && !left -> Unit
+                left && !there -> files.rename(from, to)
+                else -> throw e
+            }
+        }
     }
 
     fun createFolder(name: String) {
