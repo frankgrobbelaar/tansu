@@ -5,6 +5,10 @@ What changed in each version of tansu, newest first, in plain words. A release m
 
 ## Unreleased
 
+## 0.4.3 - 2026-11-13
+
+One more fix for moving folders.
+
 - An empty folder moved as the job was paused no longer fails as missing when it resumes.
 
 ## 0.4.2 - 2026-11-13
